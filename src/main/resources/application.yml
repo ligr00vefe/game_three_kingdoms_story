@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: threeKingdoms
+
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/three_kingdoms_db?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${GAME_DB_USER:threeKingdoms}
+    password: ${GAME_DB_PASSWORD:1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # 스키마 변경은 오직 Flyway 마이그레이션으로 (DEVELOPMENT_PLAN 2장)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migrationcd 
+    baseline-on-migrate: false
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+
+logging:
+  level:
+    org.hibernate.SQL: debug

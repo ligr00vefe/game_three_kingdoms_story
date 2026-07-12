@@ -1,0 +1,39 @@
+{
+  "zombie_yellow": {
+    "name": "황건당 좀비",
+    "textureKey": "zombie_yellow_idle",
+    "maxHp": 30,
+    "attack": 5,
+    "defense": 1,
+    "exp": 15,
+    "moveSpeed": 55,
+    "detectRange": 220,
+    "attackRange": 42,
+    "attackCooldownMs": 1200,
+    "attackWindupMs": 350,
+    "drops": [
+      {
+        "code": "coin",
+        "chance": 1.0,
+        "min": 1,
+        "max": 4
+      },
+      {
+        "code": "consume_hp_potion_s",
+        "chance": 0.3
+      },
+      {
+        "code": "etc_yellow_turban_scrap",
+        "chance": 0.1
+      },
+      {
+        "code": "artifact_red_hare_shoe",
+        "chance": 0.02
+      },
+      {
+        "code": "equip_yellow_turban_cap",
+        "chance": 0.08
+      }
+    ]
+  }
+}

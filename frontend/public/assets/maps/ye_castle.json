@@ -1,0 +1,79 @@
+{
+  "name": "ye_castle",
+  "displayName": "업성",
+  "theme": "castle_interior",
+  "underFloorStyle": "stone",
+  "worldWidth": 2400,
+  "worldHeight": 664,
+  "groundY": 536,
+  "playerSpawn": {
+    "x": 360,
+    "y": 440
+  },
+  "platforms": [
+    {
+      "x": 560,
+      "y": 430,
+      "width": 192,
+      "kind": "stone"
+    },
+    {
+      "x": 1380,
+      "y": 430,
+      "width": 224,
+      "kind": "wood"
+    }
+  ],
+  "obstacles": [],
+  "ladders": [],
+  "stairs": [],
+  "npcSpawns": [
+    {
+      "code": "npc_castle_lord",
+      "x": 810,
+      "y": 500
+    },
+    {
+      "code": "npc_gatekeeper",
+      "x": 2070,
+      "y": 500
+    }
+  ],
+  "monsterSpawns": [],
+  "underFloorHeight": 96,
+  "decor": [
+    {
+      "kind": "buildings",
+      "x": 380,
+      "width": 998,
+      "height": 220
+    },
+    {
+      "kind": "gwan",
+      "x": 1010,
+      "width": 380,
+      "height": 270
+    },
+    {
+      "kind": "buildings",
+      "x": 1700,
+      "width": 998,
+      "height": 220
+    },
+    {
+      "kind": "gate",
+      "x": 2310,
+      "width": 260,
+      "height": 340
+    }
+  ],
+  "portals": [
+    {
+      "x": 2210,
+      "name": "성 밖",
+      "targetMap": "map_stage1",
+      "targetX": 170,
+      "targetY": 440
+    }
+  ]
+}
