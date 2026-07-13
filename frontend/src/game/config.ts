@@ -47,7 +47,7 @@ export const PLAYER = {
    * 발끝을 잔디 경계(충돌면)보다 안쪽으로 내리는 양(px, 월드). 0이면 잔디 맨 윗선에 발이 닿아
    * 공중에 뜬 것처럼 보인다 — 잔디 중앙에 발이 오도록 양수로. 높이면 더 깊이 내려간다.
    */
-  FOOT_SINK: 4,
+  FOOT_SINK: 6,
 } as const
 
 export const COMBAT = {

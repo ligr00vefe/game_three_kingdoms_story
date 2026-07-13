@@ -53,8 +53,8 @@ interface MapData {
   underFloorHeight?: number
   npcSpawns: { code: string; x: number; y: number }[]
   monsterSpawns: { code: string; xMin: number; xMax: number; max: number }[]
-  /** 장식 건물 (충돌 없음): 관청/성문/거리 상가 등 — groundY에 바닥을 맞춰 배치 */
-  decor?: { kind: 'gwan' | 'gate' | 'buildings'; x: number; width: number; height: number }[]
+  /** 장식 건물 (충돌 없음): 관청/거리 상가/우측 성벽 마감 등 — groundY에 바닥을 맞춰 배치 */
+  decor?: { kind: 'gwan' | 'buildings' | 'rightWall'; x: number; width: number; height: number }[]
   /** 포탈: 근처에서 ↑키로 targetMap으로 이동 (GAME_DESIGN 맵 이동) */
   portals?: PortalDef[]
 }
@@ -62,8 +62,8 @@ interface MapData {
 /** decor kind → 아트 키 매핑. 실제 아트가 없으면 도형 placeholder 대신 생략한다. */
 const DECOR_TEXTURES: Record<string, { art: string }> = {
   gwan: { art: 'img_gwan' },
-  gate: { art: 'img_gate' },
   buildings: { art: 'img_buildings' },
+  rightWall: { art: 'img_right_wall' },
 }
 
 /** 포탈 상호작용 반경 (px) */
@@ -97,7 +97,7 @@ const DEPTH = {
   BG_FAR: -100,   // 먼 배경(하늘/원경)
   BG_MID: -80,    // 중경(성벽/산/건물 실루엣)
   BG_NEAR: -60,   // 근경(반복 성벽/나무)
-  DECOR: -52,     // 관청/성문 등 건물 (액터 뒤)
+  DECOR: -52,     // 관청 등 건물 (액터 뒤)
   GROUND: -50,    // 보행로/발판/장애물/사다리
   FOREGROUND: -40, // 바닥 아래 장식(연못) — 돌바닥 위, 액터 아래
 } as const
@@ -137,6 +137,13 @@ export class GameScene extends Phaser.Scene {
   private tileScaleFor(key: string, targetH: number) {
     const img = this.textures.get(key).getSourceImage() as HTMLImageElement
     return targetH / img.height
+  }
+
+  /** tileScaleFor와 달리 스프라이트시트의 개별 프레임 높이 기준으로 스케일을 계산한다
+   * (스프라이트시트는 getSourceImage()가 시트 전체 크기를 반환해 tileScaleFor를 못 쓴다). */
+  private tileScaleForFrame(key: string, frame: number, targetH: number) {
+    const f = this.textures.get(key).get(frame)
+    return targetH / f.height
   }
 
   constructor() {
@@ -190,6 +197,38 @@ export class GameScene extends Phaser.Scene {
       return layer
     }
 
+    /**
+     * addLayer와 달리 tileSprite(GPU REPEAT) 대신 타일 폭만큼 개별 Image를 나란히 배치한다.
+     * tileSprite는 반복 단위를 통째로 같은 텍스처로만 채우기 때문에 "특정 칸만 다른 그림"이
+     * 불가능해서, 성벽 중간 칸에 성문(gate) 변형을 끼워 넣으려면 이 방식이 필요하다.
+     * count/gateIndex는 호출부에서 직접 지정한다 — cover(scroll) 기준으로 자동 계산하면
+     * parallax(스크롤계수 0.6) 여유분 때문에 카메라를 끝까지 밀어도 화면에 거의/전혀 안 잡히는
+     * 칸까지 만들어져(마지막 칸은 화면에 아예 안 잡히고, 그 앞 칸도 가장자리 일부만 잠깐 보임)
+     * 값을 눈으로 확인하며 맞추는 게 낫다.
+     * 타일 폭을 정수로 반올림해 배치해야 setRoundPixels(true)에서 칸마다 독립적으로 반올림되며
+     * 생기는 1px 이음새를 막을 수 있다.
+     */
+    const addTiledWall = (
+      key: string, gateKey: string, scroll: number, depth: number, heightPx: number, topY: number,
+      count: number, gateIndex: number,
+    ) => {
+      if (!this.art(key)) return
+      const yScroll = scroll < 0.2 ? scroll : 1
+      const sc = this.tileScaleFor(key, heightPx)
+      const tileW = Math.round((this.textures.get(key).getSourceImage() as HTMLImageElement).width * sc)
+      const hasGate = this.art(gateKey)
+      for (let i = 0; i < count; i++) {
+        const texKey = hasGate && i === gateIndex ? gateKey : key
+        this.add
+          .image(i * tileW, topY, texKey)
+          .setOrigin(0, 0)
+          .setScrollFactor(scroll, yScroll)
+          .setDepth(depth)
+          .setDisplaySize(tileW, heightPx)
+        this.textures.get(texKey).setFilter(Phaser.Textures.FilterMode.NEAREST)
+      }
+    }
+
     if (map.theme === 'castle_interior') {
       this.cameras.main.setBackgroundColor(0xa8dde0)
       // far: 하늘 + 먼 원경 (아주 느림)
@@ -204,10 +243,14 @@ export class GameScene extends Phaser.Scene {
       if (this.art('img_castle_mid')) {
         addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 300, map.groundY - 280)
       }
-      // near: 안뜰을 두른 성벽 — bg_inside_wall(가로 반복). CASTLE_WALL_H를 건물보다 크게 잡아
-      // 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
+      // near: 안뜰을 두른 성벽 — bg_inside_wall 5칸 반복, 4번째 칸만 bg_inside_wall_gate.
+      // CASTLE_WALL_H를 건물보다 크게 잡아 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
       const wallH = CASTLE_WALL_H
-      addLayer(this.art('img_castle_wall') ? 'img_castle_wall' : 'ph_wall', 0.6, DEPTH.BG_NEAR, wallH, map.groundY - wallH - 40)
+      if (this.art('img_castle_wall')) {
+        addTiledWall('img_castle_wall', 'img_castle_wall_gate', 0.7, DEPTH.BG_NEAR, wallH + 25, map.groundY - wallH - 33, 5, 3)
+      } else {
+        addLayer('ph_wall', 0.7, DEPTH.BG_NEAR, wallH + 25, map.groundY - wallH - 33)
+      }
     } else {
       // 야외(성 밖): 하늘 → 먼 산 → 언덕/성곽
       addLayer(this.art('bg_sky') ? 'bg_sky' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
@@ -242,9 +285,28 @@ export class GameScene extends Phaser.Scene {
     // 바닥 아래 장식(연못/안뜰)은 돌바닥보다 위 depth — 돌바닥 하단 가림 없이 앞에 보인다 (⑦)
     if (this.art(underArtKey)) {
       const wh = underH + 40
-      const band = this.add.tileSprite(0, map.worldHeight - wh, map.worldWidth, wh, underArtKey).setOrigin(0, 0)
-      band.setTileScale(this.tileScaleFor(underArtKey, wh))
-      band.setDepth(DEPTH.FOREGROUND)
+      const bandY = map.worldHeight - wh
+      this.add.tileSprite(0, bandY, map.worldWidth, wh, underArtKey).setOrigin(0, 0)
+        .setTileScale(this.tileScaleFor(underArtKey, wh))
+        .setDepth(DEPTH.FOREGROUND)
+      // 물결 애니메이션 오버레이 — 정지 이미지(bg_river) 위에 같은 자리·크기로 겹친다.
+      // bg_river_anim은 물 부분만 담고 위아래가 알파 그라데이션으로 빠져 있어서, 덮어놔도
+      // 정지 이미지의 둑/연등/수초와 자연스럽게 섞인다. 프레임만 순환시켜 잔물결을 표현한다.
+//       if (map.underFloorStyle !== 'stone' && this.art('bg_river_anim')) {
+//         const overlay = this.add.tileSprite(0, bandY + 40, map.worldWidth, wh, 'bg_river_anim', 0).setOrigin(0, 0)
+//         overlay.setTileScale(this.tileScaleForFrame('bg_river_anim', 0, wh))
+//         overlay.setDepth(DEPTH.FOREGROUND + 1)
+//         const frameCount = this.textures.get('bg_river_anim').frameTotal - 1 // frameTotal은 __BASE 포함
+//         let frame = 0
+//         this.time.addEvent({
+//           delay: 220,
+//           loop: true,
+//           callback: () => {
+//             frame = (frame + 1) % frameCount
+//             overlay.setTexture('bg_river_anim', frame)
+//           },
+//         })
+//       }
     } else {
       this.add.tileSprite(0, map.groundY + 32, map.worldWidth, underH, underFallback)
         .setOrigin(0, 0).setDepth(DEPTH.FOREGROUND)
@@ -297,16 +359,13 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ---- 장식 건물 (관청/성문 — 충돌 없음, 지면에 바닥 정렬) ----
+    // ---- 장식 건물 (관청 — 충돌 없음, 지면에 바닥 정렬) ----
     // 실제 아트가 없으면 도형 placeholder로 대체하지 않고 아예 생략한다 (건물이 안 보이는 편이
     // 삼각형 지붕 도형이 보이는 것보다 낫다 — img_castle_mid와 동일한 정책).
     for (const d of map.decor ?? []) {
       const tex = DECOR_TEXTURES[d.kind]
       if (!tex || !this.art(tex.art)) continue
-      // 성문(gate)은 독립된 앞건물이 아니라 성벽의 연장선 — 성벽(BG_NEAR)과 같은 평면에 둬야
-      // 근경 건물처럼 따로 튀어나와 보이지 않고 성벽에서 이어지는 것처럼 보인다.
-      const depth = d.kind === 'gate' ? DEPTH.BG_NEAR : DEPTH.DECOR
-      this.add.image(d.x, map.groundY, tex.art).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(depth)
+      this.add.image(d.x, map.groundY, tex.art).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(DEPTH.DECOR)
     }
 
     const ladders = map.ladders.map((l) => {

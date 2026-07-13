@@ -15,6 +15,15 @@ const INTERACT_RANGE = 60
 const NPC_DEPTH = -10
 
 /**
+ * 말풍선 Y오프셋 미세조정(px, 기본 계산값에 더함). 원본 이미지의 여백/비율 차이로 특정
+ * NPC만 말풍선이 머리와 어긋나 보일 때 여기서 그 NPC(textureKey)만 보정한다.
+ * 양수 = 더 위로, 음수 = 더 아래로.
+ */
+const BUBBLE_OFFSET_ADJUST: Record<string, number> = {
+  npc_castle_lord: 0, // 동탁 — 위치를 옮기려면 이 값을 조정
+}
+
+/**
  * 비전투 NPC (GAME_DESIGN 9장): 이름표 + 주기적 말풍선(월드 좌표 부착 = Phaser 담당).
  * 대화창 UI는 React가 담당 — 여기서는 상호작용 이벤트만 발행한다.
  */
@@ -57,7 +66,7 @@ export class Npc extends Phaser.GameObjects.Sprite {
 
     // 말풍선: NPC 실제 크기(발밑 이름표와 같은 기준)에 맞춰 머리 위 여백을 계산 —
     // 동탁(136px)은 자연히 더 높게, 작은 NPC(82px)는 더 낮게 위치한다.
-    const bubbleOffsetY = this.displayHeight / 2 + 14
+    const bubbleOffsetY = this.displayHeight / 2 + 14 + (BUBBLE_OFFSET_ADJUST[def.textureKey] ?? 0)
     this.bubbleText = scene.add
       .text(0, 0, '', { fontSize: '12px', color: '#333333', wordWrap: { width: 150 } })
       .setOrigin(0.5)

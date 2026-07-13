@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
-import { EventBus, GameEvents } from '../game/EventBus'
 
 /**
  * 하단 중앙 상태바 (메이플 스타일): Lv 배지 + 이름 + HP/MP 바(수치 표기) + 메뉴 버튼.
@@ -50,8 +49,6 @@ export function StatusBar() {
       <div className="statusbar-menu">
         <button className="menu-btn" title="스탯 (S)" onClick={() => useUiStore.getState().toggleStats()}>👤</button>
         <button className="menu-btn" title="스킬 (K)" onClick={() => useUiStore.getState().toggleSkillbook()}>📖</button>
-        <button className="menu-btn" title="아이템 (I)" onClick={() => EventBus.emit(GameEvents.TOGGLE_INVENTORY)}>🎒</button>
-        <button className="menu-btn" title="장비창 (E)" onClick={() => useUiStore.getState().toggleEquip()}>🛡</button>
         <button className="menu-btn" title="퀘스트 (Q)" onClick={() => useUiStore.getState().toggleQuest()}>📜</button>
         <button className="menu-btn" title="미니맵 (M)" onClick={() => useUiStore.getState().toggleMinimap()}>🗺</button>
         <button className="menu-btn" title="설정 (ESC)" onClick={() => useUiStore.getState().setSettingsOpen(true)}>⚙</button>
