@@ -27,6 +27,18 @@ html, body, #root { height: 100%; }
 #game-container { width: 100%; height: 100%; }
 #game-container canvas { display: block; }
 
+/* 인터페이스 전체 축소 — 작은 창에서도 HUD가 다 들어오도록. 좌표는 그대로 두고
+   transform으로만 줄이는 방식이라 내부 패널들의 절대 px 값을 개별로 안 고쳐도 된다.
+   원본 100% 영역을 다시 채우도록 1/scale 만큼 키운 뒤 scale로 되돌린다. */
+.ui-overlay {
+  position: absolute;
+  inset: 0;
+  transform: scale(0.85);
+  transform-origin: top left;
+  width: calc(100% / 0.85);
+  height: calc(100% / 0.85);
+}
+
 .server-status {
   position: absolute;
   top: 104px; /* 미니맵 아래 */
@@ -402,11 +414,19 @@ html, body, #root { height: 100%; }
 }
 .chat-send:hover { background: #3c4049; }
 
-/* ---- 우하단 단축키 안내바 (키바인딩 미러 + 실기능 버튼) ---- */
-.quickslots {
+/* ---- 우하단: 퀵슬롯(1~7키) + 단축키 안내바를 세로로 쌓는 컨테이너 ---- */
+.qs-stack {
   position: absolute;
   right: 8px;
   bottom: 19px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* ---- 단축키 안내바 (키바인딩 미러 + 실기능 버튼) ---- */
+.quickslots {
   display: grid;
   grid-template-columns: repeat(6, 42px);
   gap: 3px;
@@ -1016,7 +1036,7 @@ html, body, #root { height: 100%; }
 .inv-equip-btn:hover { background: #42454f; }
 
 /* ==================================================================
-   퀵슬롯 액션바 (체력바 오른쪽, 1~7키)
+   퀵슬롯 액션바 (우하단, 단축키 안내바 위 — .qs-stack 참고, 1~7키)
    ================================================================== */
 .actionbar {
   display: flex;

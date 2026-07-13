@@ -122,13 +122,6 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0x5d4037); g.fillCircle(24, 52, 8); g.fillCircle(72, 52, 8)
     g.generateTexture('obstacle_cart', 96, 60)
 
-    // 패럴랙스 배경 레이어 (가로 타일링)
-    g.clear(); g.fillStyle(0x9e9e9e)
-    g.fillTriangle(0, 200, 120, 40, 240, 200)
-    g.fillTriangle(160, 200, 300, 70, 440, 200)
-    g.fillTriangle(360, 200, 460, 100, 512, 200)
-    g.generateTexture('bg_mountains', 512, 200)
-
     g.clear(); g.fillStyle(0x66bb6a)
     g.fillEllipse(100, 120, 320, 160)
     g.fillEllipse(360, 130, 380, 180)
@@ -146,7 +139,7 @@ export class PreloadScene extends Phaser.Scene {
     g.fillRect(26, 14, 4, 4); g.fillRect(36, 14, 4, 4)
     g.generateTexture('zombie_yellow_idle', 64, 64)
 
-    // ---- 업성(안전지대) placeholder — manifest에 실제 아트가 오면 같은 키로 대체되므로 exists 가드 ----
+    // ---- 감숙성 내부(안전지대) placeholder — manifest에 실제 아트가 오면 같은 키로 대체되므로 exists 가드 ----
     if (!this.textures.exists('npc_castle_lord')) {
       // 성주: 자주색 관복 + 관모의 문관
       g.clear()
@@ -169,40 +162,6 @@ export class PreloadScene extends Phaser.Scene {
       g.fillStyle(0xcfd8dc); g.fillTriangle(48, 4, 56, 4, 52, -6) // 창날
       g.generateTexture('npc_gatekeeper', 64, 64)
     }
-    if (!this.textures.exists('ph_gwan')) {
-      // 관청: 돌 기단 + 붉은 기둥 + 자주색 2단 기와지붕
-      g.clear()
-      g.fillStyle(0x8d8fa0); g.fillRect(10, 240, 360, 30)          // 기단
-      g.fillStyle(0xf6f1e3); g.fillRect(40, 130, 300, 110)         // 벽
-      g.fillStyle(0xc14b3a)                                          // 기둥
-      g.fillRect(52, 130, 16, 110); g.fillRect(182, 130, 16, 110); g.fillRect(312, 130, 16, 110)
-      g.fillStyle(0x5d4037); g.fillRect(150, 168, 80, 72)          // 대문
-      g.fillStyle(0xe8b64c); g.fillRect(150, 200, 80, 4)
-      g.fillStyle(0x6d5a86)                                          // 지붕 2단
-      g.fillTriangle(0, 130, 380, 130, 190, 70)
-      g.fillRect(0, 122, 380, 12)
-      g.fillTriangle(60, 70, 320, 70, 190, 20)
-      g.fillRect(60, 64, 260, 10)
-      g.fillStyle(0xe8b64c); g.fillRect(176, 96, 28, 18)           // 현판
-      g.generateTexture('ph_gwan', 380, 270)
-    }
-    if (!this.textures.exists('ph_gate')) {
-      // 성문: 성벽 아치 + 나무 문 + 총안 흉벽
-      g.clear()
-      g.fillStyle(0x8d8fa0); g.fillRect(0, 60, 260, 280)           // 성벽 몸체
-      g.fillStyle(0x7a7c8c)
-      for (let y = 70; y < 330; y += 24) {
-        for (let x = (y / 24) % 2 === 0 ? 0 : 20; x < 260; x += 40) g.fillRect(x, y, 36, 10)
-      }
-      g.fillStyle(0x37474f); g.fillRect(60, 160, 140, 180)         // 아치 그늘
-      g.fillStyle(0x5d4037); g.fillRect(70, 180, 120, 160)         // 나무 문
-      g.fillStyle(0xe8b64c); g.fillRect(70, 250, 120, 6)
-      g.fillStyle(0x6d5a86); g.fillRect(-6, 30, 272, 34)           // 문루 지붕
-      g.fillTriangle(0, 30, 260, 30, 130, 0)
-      g.fillStyle(0x8d8fa0)                                          // 흉벽(총안)
-      for (let x = 8; x < 260; x += 44) g.fillRect(x, 44, 28, 18)
-      g.generateTexture('ph_gate', 260, 340)
-    }
     if (!this.textures.exists('ph_wall')) {
       // 성벽 배경 밴드 (가로 타일링, 중경 패럴랙스)
       g.clear()
@@ -217,33 +176,12 @@ export class PreloadScene extends Phaser.Scene {
     }
     // 3단 패럴랙스 far/mid placeholder (⑤⑥) — 가로 심리스 반복
     if (!this.textures.exists('ph_bg_far')) {
-      // 먼 배경: 하늘 + 옅은 안개 + 아주 흐린 봉우리 실루엣
+      // 먼 배경: 단색 하늘만 (구름/봉우리 실루엣 placeholder는 제거 — bg_mountain.png 실제 아트가 그 역할을 대신한다.
+      // 예전엔 안개띠(fillRect)와 산 실루엣(fillTriangle)이 있었는데, 색 경계가 성벽 흉벽(총안) 틈으로 비쳐
+      // 가로 선/삼각형 도형처럼 보였다 — 카메라 배경색(0xa8dde0)과 동일한 단색으로 통일해 그 경계를 없앤다.
       g.clear()
       g.fillStyle(0xa8dde0); g.fillRect(0, 0, 512, 400)
-      g.fillStyle(0xc9e9ec); g.fillRect(0, 250, 512, 150)
-      g.fillStyle(0xf6f1e3); g.fillEllipse(90, 78, 120, 44); g.fillEllipse(300, 120, 150, 50); g.fillEllipse(452, 66, 108, 38)
-      g.fillStyle(0x9fb6c9); g.fillTriangle(30, 250, 150, 150, 260, 250); g.fillTriangle(300, 250, 410, 168, 512, 250); g.fillTriangle(-40, 250, 60, 176, 150, 250)
       g.generateTexture('ph_bg_far', 512, 400)
-    }
-    if (!this.textures.exists('ph_bg_mid')) {
-      // 중경: 멀리 작게 보이는 반복 성벽 + 망루 (좌우 패턴 동일 → 심리스)
-      g.clear()
-      g.fillStyle(0x7e93a6); g.fillRect(0, 130, 256, 170)
-      g.fillStyle(0x8b6f8f)
-      for (let x = 0; x < 256; x += 64) { g.fillRect(x + 10, 78, 44, 56); g.fillTriangle(x + 4, 78, x + 60, 78, x + 32, 54) }
-      g.fillStyle(0x6f8497)
-      for (let x = 0; x < 256; x += 32) { g.fillRect(x + 6, 118, 20, 12) }
-      g.fillStyle(0xe8b64c); for (let x = 0; x < 256; x += 64) { g.fillRect(x + 26, 96, 12, 10) }
-      g.generateTexture('ph_bg_mid', 256, 300)
-    }
-    if (!this.textures.exists('ph_portal')) {
-      // 포탈: 푸른 소용돌이 타원 (메이플 포탈 느낌)
-      g.clear()
-      g.fillStyle(0x1565c0, 0.5); g.fillEllipse(48, 60, 84, 108)
-      g.fillStyle(0x42a5f5, 0.7); g.fillEllipse(48, 60, 62, 84)
-      g.fillStyle(0xbbdefb, 0.9); g.fillEllipse(48, 60, 34, 52)
-      g.fillStyle(0xffffff, 0.95); g.fillEllipse(48, 60, 14, 26)
-      g.generateTexture('ph_portal', 96, 120)
     }
     // 성 내부 바닥 아래 장식(석재 안뜰) — 물 대신 사용
     g.clear()

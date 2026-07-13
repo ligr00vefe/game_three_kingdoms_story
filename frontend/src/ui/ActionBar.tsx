@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuickslotStore, QUICKSLOT_COUNT } from '../stores/quickslotStore'
 import type { QSEntry } from '../stores/quickslotStore'
 import { useInventoryStore } from '../stores/inventoryStore'
@@ -13,7 +14,7 @@ const SKILL_INFO: Record<string, { name: string; icon: string }> = {
 }
 
 /**
- * 퀵슬롯 액션바 (체력바 오른쪽, 1~7 숫자키).
+ * 퀵슬롯 액션바 (우하단, 단축키 안내바 위, 1~7 숫자키).
  * - 인벤토리 아이템/스킬 칩을 드래그해 등록 (④)
  * - 등록된 칸을 드래그해 바깥에 놓으면 해제 (⑤)
  * - 점유 칸에 드롭하면 기존 항목이 마우스에 붙음 → 다른 칸 클릭 배치/교체, 바깥 클릭 소멸 (⑥)
@@ -129,11 +130,13 @@ export function ActionBar() {
           )
         })}
       </div>
-      {/* 마우스에 붙은(교체로 밀려난) 항목 */}
-      {held && (
+      {/* 마우스에 붙은(교체로 밀려난) 항목 — 인터페이스 축소 래퍼(.ui-overlay)의 transform 영향을
+          받지 않도록 body에 직접 포탈링 (그 안에 있으면 fixed 좌표 기준이 뒤틀림) */}
+      {held && createPortal(
         <div ref={heldRef} className="aqs-held">
           <span className="aqs-icon" style={{ background: entryView(held).color }}>{entryView(held).icon}</span>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

@@ -1,4 +1,4 @@
-# AI 이미지 생성 프롬프트 (대기실 / 로딩 / 업성 안전지대)
+# AI 이미지 생성 프롬프트 (대기실 / 로딩 / 감숙성 내부 안전지대)
 
 작성일: 2026-07-11 | 대상: GPT(DALL-E) 등 AI 이미지 생성기
 **공통 스타일 프리픽스·팔레트·후처리 체크리스트는 `AI_IMAGE_PROMPTS.md` 2장·7장을 그대로 따른다.**
@@ -92,7 +92,7 @@ lantern lights, a flat dirt road strip across the bottom third.
 Very low contrast overall so centered white text stays readable.
 ```
 
-## 3. 업성 (안전지대) 맵
+## 3. 감숙성 내부 (안전지대) 맵
 
 ### Y1. 성 내부 배경 성벽 밴드 (중경, 스크롤 0.5배)
 - **크기**: 2048×880 → 2048×440 / **가로 tileable** / **상단 투명 PNG**
@@ -202,7 +202,7 @@ Full body, feet on the bottom frame line, side view facing left.
 멀미를 줄이기 위해 배경을 **3개 스크롤 레이어**로 분리한다. 코드는 `GameScene.addLayer(key, scroll, depth, height, topY)`로
 tileSprite를 가로 무한 반복하며, 아래 스크롤 계수를 사용한다 (실제 아트가 없으면 `ph_bg_far`/`ph_bg_mid`/`ph_wall` placeholder 폴백).
 
-| 레이어 | 스크롤 계수 | 성 밖 키 | 업성 키 | 특징 |
+| 레이어 | 스크롤 계수 | 성 밖 키 | 감숙성 내부 키 | 특징 |
 |---|---|---|---|---|
 | far (원경) | 0.1 | `bg_sky` | `bg_castle_interior` | 하늘·먼 봉우리. 거의 정지 |
 | mid (중경) | 0.3~0.35 | `bg_mountains` | `img_castle_mid` | 멀리 작게 보이는 성벽·망루, 반복 |
@@ -222,7 +222,7 @@ seamlessly so the pattern can repeat infinitely without visible seams.
 Keep lighting flat and even across the whole width (no vignette, no corner darkening),
 otherwise repeats will show banding. Middle section must be a clean repeatable pattern.
 ```
-- mid 레이어 프롬프트 예 (업성 `img_castle_mid`):
+- mid 레이어 프롬프트 예 (감숙성 내부 `img_castle_mid`):
 ```
 [STYLE PREFIX]
 Seamless horizontally tileable MIDGROUND layer of small distant fortress walls and

@@ -59,11 +59,11 @@ interface MapData {
   portals?: PortalDef[]
 }
 
-/** decor kind → 아트 키 / placeholder 키 매핑 */
-const DECOR_TEXTURES: Record<string, { art: string; fallback: string }> = {
-  gwan: { art: 'img_gwan', fallback: 'ph_gwan' },
-  gate: { art: 'img_gate', fallback: 'ph_gate' },
-  buildings: { art: 'img_buildings', fallback: 'ph_gwan' },
+/** decor kind → 아트 키 매핑. 실제 아트가 없으면 도형 placeholder 대신 생략한다. */
+const DECOR_TEXTURES: Record<string, { art: string }> = {
+  gwan: { art: 'img_gwan' },
+  gate: { art: 'img_gate' },
+  buildings: { art: 'img_buildings' },
 }
 
 /** 포탈 상호작용 반경 (px) */
@@ -82,12 +82,12 @@ const WALKWAY_SURFACE_ADJUST: Record<string, number> = {
 }
 
 /**
- * 업성(castle_interior) 근경 성벽(bg_inside_wall) 렌더 높이.
- * 성벽은 건물(decor, 화면 앞)보다 더 뒤에 있으므로 벽돌 하나의 화면상 크기가 건물의
- * 디테일보다 작아야 원근감이 유지된다 — 건물 배율(약 0.53배)보다 낮은 배율(약 0.35배)로
- * 맞춘다. 화면 상단 여백은 이 값 대신 산 능선/하늘 레이어로 채운다.
+ * 감숙성 내부(castle_interior) 근경 성벽(bg_inside_wall) 렌더 높이.
+ * 건물(decor, 화면 앞) 중 가장 높은 gwan(270px)보다 커야 지붕 위로 성벽이 보인다.
+ * addLayer(..., topY)는 map.groundY - wallH로 계산되므로 이 값을 키우면 성벽 상단이
+ * 위로 올라가면서(topY 감소) 건물 뒤에서 위쪽으로 삐져나와 보이게 된다.
  */
-const CASTLE_WALL_H = 220
+const CASTLE_WALL_H = 200
 
 /**
  * 렌더 깊이 레이어. 배경은 음수, 액터(플레이어/몬스터/NPC/드랍/이펙트)는 기본 0.
@@ -143,7 +143,7 @@ export class GameScene extends Phaser.Scene {
     super('Game')
   }
 
-  /** 게임 시작(기본: 업성 안전지대) 또는 포탈 이동(scene.restart)의 진입 데이터 */
+  /** 게임 시작(기본: 감숙성 내부 안전지대) 또는 포탈 이동(scene.restart)의 진입 데이터 */
   init(data: { mapKey?: string; spawnX?: number; spawnY?: number }) {
     this.mapKey = data.mapKey ?? 'map_ye_castle'
     this.spawnOverride =
@@ -183,6 +183,10 @@ export class GameScene extends Phaser.Scene {
         .setDepth(depth)
       const sc = this.tileScaleFor(key, heightPx)
       layer.setTileScale(sc, sc)
+      // WebGL tileSprite는 텍스처를 REPEAT로 감싸는데, LINEAR 필터가 타일 경계(위/아래 끝)에서
+      // 반대쪽 끝 픽셀과 섞어 얇은 가로 선(seam)을 만든다. NEAREST로 바꾸면 그 보간이 없어져
+      // 경계에서 엉뚱한 색이 섞이지 않는다 (성벽 위쪽에 계속 보이던 검은 줄의 원인).
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST)
       return layer
     }
 
@@ -191,23 +195,29 @@ export class GameScene extends Phaser.Scene {
       // far: 하늘 + 먼 원경 (아주 느림)
       addLayer(this.art('bg_castle_interior') ? 'bg_castle_interior' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
       // 제일 먼 배경: 성벽 위로 아스라이 보이는 산 능선 (반복, 아주 느린 시차 — 하늘보다도 느리진 않되 성벽/건물보다 훨씬 느리게)
+      // topY=0 → 화면 맨 꼭대기에 밀착 (스크롤계수가 낮아 카메라가 움직여도 거의 고정으로 보인다)
       if (this.art('bg_mountain')) {
-        addLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 300, map.groundY - 500)
+        addLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 300, 80)
       }
       // mid: 멀리 보이는 성벽/망루 (반복) — 실제 아트(img_castle_mid)가 있을 때만.
       // placeholder(ph_bg_mid)는 near 성벽과 겹쳐 "성벽이 둘"로 보여서 castle_interior에선 생략.
       if (this.art('img_castle_mid')) {
-        addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 300, map.groundY - 300 + 20)
+        addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 300, map.groundY - 280)
       }
-      // near: 안뜰을 두른 성벽 — bg_inside_wall(가로 반복). 벽돌이 개별로 도드라져 보이지 않도록
-      // 원본 해상도에 가까운(과도하게 확대하지 않는) 높이로 그린다 — 화면 상단의 빈 공간은
-      // 뒤의 산 능선 레이어가 채운다.
+      // near: 안뜰을 두른 성벽 — bg_inside_wall(가로 반복). CASTLE_WALL_H를 건물보다 크게 잡아
+      // 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
       const wallH = CASTLE_WALL_H
-      addLayer(this.art('img_castle_wall') ? 'img_castle_wall' : 'ph_wall', 0.6, DEPTH.BG_NEAR, wallH, map.groundY - wallH)
+      addLayer(this.art('img_castle_wall') ? 'img_castle_wall' : 'ph_wall', 0.6, DEPTH.BG_NEAR, wallH, map.groundY - wallH - 40)
     } else {
       // 야외(성 밖): 하늘 → 먼 산 → 언덕/성곽
       addLayer(this.art('bg_sky') ? 'bg_sky' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
-      addLayer(this.art('bg_mountains') ? 'bg_mountains' : 'ph_bg_mid', 0.3, DEPTH.BG_MID, 240, map.groundY - 330)
+      // 감숙성 내부와 동일한 원경 산 능선을 성 밖에도 적용 (⑤⑥ 톤 일관성)
+      if (this.art('bg_mountain')) {
+        addLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 300, 80)
+      }
+      // 예전엔 중경에 'bg_mountains'(도형 placeholder — PreloadScene에 삼각형 산으로 무조건 생성됨)를
+      // 폴백으로 썼는데, 그 키로 실제 아트가 로드되는 일이 없어 항상 삼각형이 보였다. 실제 아트가
+      // 생기기 전까진 이 레이어를 아예 생략 — 삼각형 placeholder보다 없는 게 낫다.
       const nearKey = this.art('bg_castle') ? 'bg_castle' : this.art('bg_hills') ? 'bg_hills' : 'ph_wall'
       addLayer(nearKey, 0.55, DEPTH.BG_NEAR, 220, map.groundY - 200)
     }
@@ -217,7 +227,7 @@ export class GameScene extends Phaser.Scene {
     const oneWays = this.physics.add.staticGroup()
 
     // 보행로(바닥): 지면선 아래 1줄만 물리 충돌. 그 아래는 장식 밴드 (GAME_DESIGN 10.1)
-    // 업성 내부는 walkway_01(석재), 성 밖은 walkway_02(흙/잔디 길)로 별도 텍스처를 쓴다.
+    // 감숙성 내부 내부는 walkway_01(석재), 성 밖은 walkway_02(흙/잔디 길)로 별도 텍스처를 쓴다.
     const walkwayKey = map.theme === 'castle_interior' ? 'img_walkway_inside' : 'img_walkway_outside'
     const walkwayArt = this.art(walkwayKey)
     for (let x = 0; x < map.worldWidth; x += 32) {
@@ -227,7 +237,7 @@ export class GameScene extends Phaser.Scene {
     }
     // 바닥 아래 장식 밴드 — 캐릭터가 화면 bottom에 직접 닿지 않는다 (성 내부는 석재 안뜰)
     const underH = map.underFloorHeight ?? 96
-    const underArtKey = map.underFloorStyle === 'stone' ? 'img_courtyard' : 'img_water'
+    const underArtKey = map.underFloorStyle === 'stone' ? 'img_courtyard' : 'bg_river'
     const underFallback = map.underFloorStyle === 'stone' ? 'tile_underfloor_stone' : 'tile_underfloor'
     // 바닥 아래 장식(연못/안뜰)은 돌바닥보다 위 depth — 돌바닥 하단 가림 없이 앞에 보인다 (⑦)
     if (this.art(underArtKey)) {
@@ -288,11 +298,15 @@ export class GameScene extends Phaser.Scene {
     }
 
     // ---- 장식 건물 (관청/성문 — 충돌 없음, 지면에 바닥 정렬) ----
+    // 실제 아트가 없으면 도형 placeholder로 대체하지 않고 아예 생략한다 (건물이 안 보이는 편이
+    // 삼각형 지붕 도형이 보이는 것보다 낫다 — img_castle_mid와 동일한 정책).
     for (const d of map.decor ?? []) {
       const tex = DECOR_TEXTURES[d.kind]
-      if (!tex) continue
-      const key = this.art(tex.art) ? tex.art : tex.fallback
-      this.add.image(d.x, map.groundY, key).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(DEPTH.DECOR)
+      if (!tex || !this.art(tex.art)) continue
+      // 성문(gate)은 독립된 앞건물이 아니라 성벽의 연장선 — 성벽(BG_NEAR)과 같은 평면에 둬야
+      // 근경 건물처럼 따로 튀어나와 보이지 않고 성벽에서 이어지는 것처럼 보인다.
+      const depth = d.kind === 'gate' ? DEPTH.BG_NEAR : DEPTH.DECOR
+      this.add.image(d.x, map.groundY, tex.art).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(depth)
     }
 
     const ladders = map.ladders.map((l) => {
@@ -313,12 +327,15 @@ export class GameScene extends Phaser.Scene {
     // ---- 포탈 (↑키로 맵 이동) ----
     this.portals = map.portals ?? []
     for (const p of this.portals) {
-      const key = this.art('img_portal') ? 'img_portal' : 'ph_portal'
-      const portal = this.add.image(p.x, map.groundY - 4, key).setOrigin(0.5, 1)
-      this.tweens.add({
-        targets: portal, scaleX: 0.86, alpha: 0.75,
-        duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-      })
+      // 상호작용은 this.portals(좌표) 기준이라 이미지 유무와 무관 — 실제 아트 없으면
+      // 도형 소용돌이 placeholder 대신 안내 텍스트만 표시한다.
+      if (this.art('img_portal')) {
+        const portal = this.add.image(p.x, map.groundY - 4, 'img_portal').setOrigin(0.5, 1)
+        this.tweens.add({
+          targets: portal, scaleX: 0.86, alpha: 0.75,
+          duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        })
+      }
       this.add
         .text(p.x, map.groundY - 128, `${p.name} ▲`, {
           fontSize: '12px', color: '#e3f2fd', backgroundColor: '#1a237e99', padding: { x: 6, y: 2 },
@@ -391,7 +408,7 @@ export class GameScene extends Phaser.Scene {
     this.npcs = []
     for (const n of map.npcSpawns) {
       const def = npcDefs[n.code]
-      if (def) this.npcs.push(new Npc(this, n.x, map.groundY - 32, n.code, def))
+      if (def) this.npcs.push(new Npc(this, n.x, n.y, n.code, def))
     }
 
     // ---- 성장/사망 이벤트 ----
@@ -585,6 +602,11 @@ export class GameScene extends Phaser.Scene {
     if (this.input_.questJustDown) EventBus.emit(GameEvents.TOGGLE_QUEST)
     if (this.input_.minimapJustDown) EventBus.emit(GameEvents.TOGGLE_MINIMAP)
     if (this.input_.screenshotJustDown) this.takeScreenshot()
+
+    // 캐릭터가 NPC와 겹쳐 있는 동안 테두리(글로우) 표시
+    for (let i = 0; i < this.npcs.length; i++) {
+      this.npcs[i].setPlayerOverlap(this.npcs[i].isPlayerNear(this.player.x, this.player.y))
+    }
 
     // ↑ 상호작용: 포탈 우선, 그다음 NPC 대화 (포탈/NPC는 맵에서 겹치지 않게 배치)
     if (this.input_.upJustDown && !this.player.climbing && !this.transitioning) {

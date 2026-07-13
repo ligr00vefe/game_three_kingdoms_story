@@ -2,28 +2,24 @@ import { useEffect, useState } from 'react'
 
 export const GAME_WINDOW_NAME = 'threeKingdomsStory'
 
+// 기본 시작 창 크기 — 전체화면이 아닌 적당한 사이즈로 시작 (전체화면은 ESC 설정에서 수동 전환)
+const DEFAULT_WINDOW_WIDTH = 1280
+const DEFAULT_WINDOW_HEIGHT = 800
+
 function openGameWindow(): boolean {
   const url = `${location.pathname}?mode=game`
-  // popup 지정 → 탭이 아닌 독립 새 창(화면 크기로 최대화). 같은 이름으로 다시 열면 기존 창 재사용
+  const width = Math.min(DEFAULT_WINDOW_WIDTH, screen.availWidth)
+  const height = Math.min(DEFAULT_WINDOW_HEIGHT, screen.availHeight)
+  const left = Math.max(0, Math.round((screen.availWidth - width) / 2))
+  const top = Math.max(0, Math.round((screen.availHeight - height) / 2))
+  // popup 지정 → 탭이 아닌 독립 새 창(적당한 사이즈, 화면 중앙). 같은 이름으로 다시 열면 기존 창 재사용
   const win = window.open(
     url,
     GAME_WINDOW_NAME,
-    `popup=yes,left=0,top=0,width=${screen.availWidth},height=${screen.availHeight},resizable=yes`,
+    `popup=yes,left=${left},top=${top},width=${width},height=${height},resizable=yes`,
   )
   if (!win) return false
   win.focus()
-  // 새 창은 스스로 전체화면이 될 수 없어(브라우저 보안) 열어준 쪽에서 전체화면 권한을 위임한다
-  // (Chromium Capability Delegation — 클릭의 user activation이 유효한 ~5초 안에 전달).
-  // 미지원 브라우저는 무시되고, 게임 창의 "첫 입력 시 전체화면" 폴백이 동작한다.
-  for (const ms of [700, 1800, 3500]) {
-    setTimeout(() => {
-      try {
-        win.postMessage('tk-fullscreen', { targetOrigin: location.origin, delegate: 'fullscreen' } as WindowPostMessageOptions)
-      } catch {
-        win.postMessage('tk-fullscreen', location.origin)
-      }
-    }, ms)
-  }
   return true
 }
 

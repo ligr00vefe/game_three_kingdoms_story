@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
 import { useScreenStore } from '../stores/screenStore'
 
@@ -7,11 +8,21 @@ import { useScreenStore } from '../stores/screenStore'
  */
 export function SettingsMenu() {
   const open = useUiStore((s) => s.settingsOpen)
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement)
+
+  // 버튼 라벨이 실제 전체화면 상태를 반영하도록 — F11 등 다른 경로로 바뀌어도 동기화
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
   if (!open) return null
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen().catch(() => {})
+    useUiStore.getState().setSettingsOpen(false)
   }
 
   // 대기실 복귀: 설정 닫고 화면을 lobby로 → PhaserGame 언마운트되며 게임 인스턴스 정리
@@ -46,7 +57,9 @@ export function SettingsMenu() {
         >
           ⌨ 단축키 세팅
         </button>
-        <button className="settings-item" onClick={toggleFullscreen}>⛶ 전체화면 전환</button>
+        <button className="settings-item" onClick={toggleFullscreen}>
+          {isFullscreen ? '⛶ 일반화면 전환' : '⛶ 전체화면 전환'}
+        </button>
         <div className="settings-sep" />
         <button className="settings-item" onClick={returnToLobby}>🏠 대기실로 돌아가기</button>
         <button className="settings-item settings-item--danger" onClick={exitGame}>✖ 게임 종료</button>

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
 import { EventBus, GameEvents } from '../game/EventBus'
-import { ActionBar } from './ActionBar'
 
 /**
  * 하단 중앙 상태바 (메이플 스타일): Lv 배지 + 이름 + HP/MP 바(수치 표기) + 메뉴 버튼.
@@ -48,8 +47,6 @@ export function StatusBar() {
           <span ref={mpTextRef} className="sbar-text" />
         </div>
       </div>
-      {/* 퀵슬롯 (체력바 오른쪽, 1~7키) */}
-      <ActionBar />
       <div className="statusbar-menu">
         <button className="menu-btn" title="스탯 (S)" onClick={() => useUiStore.getState().toggleStats()}>👤</button>
         <button className="menu-btn" title="스킬 (K)" onClick={() => useUiStore.getState().toggleSkillbook()}>📖</button>

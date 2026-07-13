@@ -1,9 +1,9 @@
 {
   "name": "ye_castle",
-  "displayName": "업성",
+  "displayName": "감숙성 내부",
   "theme": "castle_interior",
-  "underFloorStyle": "stone",
-  "worldWidth": 2400,
+  "underFloorStyle": "water",
+  "worldWidth": 2850,
   "worldHeight": 664,
   "groundY": 536,
   "playerSpawn": {
@@ -30,13 +30,13 @@
   "npcSpawns": [
     {
       "code": "npc_castle_lord",
-      "x": 810,
-      "y": 500
+      "x": 1150,
+      "y": 480
     },
     {
       "code": "npc_gatekeeper",
-      "x": 2070,
-      "y": 500
+      "x": 2351,
+      "y": 495
     }
   ],
   "monsterSpawns": [],
@@ -62,14 +62,14 @@
     },
     {
       "kind": "gate",
-      "x": 2310,
-      "width": 260,
+      "x": 2561,
+      "width": 424,
       "height": 340
     }
   ],
   "portals": [
     {
-      "x": 2210,
+      "x": 2461,
       "name": "성 밖",
       "targetMap": "map_stage1",
       "targetX": 170,

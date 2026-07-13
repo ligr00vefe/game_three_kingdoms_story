@@ -55,7 +55,7 @@ export function LoadingScreen() {
           <span className="load-char-leg load-char-leg--r" />
         </div>
         <div className="loading-ground" />
-        <p className="loading-tip">{charName} 장군이 업성으로 향하는 중…</p>
+        <p className="loading-tip">{charName} 장군이 감숙성 내부으로 향하는 중…</p>
       </div>
     </div>
   )

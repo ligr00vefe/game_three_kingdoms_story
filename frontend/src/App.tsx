@@ -5,6 +5,7 @@ import { StatusBar } from './ui/StatusBar'
 import { ExpBar } from './ui/ExpBar'
 import { ChatBox } from './ui/ChatBox'
 import { QuickSlots } from './ui/QuickSlots'
+import { ActionBar } from './ui/ActionBar'
 import { Minimap } from './ui/Minimap'
 import { DeathOverlay } from './ui/DeathOverlay'
 import { fetchHealth } from './api/health'
@@ -51,18 +52,6 @@ function GameApp() {
       .catch(() => useGameStore.getState().setServerStatus('down'))
     const stopAutosave = startAutosave()
     return stopAutosave
-  }, [])
-
-  // 런처가 위임한 전체화면 권한 수신 (Capability Delegation) → 새 창이 뜨자마자 전체화면
-  useEffect(() => {
-    const onMsg = (e: MessageEvent) => {
-      if (e.origin !== location.origin || e.data !== 'tk-fullscreen') return
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {}) // 미지원/거부 시 첫 입력 폴백
-      }
-    }
-    window.addEventListener('message', onMsg)
-    return () => window.removeEventListener('message', onMsg)
   }, [])
 
   // 전체화면 중 ESC가 전체화면을 끄지 않고 설정 메뉴를 열도록 Keyboard Lock (Chromium 계열).
@@ -126,7 +115,9 @@ function GameApp() {
           <PhaserGame />
         </Suspense>
         {screen === 'game' && (
-          <>
+          // 작은 창에서도 전체 인터페이스가 다 보이도록 축소 — 좌표계는 그대로 두고
+          // transform으로만 줄인다 (내부 각 패널의 px 절대값을 일일이 안 고쳐도 됨)
+          <div className="ui-overlay">
             <Minimap />
             <NoticeBanner />
             {FEATURES.equipment && <InventoryPanel />}
@@ -139,7 +130,11 @@ function GameApp() {
             {/* ---- 하단 인터페이스 (메이플 스타일) ---- */}
             <ChatBox />
             <StatusBar />
-            <QuickSlots />
+            {/* 퀵슬롯(1~7키)을 단축키 안내바 바로 위에 세로로 쌓는다 */}
+            <div className="qs-stack">
+              <ActionBar />
+              <QuickSlots />
+            </div>
             <ExpBar />
             {/* ---- 모달 ---- */}
             <SettingsMenu />
@@ -147,7 +142,7 @@ function GameApp() {
             <p className={`server-status server-status--${serverStatus}`}>
               {serverStatus === 'checking' ? '서버 확인 중…' : serverStatus === 'ok' ? '' : '서버 연결 안 됨 (진행 저장 안 됨)'}
             </p>
-          </>
+          </div>
         )}
         {screen === 'loading' && <LoadingScreen />}
       </div>
