@@ -27,7 +27,7 @@
     "npc_gatekeeper": "assets/img/npc/npc_gatekeeper.png"
   },
   "spritesheets": {
-    "bg_river_anim":      { "url": "assets/img/bg/bg_river_animation.png",   "frameWidth": 1350, "frameHeight": 291 },
+    "bg_river_anim":      { "url": "assets/img/bg/bg_river_animation.png",   "frameWidth": 1350, "frameHeight": 291.25 },
     "guanwu_t1_idle_r":   { "url": "assets/img/char/guanwu_t1_idle_r.png",   "frameWidth": 128, "frameHeight": 128 },
     "guanwu_t1_idle_l":   { "url": "assets/img/char/guanwu_t1_idle_l.png",   "frameWidth": 128, "frameHeight": 128 },
     "guanwu_t1_walk_r":   { "url": "assets/img/char/guanwu_t1_walk_r.png",   "frameWidth": 128, "frameHeight": 128 },

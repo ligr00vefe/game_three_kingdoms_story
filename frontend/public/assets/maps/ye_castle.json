@@ -22,8 +22,8 @@
     },
     {
       "code": "npc_gatekeeper",
-      "x": 2351,
-      "y": 495
+      "x": 2290,
+      "y": 497
     }
   ],
   "monsterSpawns": [],
@@ -49,14 +49,15 @@
     },
     {
       "kind": "rightWall",
-      "x": 2932,
+      "x": 2890,
       "width": 536,
-      "height": 420
+      "height": 480,
+      "yOffset": 60
     }
   ],
   "portals": [
     {
-      "x": 2461,
+      "x": 2483,
       "name": "성 밖",
       "targetMap": "map_stage1",
       "targetX": 170,

@@ -53,8 +53,9 @@ interface MapData {
   underFloorHeight?: number
   npcSpawns: { code: string; x: number; y: number }[]
   monsterSpawns: { code: string; xMin: number; xMax: number; max: number }[]
-  /** 장식 건물 (충돌 없음): 관청/거리 상가/우측 성벽 마감 등 — groundY에 바닥을 맞춰 배치 */
-  decor?: { kind: 'gwan' | 'buildings' | 'rightWall'; x: number; width: number; height: number }[]
+  /** 장식 건물 (충돌 없음): 관청/거리 상가/우측 성벽 마감 등 — groundY에 바닥을 맞춰 배치.
+   * yOffset: 밑변 기준선을 groundY에서 위/아래로 옮긴다 (양수=아래로, 음수=위로, px). */
+  decor?: { kind: 'gwan' | 'buildings' | 'rightWall'; x: number; width: number; height: number; yOffset?: number }[]
   /** 포탈: 근처에서 ↑키로 targetMap으로 이동 (GAME_DESIGN 맵 이동) */
   portals?: PortalDef[]
 }
@@ -87,7 +88,7 @@ const WALKWAY_SURFACE_ADJUST: Record<string, number> = {
  * addLayer(..., topY)는 map.groundY - wallH로 계산되므로 이 값을 키우면 성벽 상단이
  * 위로 올라가면서(topY 감소) 건물 뒤에서 위쪽으로 삐져나와 보이게 된다.
  */
-const CASTLE_WALL_H = 200
+const CASTLE_WALL_H = 201
 
 /**
  * 렌더 깊이 레이어. 배경은 음수, 액터(플레이어/몬스터/NPC/드랍/이펙트)는 기본 0.
@@ -289,24 +290,51 @@ export class GameScene extends Phaser.Scene {
       this.add.tileSprite(0, bandY, map.worldWidth, wh, underArtKey).setOrigin(0, 0)
         .setTileScale(this.tileScaleFor(underArtKey, wh))
         .setDepth(DEPTH.FOREGROUND)
-      // 물결 애니메이션 오버레이 — 정지 이미지(bg_river) 위에 같은 자리·크기로 겹친다.
-      // bg_river_anim은 물 부분만 담고 위아래가 알파 그라데이션으로 빠져 있어서, 덮어놔도
-      // 정지 이미지의 둑/연등/수초와 자연스럽게 섞인다. 프레임만 순환시켜 잔물결을 표현한다.
-//       if (map.underFloorStyle !== 'stone' && this.art('bg_river_anim')) {
-//         const overlay = this.add.tileSprite(0, bandY + 40, map.worldWidth, wh, 'bg_river_anim', 0).setOrigin(0, 0)
-//         overlay.setTileScale(this.tileScaleForFrame('bg_river_anim', 0, wh))
-//         overlay.setDepth(DEPTH.FOREGROUND + 1)
-//         const frameCount = this.textures.get('bg_river_anim').frameTotal - 1 // frameTotal은 __BASE 포함
-//         let frame = 0
-//         this.time.addEvent({
-//           delay: 220,
-//           loop: true,
-//           callback: () => {
-//             frame = (frame + 1) % frameCount
-//             overlay.setTexture('bg_river_anim', frame)
-//           },
-//         })
-//       }
+      // 물결 애니메이션 오버레이 — 연못 전체가 아니라 물이 실제로 움직이는 "일부 구간"에만 얹는다.
+      // 정지 이미지 bg_river.png(원본 926px) 안에서 움직이는 물은 위에서 RIVER_ANIM_SRC_TOP(470px)
+      // 지점부터 RIVER_ANIM_SRC_H(220px) 높이 구간이다. 연못은 화면에서 wh 높이로 축소돼 그려지므로
+      // (스케일 = wh/926), 오버레이도 같은 스케일로 그 부분 구간에만 맞춰 위치·크기를 잡는다.
+      // (예전엔 연못과 1:1 크기라 가정해 밴드 전체를 덮어 물이 지나치게 크게 나왔다.)
+      if (map.underFloorStyle !== 'stone' && this.art('bg_river_anim')) {
+        const RIVER_SRC_H = 926     // bg_river.png 원본 세로
+        const RIVER_ANIM_SRC_TOP = 265 // 연못 원본 기준 물 애니메이션 시작 y
+        const RIVER_ANIM_SRC_H = 460   // 연못 원본 기준 물 애니메이션 높이
+        const scale = wh / RIVER_SRC_H
+        const animY = bandY + RIVER_ANIM_SRC_TOP * scale
+        const animH = RIVER_ANIM_SRC_H * scale
+        const frameCount = this.textures.get('bg_river_anim').frameTotal - 1 // frameTotal은 __BASE 포함
+        // 프레임을 즉시 setTexture로 바꾸면 뚝뚝 끊긴다 → 레이어 2장을 겹쳐놓고 알파를 크로스페이드해
+        // 스르륵 녹아들 듯 교체한다. 한 장(top)이 서서히 사라지는 동안 다른 장(back)에 다음 프레임을
+        // 깔아 서서히 띄운다. 둘 다 반투명 물이라 겹치는 순간에도 자연스러운 디졸브가 된다.
+        const makeLayer = () => {
+          const o = this.add.tileSprite(0, animY, map.worldWidth, animH, 'bg_river_anim', 0).setOrigin(0, 0)
+          o.setTileScale(this.tileScaleForFrame('bg_river_anim', 0, animH))
+          o.setDepth(DEPTH.FOREGROUND + 1)
+          return o
+        }
+        const DEPTH_BASE = DEPTH.FOREGROUND + 1
+        // base: 항상 불투명하게 깔려 있는 현재 프레임. incoming: 그 위에 다음 프레임을 0→1로 페이드인.
+        // 아래를 계속 불투명하게 두므로 전환 중간에 물이 옅어지는 "꺼짐" 없이 스르륵 덮인다.
+        let base = makeLayer()
+        let incoming = makeLayer().setAlpha(0).setDepth(DEPTH_BASE + 1)
+        let frame = 0
+        const HOLD = 390 // 프레임 교체 주기 (잔잔하게)
+        const FADE = 50 // 페이드인 시간 (길수록 easing이 뚜렷하게 보인다)
+        const EASE = 'Quad.InOut' // 'Cubic.InOut', 'Quad.Out', 'Linear' 등으로 교체 가능
+        this.time.addEvent({
+          delay: HOLD,
+          loop: true,
+          callback: () => {
+            frame = (frame + 1) % frameCount
+            incoming.setTexture('bg_river_anim', frame).setAlpha(0).setDepth(DEPTH_BASE + 1)
+            base.setDepth(DEPTH_BASE)
+            this.tweens.add({
+              targets: incoming, alpha: 1, duration: FADE, ease: EASE,
+              onComplete: () => { const t = base; base = incoming; incoming = t }, // 역할 교대
+            })
+          },
+        })
+      }
     } else {
       this.add.tileSprite(0, map.groundY + 32, map.worldWidth, underH, underFallback)
         .setOrigin(0, 0).setDepth(DEPTH.FOREGROUND)
@@ -365,7 +393,8 @@ export class GameScene extends Phaser.Scene {
     for (const d of map.decor ?? []) {
       const tex = DECOR_TEXTURES[d.kind]
       if (!tex || !this.art(tex.art)) continue
-      this.add.image(d.x, map.groundY, tex.art).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(DEPTH.DECOR)
+      // 밑변 기준선: 기본 groundY, yOffset이 있으면 위/아래로 이동 (양수=아래, 음수=위)
+      this.add.image(d.x, map.groundY + (d.yOffset ?? 0), tex.art).setOrigin(0.5, 1).setDisplaySize(d.width, d.height).setDepth(DEPTH.DECOR)
     }
 
     const ladders = map.ladders.map((l) => {
