@@ -111,7 +111,7 @@
 | `guanwu_t1_jump_r.png` / `_l.png` | jump (대쉬도 공용) | 2 | 코드가 프레임 직접 선택(반복 없음) | 미제작 |
 | ~~dash~~ | dash | — | — | ❌ 불필요 (jump 재사용) |
 | `guanwu_t1_climb.png` (뒷모습, 단일) | climb | 2 | 무한loop(움직일 때만) | 미제작 |
-| `guanwu_t1_thrust_r.png` / `_l.png` | thrust | 6 | 1회 | 미제작 |
+| `guanwu_t1_thrust_r.png` / `_l.png` | thrust | 6 | 1회 | ✅ 완료 (2026-07-15 게임 적용) |
 | `guanwu_t1_swing_r.png` / `_l.png` | swing | 6 | 1회 | 미제작 |
 | `guanwu_t1_skill_r.png` / `_l.png` | skill | 8 | 1회 | 미제작 |
 | `guanwu_t1_hit_r.png` / `_l.png` | hit | 2 | 1회 | 미제작 |
@@ -121,7 +121,7 @@
 - 아트가 없는 동작은 게임이 **같은 방향의 idle로 자동 폴백**한다 (안 깨짐, placeholder 깜빡임 없음). 파일만 추가하면 코드 수정 없이 살아난다.
 - 원본 시트는 셀 격자(예: 2×2, 3×2, 6×1) 어떤 배치든 괜찮고 배경도 투명/흰색 무관 — 코드 연동 시 내가 128×128 스트립 규격으로 재가공한다. 단 **한 시트 안에서 캐릭터 비율·크기 일관성**은 지켜져야 한다.
 
-**제작 우선순위 제안**: thrust·swing(공격 2종)이 다음 순서 — idle·walk와 합치면 전투까지 완성. 그다음 jump/dash/climb/skill/hit/dead/rally.
+**제작 우선순위 제안**: swing(휘두르기)이 다음 순서 — thrust는 2026-07-15 완료되어 idle·walk·thrust로 기본 전투 골격이 섰다. 그다음 jump/dash/climb/skill/hit/dead/rally.
 
 ---
 
