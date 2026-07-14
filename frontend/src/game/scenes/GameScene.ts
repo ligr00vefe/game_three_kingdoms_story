@@ -174,7 +174,7 @@ export class GameScene extends Phaser.Scene {
 
     // 줌 적용 후 실제 보이는 월드 크기 — 배경 커버 폭 계산용
     const viewW = width / CAMERA.ZOOM
-    const cover = (factor: number) => Math.ceil(viewW + factor * map.worldWidth) + 64
+    const cover = (factor: number) => Math.ceil(viewW + factor * map.worldWidth) + 256
 
     // ---- 3단 패럴랙스 배경 (원근 완만 + 심리스 타일, ⑤⑥) ----
     // tileSprite로 가로 무한 반복 → 중앙 패턴이 이음새 없이 이어진다.

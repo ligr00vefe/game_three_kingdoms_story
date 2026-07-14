@@ -26,7 +26,7 @@ export function startGame(parent: HTMLElement): Phaser.Game {
       },
     },
     scale: {
-      mode: Phaser.Scale.FIT,
+      mode: Phaser.Scale.FILL,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [BootScene, PreloadScene, GameScene],
