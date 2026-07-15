@@ -133,10 +133,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ---------- 애니메이션 재생 ----------
+  /** 이 티어에 해당 액션의 **현재 방향** 아트가 실제로 로드돼 있는지 */
+  private hasAnim(action: AnimAction): boolean {
+    return this.availableAnims.has(`${action}_${this.facing === 1 ? 'r' : 'l'}`)
+  }
+
   /**
    * 현재 상태 머신 상태 → 스프라이트시트 액션 이름 (sit은 기능 제거 — idle 폴백).
    * 대쉬(jumpdash)는 별도 아트 없이 **점프와 같은 모션**을 쓴다 (2026-07-12 확정:
    * 대쉬는 점프 자세 + 뒤 잔상 이펙트(onAirDash)로 표현). → 'jump' 반환.
+   * 스킬도 같은 방식으로 **기본 공격 모션을 빌려 쓴다** — 스킬 전용 아트가 아직 없는데,
+   * 그냥 두면 폴백 체인이 idle로 떨어져 시전 중 가만히 서 있게 된다(2026-07-16).
+   * skill 아트가 들어오면 자동으로 그쪽을 쓴다 — 이 코드는 손댈 필요 없다.
    */
   private resolveAction(): AnimAction {
     switch (this.state_) {
@@ -145,7 +153,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'jumpdash': return 'jump'
       case 'climb': return 'climb'
       case 'attack': return 'attack'
-      case 'skill': return 'skill'
+      case 'skill': return this.hasAnim('skill') ? 'skill' : 'attack'
       case 'hit': return 'hit'
       case 'dead': return 'dead'
       default: return 'idle'
@@ -188,6 +196,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.play(key, true)
+
+    // 스킬이 기본 공격 모션을 빌려 쓰는 동안은 재생 속도를 스킬 지속시간에 맞춘다 —
+    // attack 시트는 550ms(ATTACK_DURATION_MS)인데 스킬은 450ms라 그냥 두면 회수 동작이 잘린다.
+    // 스킬 전용 아트가 들어오면 action이 'skill'이 되어 자동으로 등배속으로 돌아온다.
+    this.anims.timeScale =
+      this.state_ === 'skill' && action === 'attack'
+        ? COMBAT.ATTACK_DURATION_MS / COMBAT.SKILL_DURATION_MS
+        : 1
 
     // 사다리: 오르내리는 중에만 프레임 진행, 멈추면 정지
     if (action === 'climb') {

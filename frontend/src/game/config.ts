@@ -73,7 +73,10 @@ export const COMBAT = {
   SKILL_HEIGHT: 110,
   SKILL_MAX_TARGETS: 8,
   SKILL_DURATION_MS: 450,
-  SKILL_HIT_AT_MS: 150,
+  // 스킬 전용 아트가 없어 기본 공격 모션을 450ms에 맞춰 압축 재생한다(Player.updateAnimation).
+  // 그때 f3(최대 신장)이 205~311ms 구간이라 그 시작에 맞췄다 — 250 × (450/550) ≈ 205.
+  // 스킬 전용 아트(8프레임)가 들어오면 그 시트 기준으로 다시 잡아야 한다.
+  SKILL_HIT_AT_MS: 205,
   SKILL_HITSTOP_MS: 70,
 
   /** 피격 (GAME_DESIGN 4.3) */
