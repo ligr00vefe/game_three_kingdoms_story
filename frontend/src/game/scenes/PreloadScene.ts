@@ -212,11 +212,14 @@ export class PreloadScene extends Phaser.Scene {
     g.generateTexture('fx_skill_dragon', 224, 128)
 
     // 기본 공격 이펙트: 창끝 직선 궤적 (2026-07-16 단일 모션 통합)
-    g.clear()
-    g.fillStyle(0x87ceeb, 0.55); g.fillRect(0, 24, 130, 16)
-    g.fillStyle(0xffffff, 0.95); g.fillRect(0, 28, 138, 8)
-    g.fillStyle(0xe3f2fd, 1); g.fillTriangle(130, 18, 130, 46, 160, 32) // 창끝
-    g.generateTexture('fx_attack', 160, 64)
+    // manifest에 실제 아트(fx/effect_basic_attack.png)가 있으면 그쪽을 쓰고, 없을 때만 도형 폴백
+    if (!this.textures.exists('fx_attack')) {
+      g.clear()
+      g.fillStyle(0x87ceeb, 0.55); g.fillRect(0, 24, 130, 16)
+      g.fillStyle(0xffffff, 0.95); g.fillRect(0, 28, 138, 8)
+      g.fillStyle(0xe3f2fd, 1); g.fillTriangle(130, 18, 130, 46, 160, 32) // 창끝
+      g.generateTexture('fx_attack', 160, 64)
+    }
 
     // 점프 대쉬 잔상: 수평 스피드라인
     g.clear()

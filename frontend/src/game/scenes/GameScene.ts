@@ -448,8 +448,10 @@ export class GameScene extends Phaser.Scene {
 
     // ---- 전투 판정 주입 (Player는 몬스터를 직접 모른다) ----
     this.player.onBasicAttack = (hitbox, facing) => {
-      // 기본 공격은 창 찌르기 단일 모션 (2026-07-16 통합 — 휘두르기 분기 폐지)
-      this.effects.attack(this.player.x + facing * 62, this.player.y - 6, facing)
+      // 기본 공격은 창 찌르기 단일 모션 (2026-07-16 통합 — 휘두르기 분기 폐지).
+      // y 오프셋 주의: 캐릭터는 128 프레임 하단 정렬이라 창끝이 sprite 중심(player.y)보다 아래다.
+      // 창끝은 프레임 y≈95.5 = 중심 대비 +31.5px → VISUAL_SCALE(0.7) 적용 시 월드 +22px.
+      this.effects.attack(this.player.x + facing * 46, this.player.y + 22, facing)
       this.resolveAttack(hitbox, COMBAT.ATTACK_MAX_TARGETS, false)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)

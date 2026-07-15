@@ -53,7 +53,9 @@ export const PLAYER = {
 export const COMBAT = {
   /** 기본 공격 (GAME_DESIGN 4.1) */
   ATTACK_DURATION_MS: 550,
-  ATTACK_HIT_AT_MS: 190,        // 모션 중 판정 발생 시점
+  // 판정 시점은 PLAYER_ANIM_SPECS의 attack durations[60,150,40,130,90,80] 누적과 맞춘다.
+  // f3(최대 신장) = 250~380ms 구간이라 그 시작인 250에 맞췄다. durations를 바꾸면 여기도 같이.
+  ATTACK_HIT_AT_MS: 250,        // 모션 중 판정 발생 시점
   ATTACK_REACH: 96,             // 전방 약 1.5캐릭터 폭 (언월도 리치)
   ATTACK_HEIGHT: 70,
   ATTACK_MAX_TARGETS: 3,

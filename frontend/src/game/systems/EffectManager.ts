@@ -24,15 +24,31 @@ export class EffectManager {
     this.textPool = scene.add.group({ maxSize: 30 })
   }
 
-  /** 기본 공격 — 창 찌르기 직선 궤적 (2026-07-16 단일 모션 통합) */
+  /**
+   * 기본 공격 이펙트의 월드 길이(px) — 뻗기 전 → 뻗은 뒤.
+   * 아트가 오른쪽 끝으로 수렴하는 형태라 "창끝"이 곧 이펙트의 앞끝이다.
+   * 앞끝이 ATTACK_REACH(96)를 크게 넘으면 안 닿는 거리까지 맞을 것처럼 보이므로
+   * 시작 시 앞끝 ≈ reach에 맞추고, 늘어나는 구간은 알파가 빠지는 동안으로 제한한다.
+   */
+  private static readonly ATTACK_FX_LEN_FROM = 110
+  private static readonly ATTACK_FX_LEN_TO = 135
+
+  /**
+   * 기본 공격 — 창 찌르기 직선 궤적 (2026-07-16 단일 모션 통합).
+   * 아트 원본 폭이 제각각(실제 아트 724px / 도형 폴백 160px)이라 배율을 상수로 박지 않고
+   * 텍스처 실제 폭에서 목표 길이를 역산한다. 세로는 원본 비율 유지, 가로만 늘려 찌르는 느낌.
+   */
   attack(x: number, y: number, facing: -1 | 1) {
     const img = this.attackPool.get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
+    const srcW = img.frame.realWidth || img.width || 1
+    const from = EffectManager.ATTACK_FX_LEN_FROM / srcW
+    const to = EffectManager.ATTACK_FX_LEN_TO / srcW
     img.setActive(true).setVisible(true)
-    img.setPosition(x, y).setAlpha(0.95).setScale(0.6, 1).setFlipX(facing === -1)
+    img.setPosition(x, y).setAlpha(0.95).setScale(from).setFlipX(facing === -1)
     // 전방으로 뻗어 나가는 연출: 가로 스케일 확장 + 약간 전진
     this.scene.tweens.add({
-      targets: img, scaleX: 1.15, x: x + facing * 26, alpha: 0,
+      targets: img, scaleX: to, x: x + facing * 8, alpha: 0,
       duration: COMBAT.ATTACK_DURATION_MS * 0.55, ease: 'Cubic.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })
