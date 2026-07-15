@@ -10,7 +10,6 @@ export class EffectManager {
   private attackPool: Phaser.GameObjects.Group
   private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
-  private skillDragonPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
@@ -21,7 +20,6 @@ export class EffectManager {
     this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
     this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
-    this.skillDragonPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 4 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_burst', maxSize: 8 })
@@ -42,7 +40,7 @@ export class EffectManager {
    * 엉뚱한 곳에서 터진다. 그래서 타격 지점을 origin으로 잡는다 — attack()에 넘기는 좌표의
    * 의미가 "타격 지점을 여기에 둬라"가 된다.
    *
-   * 값은 원본 대비 비율이라 도형 폴백(160x64)에도 그대로 성립한다:
+   * 값은 원본 대비 비율이라 아트를 같은 구도로 다시 그려도 그대로 성립한다:
    * - originX/Y: 타격 지점의 위치 비율. 세로축(스트리크)은 두 아트 모두 ~53% 지점
    * - lenFrac: 꼬리→타격 지점이 전체 폭에서 차지하는 비율 (월드 길이 → 배율 환산용)
    */
@@ -139,17 +137,6 @@ export class EffectManager {
     })
   }
 
-  /**
-   * 청룡참 (GAME_DESIGN 4.2 — 푸른 용 형상 대형 참격).
-   * **현재 호출부 없음** — 스킬별 분기가 없어 시전 경로가 참마돌격 하나로 고정돼 있다.
-   * 청룡참(Lv17 해금)을 연결할 때 살려 쓴다.
-   */
-  skillDragon(x: number, y: number, facing: -1 | 1) {
-    const img = this.skillDragonPool.get(x, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    this.playOnce(img, x, y, facing, 1.15, COMBAT.SKILL_DURATION_MS * 0.9)
-  }
-
   hitSpark(x: number, y: number) {
     const img = this.sparkPool.get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
@@ -174,20 +161,13 @@ export class EffectManager {
     // 발밑 = 스프라이트 프레임 하단. 캐릭터가 128 프레임에 하단 정렬돼 있어 둘이 사실상 같다
     // (캐릭터 바닥 y=127 vs 프레임 128) — target.y는 프레임 중심이라 그대로 쓰면 안 된다.
     const footY = target.getBounds().bottom
-    let pillar: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle
-    if (this.scene.textures.exists('fx_level_up')) {
-      const img = this.scene.add.image(target.x, footY, 'fx_level_up')
-      img.setOrigin(EffectManager.LEVELUP_FX.originX, EffectManager.LEVELUP_FX.originY)
-      img.setScale(EffectManager.LEVELUP_FX_HEIGHT / (img.frame.realHeight || 1))
-      img.setDepth(EffectManager.LEVELUP_FX_DEPTH)
-      // ADD 블렌드 — 아트에 반투명한 어두운 영역이 있어 일반 합성이면 배경 위에 검은 얼룩으로 남는다.
-      // 빛 이펙트라 더하기 합성이 물리적으로도 맞고, 얼룩이 자연스럽게 사라진다.
-      img.setBlendMode(Phaser.BlendModes.ADD)
-      pillar = img
-    } else {
-      // 아트가 없을 때의 도형 폴백 (기존 연출)
-      pillar = this.scene.add.rectangle(target.x, target.y - 20, 70, 180, 0xfff176, 0.55)
-    }
+    const pillar = this.scene.add.image(target.x, footY, 'fx_level_up')
+    pillar.setOrigin(EffectManager.LEVELUP_FX.originX, EffectManager.LEVELUP_FX.originY)
+    pillar.setScale(EffectManager.LEVELUP_FX_HEIGHT / (pillar.frame.realHeight || 1))
+    pillar.setDepth(EffectManager.LEVELUP_FX_DEPTH)
+    // ADD 블렌드 — 아트에 반투명한 어두운 영역이 있어 일반 합성이면 배경 위에 검은 얼룩으로 남는다.
+    // 빛 이펙트라 더하기 합성이 물리적으로도 맞고, 얼룩이 자연스럽게 사라진다.
+    pillar.setBlendMode(Phaser.BlendModes.ADD)
     const label = this.scene.add
       .text(target.x, target.y - 90, 'LEVEL UP!', {
         fontSize: '22px', fontStyle: 'bold', color: '#ffd600', stroke: '#7b5800', strokeThickness: 4,

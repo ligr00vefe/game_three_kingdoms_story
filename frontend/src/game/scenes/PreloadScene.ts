@@ -215,28 +215,6 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0x4e342e); g.fillRect(44, 28, 4, 34)    // 지팡이
     g.generateTexture('npc_village_chief', 64, 64)
 
-    // 청룡참: 푸른 대형 참격 (GAME_DESIGN 4.2)
-    g.clear()
-    g.fillStyle(0x1565c0, 0.85)
-    g.slice(110, 64, 100, Phaser.Math.DegToRad(-80), Phaser.Math.DegToRad(80), false)
-    g.fillPath()
-    g.fillStyle(0x64b5f6, 0.9)
-    g.slice(90, 64, 80, Phaser.Math.DegToRad(-75), Phaser.Math.DegToRad(75), false)
-    g.fillPath()
-    g.fillStyle(0xe3f2fd, 0.95)
-    g.fillCircle(150, 40, 10); g.fillCircle(160, 64, 8) // 용의 눈/비늘 힌트
-    g.generateTexture('fx_skill_dragon', 224, 128)
-
-    // 기본 공격 이펙트: 창끝 직선 궤적 (2026-07-16 단일 모션 통합)
-    // manifest에 실제 아트(fx/effect_basic_attack.png)가 있으면 그쪽을 쓰고, 없을 때만 도형 폴백
-    if (!this.textures.exists('fx_attack')) {
-      g.clear()
-      g.fillStyle(0x87ceeb, 0.55); g.fillRect(0, 24, 130, 16)
-      g.fillStyle(0xffffff, 0.95); g.fillRect(0, 28, 138, 8)
-      g.fillStyle(0xe3f2fd, 1); g.fillTriangle(130, 18, 130, 46, 160, 32) // 창끝
-      g.generateTexture('fx_attack', 160, 64)
-    }
-
     // 점프 대쉬 잔상: 수평 스피드라인
     g.clear()
     g.fillStyle(0xffffff, 0.9); g.fillRect(0, 10, 76, 5)
