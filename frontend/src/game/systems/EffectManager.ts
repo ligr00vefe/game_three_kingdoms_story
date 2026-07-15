@@ -7,8 +7,7 @@ import { COMBAT } from '../config'
  */
 export class EffectManager {
   private scene: Phaser.Scene
-  private slashPool: Phaser.GameObjects.Group
-  private thrustPool: Phaser.GameObjects.Group
+  private attackPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
@@ -17,8 +16,7 @@ export class EffectManager {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
-    this.slashPool = scene.add.group({ defaultKey: 'fx_slash', maxSize: 12 })
-    this.thrustPool = scene.add.group({ defaultKey: 'fx_thrust', maxSize: 12 })
+    this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 4 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
@@ -26,16 +24,9 @@ export class EffectManager {
     this.textPool = scene.add.group({ maxSize: 30 })
   }
 
-  /** 기본 공격 — 휘두르기 (GAME_DESIGN 4.1 — 초승달 궤적) */
-  slash(x: number, y: number, facing: -1 | 1) {
-    const img = this.slashPool.get(x, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    this.playOnce(img, x, y, facing, 1, COMBAT.ATTACK_DURATION_MS * 0.6)
-  }
-
-  /** 기본 공격 — 찌르기 (GAME_DESIGN 4.1 개정 — 직선 창격) */
-  thrust(x: number, y: number, facing: -1 | 1) {
-    const img = this.thrustPool.get(x, y) as Phaser.GameObjects.Image | null
+  /** 기본 공격 — 창 찌르기 직선 궤적 (2026-07-16 단일 모션 통합) */
+  attack(x: number, y: number, facing: -1 | 1) {
+    const img = this.attackPool.get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
     img.setActive(true).setVisible(true)
     img.setPosition(x, y).setAlpha(0.95).setScale(0.6, 1).setFlipX(facing === -1)

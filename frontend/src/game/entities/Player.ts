@@ -13,9 +13,6 @@ export type PlayerState =
   | 'idle' | 'walk' | 'jump' | 'jumpdash' | 'climb' | 'sit'
   | 'attack' | 'skill' | 'hit' | 'dead'
 
-/** 기본 공격 모션 종류 — 동일 확률 랜덤 (GAME_DESIGN 4.1 개정) */
-export type AttackVariant = 'thrust' | 'swing'
-
 /** 앉기(휴식) 기능 — 2026-07-12 기획에서 제거. 코드 보존용 플래그 (차후 부활 시 true) */
 const SIT_ENABLED = false
 
@@ -62,13 +59,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private currentAnimKey: string | null = null
 
   // ---- 전투 (Phase 2) ----
-  /** GameScene이 주입: 히트박스 안 몬스터 판정 (variant: 찌르기/휘두르기 연출 분기) */
-  onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, variant: AttackVariant) => void
+  /** GameScene이 주입: 히트박스 안 몬스터 판정 */
+  onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
   onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
   /** GameScene이 주입: 공중 액션 이펙트 훅 */
   onAirDash?: (x: number, y: number, facing: -1 | 1) => void
   onDoubleJump?: (x: number, y: number) => void
-  private attackVariant: AttackVariant = 'swing'
   private actionUntil = 0
   private actionHitAt = 0
   private actionHitDone = false
@@ -148,7 +144,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'jump': return 'jump'
       case 'jumpdash': return 'jump'
       case 'climb': return 'climb'
-      case 'attack': return this.attackVariant // 'thrust' | 'swing'
+      case 'attack': return 'attack'
       case 'skill': return 'skill'
       case 'hit': return 'hit'
       case 'dead': return 'dead'
@@ -423,8 +419,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private startAction(kind: 'attack' | 'skill', now: number) {
     this.state_ = kind
     this.lastCombatAt = now
-    // 기본 공격: 찌르기/휘두르기 동일 확률 랜덤 (GAME_DESIGN 4.1 개정)
-    if (kind === 'attack') this.attackVariant = Math.random() < 0.5 ? 'thrust' : 'swing'
     const duration = kind === 'attack' ? COMBAT.ATTACK_DURATION_MS : COMBAT.SKILL_DURATION_MS
     const hitAt = kind === 'attack' ? COMBAT.ATTACK_HIT_AT_MS : COMBAT.SKILL_HIT_AT_MS
     this.actionUntil = now + duration
@@ -440,7 +434,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.actionHitDone = true
       const hitbox = this.buildHitbox(this.state_ === 'skill')
       if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing)
-      else this.onBasicAttack?.(hitbox, this.facing, this.attackVariant)
+      else this.onBasicAttack?.(hitbox, this.facing)
     }
     if (now >= this.actionUntil) {
       this.state_ = this.body.blocked.down ? 'idle' : 'jump'

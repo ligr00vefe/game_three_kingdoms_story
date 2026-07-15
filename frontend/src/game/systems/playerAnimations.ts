@@ -12,10 +12,10 @@ import Phaser from 'phaser'
  *   코드 수정 없이 파일만 추가하면 살아난다.
  */
 
-/** 상태 머신과 무관한, 스프라이트시트 단위의 액션 이름 (attack은 thrust/swing 2종. sit은 기능 제거됨) */
+/** 상태 머신과 무관한, 스프라이트시트 단위의 액션 이름 (sit은 기능 제거됨) */
 export type AnimAction =
   | 'idle' | 'walk' | 'jump' | 'dash' | 'climb'
-  | 'thrust' | 'swing' | 'skill' | 'hit' | 'dead' | 'rally'
+  | 'attack' | 'skill' | 'hit' | 'dead' | 'rally'
 
 export interface AnimSpec {
   action: AnimAction
@@ -25,12 +25,20 @@ export interface AnimSpec {
   frameRate: number
   /** -1 = 무한 반복, 0 = 1회 재생 후 마지막 프레임 유지 */
   repeat: number
+  /**
+   * 프레임별 체류 시간(ms). 주면 frameRate 대신 이 타이밍으로 재생한다.
+   * Phaser 애니메이션은 tween과 달리 프레임 타이밍에 easing을 걸 수 없어,
+   * 완급은 이렇게 프레임마다 길이를 달리 줘서 만든다. 길이는 frames와 일치해야 하고
+   * 합계는 해당 액션의 지속시간(config.COMBAT)과 맞춘다.
+   */
+  durations?: readonly number[]
 }
 
 /**
  * 액션별 프레임 규격. 공격/스킬의 frameRate는 config.COMBAT 지속시간에서 역산:
- * - thrust/swing 6f ÷ 0.35s ≈ 17fps, skill 8f ÷ 0.45s ≈ 18fps
+ * - attack 6f ÷ 0.55s ≈ 11fps, skill 8f ÷ 0.45s ≈ 18fps
  * walk는 명칭만 walk이고 실제 모션은 달리기(run) — 게임 이동속도가 달리기 속도라서.
+ * attack은 2026-07-16 기준 창 찌르기 단일 모션 (대기→예비→찌르기→회수→대기 6프레임).
  */
 export const PLAYER_ANIM_SPECS: readonly AnimSpec[] = [
   { action: 'idle',   frames: 4, frameRate: 6,  repeat: -1 },
@@ -38,8 +46,10 @@ export const PLAYER_ANIM_SPECS: readonly AnimSpec[] = [
   { action: 'jump',   frames: 2, frameRate: 6,  repeat: 0  },
   { action: 'dash',   frames: 3, frameRate: 14, repeat: 0  },
   { action: 'climb',  frames: 2, frameRate: 6,  repeat: -1 },
-  { action: 'thrust', frames: 6, frameRate: 17, repeat: 0  },
-  { action: 'swing',  frames: 6, frameRate: 17, repeat: 0  },
+  // 불균등 타이밍으로 완급을 만든다 — 합계 550ms = COMBAT.ATTACK_DURATION_MS.
+  // 예비동작은 길게 끌고(tension) 타격은 짧게(snap) 최대 신장에서 멈칫(punch).
+  { action: 'attack', frames: 6, frameRate: 11, repeat: 0,
+    durations: [60, 150, 40, 130, 90, 80] },
   { action: 'skill',  frames: 8, frameRate: 18, repeat: 0  },
   { action: 'hit',    frames: 2, frameRate: 10, repeat: 0  },
   { action: 'dead',   frames: 5, frameRate: 8,  repeat: 0  },
@@ -105,7 +115,10 @@ export function createPlayerAnims(scene: Phaser.Scene, tier: number): Set<string
       if (!scene.anims.exists(key)) {
         scene.anims.create({
           key,
-          frames: scene.anims.generateFrameNumbers(key, { start: 0, end: spec.frames - 1 }),
+          // durations를 준 액션(attack)만 프레임별 완급을 쓰고, 나머지는 균등 frameRate
+          frames: spec.durations
+            ? spec.durations.map((duration, i) => ({ key, frame: i, duration }))
+            : scene.anims.generateFrameNumbers(key, { start: 0, end: spec.frames - 1 }),
           frameRate: spec.frameRate,
           repeat: spec.repeat,
         })

@@ -199,16 +199,6 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0x4e342e); g.fillRect(44, 28, 4, 34)    // 지팡이
     g.generateTexture('npc_village_chief', 64, 64)
 
-    // 참격 이펙트: 초승달 궤적 (GAME_DESIGN 4.1) — 128 규격 (ASSET_SPEC)
-    g.clear()
-    g.fillStyle(0xffffff, 0.9)
-    g.slice(64, 64, 56, Phaser.Math.DegToRad(-70), Phaser.Math.DegToRad(70), false)
-    g.fillPath()
-    g.fillStyle(0x87ceeb, 1)
-    g.slice(52, 64, 48, Phaser.Math.DegToRad(-70), Phaser.Math.DegToRad(70), false)
-    g.fillPath()
-    g.generateTexture('fx_slash', 128, 128)
-
     // 청룡참: 푸른 대형 참격 (GAME_DESIGN 4.2)
     g.clear()
     g.fillStyle(0x1565c0, 0.85)
@@ -221,12 +211,12 @@ export class PreloadScene extends Phaser.Scene {
     g.fillCircle(150, 40, 10); g.fillCircle(160, 64, 8) // 용의 눈/비늘 힌트
     g.generateTexture('fx_skill_dragon', 224, 128)
 
-    // 찌르기 이펙트: 창끝 직선 궤적 (기본 공격 랜덤 모션 2, GAME_DESIGN 4.1 개정)
+    // 기본 공격 이펙트: 창끝 직선 궤적 (2026-07-16 단일 모션 통합)
     g.clear()
     g.fillStyle(0x87ceeb, 0.55); g.fillRect(0, 24, 130, 16)
     g.fillStyle(0xffffff, 0.95); g.fillRect(0, 28, 138, 8)
     g.fillStyle(0xe3f2fd, 1); g.fillTriangle(130, 18, 130, 46, 160, 32) // 창끝
-    g.generateTexture('fx_thrust', 160, 64)
+    g.generateTexture('fx_attack', 160, 64)
 
     // 점프 대쉬 잔상: 수평 스피드라인
     g.clear()

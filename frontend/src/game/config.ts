@@ -52,8 +52,8 @@ export const PLAYER = {
 
 export const COMBAT = {
   /** 기본 공격 (GAME_DESIGN 4.1) */
-  ATTACK_DURATION_MS: 350,
-  ATTACK_HIT_AT_MS: 120,        // 모션 중 판정 발생 시점
+  ATTACK_DURATION_MS: 550,
+  ATTACK_HIT_AT_MS: 190,        // 모션 중 판정 발생 시점
   ATTACK_REACH: 96,             // 전방 약 1.5캐릭터 폭 (언월도 리치)
   ATTACK_HEIGHT: 70,
   ATTACK_MAX_TARGETS: 3,

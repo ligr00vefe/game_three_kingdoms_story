@@ -447,10 +447,9 @@ export class GameScene extends Phaser.Scene {
     })
 
     // ---- 전투 판정 주입 (Player는 몬스터를 직접 모른다) ----
-    this.player.onBasicAttack = (hitbox, facing, variant) => {
-      // 찌르기/휘두르기 랜덤 모션 (GAME_DESIGN 4.1 개정) — 판정은 동일, 연출만 분기
-      if (variant === 'thrust') this.effects.thrust(this.player.x + facing * 62, this.player.y - 6, facing)
-      else this.effects.slash(this.player.x + facing * 55, this.player.y - 6, facing)
+    this.player.onBasicAttack = (hitbox, facing) => {
+      // 기본 공격은 창 찌르기 단일 모션 (2026-07-16 통합 — 휘두르기 분기 폐지)
+      this.effects.attack(this.player.x + facing * 62, this.player.y - 6, facing)
       this.resolveAttack(hitbox, COMBAT.ATTACK_MAX_TARGETS, false)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
