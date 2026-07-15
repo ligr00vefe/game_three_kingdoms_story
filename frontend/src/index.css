@@ -1,3 +1,18 @@
+/*
+ * 데미지 숫자용 둥글고 두꺼운 폰트 (EffectManager.damageNumber).
+ * 숫자(U+30-39)만 서브셋한 3KB 파일이라 다른 글자엔 쓸 수 없다 — 한글/영문에 쓰면
+ * 폴백 폰트로 조용히 새니 주의. 자세한 출처는 assets/CREDITS.md.
+ * Phaser Text는 생성 시점에 캔버스로 구워지므로 PreloadScene에서 로드를 기다린다.
+ */
+@font-face {
+  font-family: 'Baloo2Digits';
+  src: url('/assets/fonts/Baloo2-ExtraBold-digits.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+30-39;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html {

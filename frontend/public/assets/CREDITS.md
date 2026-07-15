@@ -18,3 +18,6 @@
 | assets/img/rope.png (등나무 줄) | AI 생성 (GPT, C2) | 자체 생성물 | - | 2026-07-10 |
 | assets/img/rock.png (바위) | AI 생성 (GPT, D1) | 자체 생성물 | - | 2026-07-10 |
 | assets/img/barricade.png (황건 바리케이드) | AI 생성 (GPT, D3) | 자체 생성물 | - | 2026-07-10 |
+| assets/img/fx/effect_basic_attack.png (기본공격 창격 궤적) | AI 생성 | 자체 생성물 | - | 2026-07-16 |
+| assets/img/fx/effect_basic_attack_shot.png (기본공격 명중 폭발) | AI 생성 | 자체 생성물 | - | 2026-07-16 |
+| assets/fonts/Baloo2-ExtraBold-digits.woff2 (데미지 숫자용, **숫자 U+30-39만 서브셋**) | Google Fonts — Baloo 2, ExtraBold(800) | SIL Open Font License 1.1 (상업 사용·재배포·수정 자유, 폰트 단독 판매 금지) | https://fonts.google.com/specimen/Baloo+2 · 라이선스 전문 https://openfontlicense.org | 2026-07-16 |

@@ -133,6 +133,14 @@ export class EffectManager {
     })
   }
 
+  /**
+   * 데미지 숫자용 둥근 폰트 (index.css의 @font-face). **숫자(U+30-39)만 서브셋한 3KB 파일**이라
+   * 숫자 외 문자에 쓰면 조용히 폴백으로 샌다 — 한글/영문 라벨엔 LABEL_FONT를 쓸 것.
+   */
+  private static readonly DAMAGE_FONT = 'Baloo2Digits, system-ui, sans-serif'
+  /** 한글이 섞이는 라벨용 (아이템 획득 등) */
+  private static readonly LABEL_FONT = 'system-ui, "Malgun Gothic", sans-serif'
+
   /** 대상별 연타 스택 (최대 3단) — 같은 대상을 연속 타격하면 숫자가 위로 쌓인다 */
   private damageStacks = new WeakMap<object, { idx: number; lastAt: number }>()
   private playerStack = { idx: 0, lastAt: -Infinity }
@@ -178,6 +186,9 @@ export class EffectManager {
     )
     text.setText(String(amount))
     text.setColor(kind === 'taken' ? '#ff5252' : crit ? '#ffab00' : '#ffe082')
+    // 폰트는 매번 지정한다 — textPool을 pickupLabel과 공유해서 생성 시점 스타일이 남아 있다
+    text.setFontFamily(EffectManager.DAMAGE_FONT)
+    text.setFontStyle('800')
     text.setFontSize(crit ? 26 : kind === 'taken' ? 16 : 18)
     text.setAlpha(1).setScale(crit ? 1.15 : 1)
 
@@ -198,7 +209,11 @@ export class EffectManager {
       this.textPool.add(text)
     }
     text.setActive(true).setVisible(true)
-    text.setPosition(x, y).setText(label).setColor('#a5d6a7').setFontSize(13).setAlpha(1).setScale(1)
+    text.setPosition(x, y).setText(label).setColor('#a5d6a7').setAlpha(1).setScale(1)
+    // 한글이 섞이므로 숫자 서브셋 폰트를 쓰면 안 된다 (damageNumber와 풀 공유 — 매번 되돌린다)
+    text.setFontFamily(EffectManager.LABEL_FONT)
+    text.setFontStyle('bold')
+    text.setFontSize(13)
     this.scene.tweens.add({
       targets: text, y: y - 30, alpha: 0, duration: 700, ease: 'Cubic.easeOut',
       onComplete: () => { text!.setActive(false).setVisible(false) },

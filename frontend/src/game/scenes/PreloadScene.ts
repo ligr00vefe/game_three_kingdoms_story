@@ -38,10 +38,26 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create() {
-    this.loadManifestAssets().then(() => {
+    Promise.all([this.loadManifestAssets(), this.loadFonts()]).then(() => {
       this.generatePlaceholders()
       this.scene.start('Game')
     })
+  }
+
+  /**
+   * 웹폰트 선로딩. Phaser Text는 **생성 시점에 캔버스로 구워지므로**, 폰트가 준비되기 전에
+   * 만든 텍스트는 폴백 글꼴 그대로 굳는다(다시 setText 하기 전까지 안 고쳐짐).
+   * 숫자만 서브셋한 폰트라 로드 트리거 문자열도 숫자여야 한다.
+   * 폰트를 못 받아도 게임은 폴백 글꼴로 계속 진행한다 — 로딩을 막지 않는다.
+   */
+  private loadFonts(): Promise<void> {
+    if (!document.fonts?.load) return Promise.resolve()
+    return document.fonts
+      .load('800 18px Baloo2Digits', '0123456789')
+      .then(() => undefined)
+      .catch(() => {
+        console.warn('[fonts] Baloo2Digits 로드 실패 — 기본 글꼴로 진행')
+      })
   }
 
   /** manifest.json에 등록된 이미지/스프라이트시트 로드 (2차 로드) */
