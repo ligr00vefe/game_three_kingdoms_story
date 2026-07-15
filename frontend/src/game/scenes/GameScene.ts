@@ -464,7 +464,10 @@ export class GameScene extends Phaser.Scene {
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
     this.player.onSkill = (hitbox, facing) => {
-      this.effects.skillDragon(this.player.x + facing * 100, this.player.y - 10, facing)
+      // 시전 가능한 스킬이 참마돌격 하나뿐이라 분기 없이 바로 호출한다 (skillStore의 5종은
+      // 스킬트리 UI 데이터일 뿐 아직 시전 경로가 없음). 스킬별 분기가 생기면 여기서 갈라야 한다.
+      // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
+      this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
       this.resolveAttack(hitbox, COMBAT.SKILL_MAX_TARGETS, true)
       // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
       this.physics.pause()

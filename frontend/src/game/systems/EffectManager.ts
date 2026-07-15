@@ -10,6 +10,7 @@ export class EffectManager {
   private attackPool: Phaser.GameObjects.Group
   private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
+  private skillDragonPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
@@ -19,7 +20,8 @@ export class EffectManager {
     this.scene = scene
     this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
     this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
-    this.skillPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 4 })
+    this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
+    this.skillDragonPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 4 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_burst', maxSize: 8 })
@@ -106,9 +108,44 @@ export class EffectManager {
     })
   }
 
-  /** 청룡참 (GAME_DESIGN 4.2 — 푸른 용 형상 대형 참격) */
-  skillDragon(x: number, y: number, facing: -1 | 1) {
+  /**
+   * 참마돌격 이펙트 정렬 — attack()과 같은 "스트리크+폭발" 구조라 타격 지점을 origin으로 잡는다.
+   * 원본(1422x613) 기준 폭발코어 x=1182 / 스트리크 축 y=289. 값은 비율이라 원본이 바뀌어도
+   * 같은 구도면 성립한다. 꼬리→코어 길이를 SKILL_REACH(200)에 맞춘다.
+   */
+  private static readonly SKILL_FX = { originX: 0.831, originY: 0.471, lenFrac: 0.831 } as const
+  private static readonly SKILL_FX_LEN_FROM = 200
+  private static readonly SKILL_FX_LEN_TO = 240
+
+  /**
+   * 참마돌격 (GAME_DESIGN 4.2) — 현재 게임에 시전 가능한 스킬은 이것 하나뿐이라
+   * onSkill이 곧 참마돌격이다. 스킬별 분기가 생기면 여기서 갈라야 한다.
+   * (x, y)는 타격 지점 — attack()과 같은 규약.
+   */
+  skillCharge(x: number, y: number, facing: -1 | 1) {
     const img = this.skillPool.get(x, y) as Phaser.GameObjects.Image | null
+    if (!img) return
+    const srcW = img.frame.realWidth || img.width || 1
+    const spec = EffectManager.SKILL_FX
+    const from = EffectManager.SKILL_FX_LEN_FROM / (srcW * spec.lenFrac)
+    const to = EffectManager.SKILL_FX_LEN_TO / (srcW * spec.lenFrac)
+    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
+    img.setActive(true).setVisible(true)
+    img.setPosition(x, y).setAlpha(0.95).setScale(from).setFlipX(facing === -1)
+    this.scene.tweens.add({
+      targets: img, scale: to, alpha: 0,
+      duration: COMBAT.SKILL_DURATION_MS * 0.9, ease: 'Cubic.easeOut',
+      onComplete: () => { img.setActive(false).setVisible(false) },
+    })
+  }
+
+  /**
+   * 청룡참 (GAME_DESIGN 4.2 — 푸른 용 형상 대형 참격).
+   * **현재 호출부 없음** — 스킬별 분기가 없어 시전 경로가 참마돌격 하나로 고정돼 있다.
+   * 청룡참(Lv17 해금)을 연결할 때 살려 쓴다.
+   */
+  skillDragon(x: number, y: number, facing: -1 | 1) {
+    const img = this.skillDragonPool.get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
     this.playOnce(img, x, y, facing, 1.15, COMBAT.SKILL_DURATION_MS * 0.9)
   }
@@ -119,9 +156,38 @@ export class EffectManager {
     this.playOnce(img, x, y, 1, 0.8, 180)
   }
 
+  /**
+   * 레벨업 빛 기둥 정렬 — 원본(683x656)의 바닥 링이 y=526에 있어 그 지점을 발밑에 맞춘다.
+   * 중앙 정렬하면 기둥이 공중에 뜬다.
+   */
+  private static readonly LEVELUP_FX = { originX: 0.488, originY: 0.802 } as const
+  /** 기둥 목표 높이(월드 px) — 캐릭터(~51px)보다 확실히 크게 */
+  private static readonly LEVELUP_FX_HEIGHT = 165
+  /**
+   * 기둥은 캐릭터 **뒤**에 깐다 (플레이어 depth 0). 앞에 두면 정작 레벨업한 관우가 안 보인다.
+   * NPC(-10)보다는 앞이라 옆에 NPC가 있어도 기둥이 가려지지 않는다.
+   */
+  private static readonly LEVELUP_FX_DEPTH = -1
+
   /** 레벨업 빛 기둥 (GAME_DESIGN 5.1) — 저빈도라 풀 없이 생성/파괴 */
   levelUp(target: Phaser.GameObjects.Sprite) {
-    const pillar = this.scene.add.rectangle(target.x, target.y - 20, 70, 180, 0xfff176, 0.55)
+    // 발밑 = 스프라이트 프레임 하단. 캐릭터가 128 프레임에 하단 정렬돼 있어 둘이 사실상 같다
+    // (캐릭터 바닥 y=127 vs 프레임 128) — target.y는 프레임 중심이라 그대로 쓰면 안 된다.
+    const footY = target.getBounds().bottom
+    let pillar: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle
+    if (this.scene.textures.exists('fx_level_up')) {
+      const img = this.scene.add.image(target.x, footY, 'fx_level_up')
+      img.setOrigin(EffectManager.LEVELUP_FX.originX, EffectManager.LEVELUP_FX.originY)
+      img.setScale(EffectManager.LEVELUP_FX_HEIGHT / (img.frame.realHeight || 1))
+      img.setDepth(EffectManager.LEVELUP_FX_DEPTH)
+      // ADD 블렌드 — 아트에 반투명한 어두운 영역이 있어 일반 합성이면 배경 위에 검은 얼룩으로 남는다.
+      // 빛 이펙트라 더하기 합성이 물리적으로도 맞고, 얼룩이 자연스럽게 사라진다.
+      img.setBlendMode(Phaser.BlendModes.ADD)
+      pillar = img
+    } else {
+      // 아트가 없을 때의 도형 폴백 (기존 연출)
+      pillar = this.scene.add.rectangle(target.x, target.y - 20, 70, 180, 0xfff176, 0.55)
+    }
     const label = this.scene.add
       .text(target.x, target.y - 90, 'LEVEL UP!', {
         fontSize: '22px', fontStyle: 'bold', color: '#ffd600', stroke: '#7b5800', strokeThickness: 4,
