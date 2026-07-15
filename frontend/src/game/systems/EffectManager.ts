@@ -8,6 +8,7 @@ import { COMBAT } from '../config'
 export class EffectManager {
   private scene: Phaser.Scene
   private attackPool: Phaser.GameObjects.Group
+  private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
@@ -17,6 +18,7 @@ export class EffectManager {
   constructor(scene: Phaser.Scene) {
     this.scene = scene
     this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
+    this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 4 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
@@ -25,30 +27,54 @@ export class EffectManager {
   }
 
   /**
-   * 기본 공격 이펙트의 월드 길이(px) — 뻗기 전 → 뻗은 뒤.
-   * 아트가 오른쪽 끝으로 수렴하는 형태라 "창끝"이 곧 이펙트의 앞끝이다.
-   * 앞끝이 ATTACK_REACH(96)를 크게 넘으면 안 닿는 거리까지 맞을 것처럼 보이므로
-   * 시작 시 앞끝 ≈ reach에 맞추고, 늘어나는 구간은 알파가 빠지는 동안으로 제한한다.
+   * 기본 공격 이펙트의 "꼬리 → 타격 지점" 월드 길이(px) — 뻗기 전 → 뻗은 뒤.
+   * 타격 지점이 ATTACK_REACH(96)를 크게 넘으면 안 닿는 거리까지 맞을 것처럼 보이므로
+   * 시작 시 ≈ reach에 맞추고, 늘어나는 구간은 알파가 빠지는 동안으로 제한한다.
    */
   private static readonly ATTACK_FX_LEN_FROM = 110
   private static readonly ATTACK_FX_LEN_TO = 135
 
   /**
-   * 기본 공격 — 창 찌르기 직선 궤적 (2026-07-16 단일 모션 통합).
-   * 아트 원본 폭이 제각각(실제 아트 724px / 도형 폴백 160px)이라 배율을 상수로 박지 않고
-   * 텍스처 실제 폭에서 목표 길이를 역산한다. 세로는 원본 비율 유지, 가로만 늘려 찌르는 느낌.
+   * 기본 공격 이펙트 아트별 정렬 기준. 두 아트는 "타격 지점"이 그림 안에서 서로 다른 데 있어
+   * (빗나감=스트리크가 수렴하는 끝 / 명중=방사형 폭발 코어) bbox 중앙으로 맞추면 폭발이
+   * 엉뚱한 곳에서 터진다. 그래서 타격 지점을 origin으로 잡는다 — attack()에 넘기는 좌표의
+   * 의미가 "타격 지점을 여기에 둬라"가 된다.
+   *
+   * 값은 원본 대비 비율이라 도형 폴백(160x64)에도 그대로 성립한다:
+   * - originX/Y: 타격 지점의 위치 비율. 세로축(스트리크)은 두 아트 모두 ~53% 지점
+   * - lenFrac: 꼬리→타격 지점이 전체 폭에서 차지하는 비율 (월드 길이 → 배율 환산용)
    */
-  attack(x: number, y: number, facing: -1 | 1) {
-    const img = this.attackPool.get(x, y) as Phaser.GameObjects.Image | null
+  private static readonly ATTACK_FX = {
+    miss: { key: 'fx_attack',     originX: 0.997, originY: 0.538, lenFrac: 0.983 },
+    hit:  { key: 'fx_attack_hit', originX: 0.698, originY: 0.524, lenFrac: 0.691 },
+  } as const
+
+  /**
+   * 기본 공격 — 창 찌르기 궤적 (2026-07-16 단일 모션 통합).
+   * hit=true면 폭발이 붙은 명중 아트로 교체한다. 판정과 이펙트가 같은 틱(ATTACK_HIT_AT_MS)에
+   * 일어나므로 "빗나감 → 명중"으로 전환할 필요 없이 처음부터 맞는 아트를 고른다.
+   * (x, y)는 타격 지점 — 명중 시 적 위치, 빗나감 시 리치 끝.
+   */
+  attack(x: number, y: number, facing: -1 | 1, hit = false) {
+    // 명중 아트가 아직 없으면 조용히 빗나감 아트로 폴백
+    const useHit = hit && this.scene.textures.exists(EffectManager.ATTACK_FX.hit.key)
+    const spec = useHit ? EffectManager.ATTACK_FX.hit : EffectManager.ATTACK_FX.miss
+    const img = (useHit ? this.attackHitPool : this.attackPool).get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
+
     const srcW = img.frame.realWidth || img.width || 1
-    const from = EffectManager.ATTACK_FX_LEN_FROM / srcW
-    const to = EffectManager.ATTACK_FX_LEN_TO / srcW
+    const from = EffectManager.ATTACK_FX_LEN_FROM / (srcW * spec.lenFrac)
+    const to = EffectManager.ATTACK_FX_LEN_TO / (srcW * spec.lenFrac)
+    // 좌향은 flipX — origin도 같이 뒤집어야 타격 지점이 제자리에 온다
+    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
     img.setActive(true).setVisible(true)
     img.setPosition(x, y).setAlpha(0.95).setScale(from).setFlipX(facing === -1)
-    // 전방으로 뻗어 나가는 연출: 가로 스케일 확장 + 약간 전진
+
     this.scene.tweens.add({
-      targets: img, scaleX: to, x: x + facing * 8, alpha: 0,
+      targets: img,
+      // 명중은 폭발이 부풀도록 균등 확대, 빗나감은 궤적이 앞으로 뻗도록 가로만 확대
+      ...(useHit ? { scale: to } : { scaleX: to, x: x + facing * 8 }),
+      alpha: 0,
       duration: COMBAT.ATTACK_DURATION_MS * 0.55, ease: 'Cubic.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })

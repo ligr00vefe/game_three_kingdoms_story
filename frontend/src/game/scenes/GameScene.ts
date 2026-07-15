@@ -3,7 +3,7 @@ import { EventBus, GameEvents } from '../EventBus'
 import { Player } from '../entities/Player'
 import { Npc } from '../entities/Npc'
 import type { NpcDef } from '../entities/Npc'
-import type { MonsterDef, MonsterTarget } from '../entities/Monster'
+import type { Monster, MonsterDef, MonsterTarget } from '../entities/Monster'
 import { InputManager } from '../systems/InputManager'
 import { EffectManager } from '../systems/EffectManager'
 import { SpawnManager } from '../systems/SpawnManager'
@@ -449,10 +449,16 @@ export class GameScene extends Phaser.Scene {
     // ---- 전투 판정 주입 (Player는 몬스터를 직접 모른다) ----
     this.player.onBasicAttack = (hitbox, facing) => {
       // 기본 공격은 창 찌르기 단일 모션 (2026-07-16 통합 — 휘두르기 분기 폐지).
+      // 판정을 **먼저** 돌려 명중 여부를 알아낸 뒤 이펙트를 고른다 — 둘 다 같은 틱
+      // (ATTACK_HIT_AT_MS)이라 "빗나감 → 명중" 전환 없이 바로 맞는 아트를 쓸 수 있다.
+      const hits = this.resolveAttack(hitbox, COMBAT.ATTACK_MAX_TARGETS, false)
+      // 타격 지점: 명중이면 가장 가까운 적(리치 안으로 클램프), 빗나가면 리치 끝.
       // y 오프셋 주의: 캐릭터는 128 프레임 하단 정렬이라 창끝이 sprite 중심(player.y)보다 아래다.
       // 창끝은 프레임 y≈95.5 = 중심 대비 +31.5px → VISUAL_SCALE(0.7) 적용 시 월드 +22px.
-      this.effects.attack(this.player.x + facing * 46, this.player.y + 22, facing)
-      this.resolveAttack(hitbox, COMBAT.ATTACK_MAX_TARGETS, false)
+      const dist = hits.length > 0
+        ? Phaser.Math.Clamp((hits[0].x - this.player.x) * facing, 50, COMBAT.ATTACK_REACH)
+        : COMBAT.ATTACK_REACH
+      this.effects.attack(this.player.x + facing * dist, this.player.y + 22, facing, hits.length > 0)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
@@ -581,7 +587,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 히트박스 안의 몬스터에게 데미지 — 가까운 순 maxTargets마리 (GAME_DESIGN 4.1) */
-  private resolveAttack(hitbox: Phaser.Geom.Rectangle, maxTargets: number, isSkill: boolean) {
+  /** 히트박스에 걸린 몬스터에 데미지를 적용하고, **실제로 맞은 대상**을 거리순으로 반환한다 */
+  private resolveAttack(hitbox: Phaser.Geom.Rectangle, maxTargets: number, isSkill: boolean): Monster[] {
     const attackPower = useGameStore.getState().attackPower
     const candidates = this.spawner.monsters
       .filter((m) => m.alive && hitbox.contains(m.x, m.y))
@@ -601,6 +608,7 @@ export class GameScene extends Phaser.Scene {
         if (drops) this.drops.rollDrops(m.x, m.y - 10, drops)
       }
     }
+    return candidates
   }
 
   private handleLevelUp = () => {
