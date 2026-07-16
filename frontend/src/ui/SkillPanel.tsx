@@ -41,6 +41,13 @@ export function SkillPanel() {
                 if (locked) return
                 e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'skill', code: def.code }))
                 e.dataTransfer.effectAllowed = 'move'
+                // 기본 드래그 이미지는 셀 전체(이름·레벨·버튼 포함) — 아이콘만 커서를 따라오게 교체.
+                // 크기는 CSS 상수가 아니라 실측으로 — 패널이 스케일 변형을 받으면 34px이 아니다.
+                const icon = e.currentTarget.querySelector('.sk-icon')
+                if (icon) {
+                  const r = icon.getBoundingClientRect()
+                  e.dataTransfer.setDragImage(icon, r.width / 2, r.height / 2)
+                }
               }}
               title={locked ? `Lv ${def.unlockLevel}에 해금` : `${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
             >

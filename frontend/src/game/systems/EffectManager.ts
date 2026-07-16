@@ -114,6 +114,13 @@ export class EffectManager {
   private static readonly SKILL_FX = { originX: 0.831, originY: 0.471, lenFrac: 0.831 } as const
   private static readonly SKILL_FX_LEN_FROM = 200
   private static readonly SKILL_FX_LEN_TO = 240
+  /**
+   * ★ 참마돌격 이펙트 속도 조절값 — 이펙트가 퍼지며 사라지기까지의 시간(ms). 크게 잡을수록 느리다.
+   * 시전 모션/판정(COMBAT.SKILL_DURATION_MS=450, SKILL_HIT_AT_MS)과는 분리돼 있어
+   * 이 값만 바꾸면 게임 플레이 타이밍은 그대로고 보이는 속도만 바뀐다.
+   * (기존엔 SKILL_DURATION_MS × 0.9 = 405ms라 너무 빨리 지나갔다.)
+   */
+  private static readonly SKILL_FX_DURATION_MS = 720
 
   /**
    * 참마돌격 (GAME_DESIGN 4.2) — 현재 게임에 시전 가능한 스킬은 이것 하나뿐이라
@@ -132,7 +139,8 @@ export class EffectManager {
     img.setPosition(x, y).setAlpha(0.95).setScale(from).setFlipX(facing === -1)
     this.scene.tweens.add({
       targets: img, scale: to, alpha: 0,
-      duration: COMBAT.SKILL_DURATION_MS * 0.9, ease: 'Cubic.easeOut',
+      // Cubic.easeOut은 초반에 몰아서 끝나 알맹이를 놓친다 — Sine이 더 고르게 보인다
+      duration: EffectManager.SKILL_FX_DURATION_MS, ease: 'Sine.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })
   }

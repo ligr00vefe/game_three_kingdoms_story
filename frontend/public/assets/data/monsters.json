@@ -2,6 +2,7 @@
   "zombie_yellow": {
     "name": "황건당 좀비",
     "textureKey": "zombie_yellow_idle",
+    "runTextureKey": "zombie_yellow_run",
     "maxHp": 30,
     "attack": 5,
     "defense": 1,

@@ -144,16 +144,19 @@ export class PreloadScene extends Phaser.Scene {
     g.generateTexture('bg_hills', 512, 140)
 
     // 황건당 좀비: 64x64, 회녹색 몸 + 누런 두건 (GAME_DESIGN 6.2)
-    g.clear()
-    g.fillStyle(0x7a8a6d)
-    g.fillRect(14, 18, 36, 46)
-    g.fillStyle(0x8a9b7c)
-    g.fillRect(20, 4, 24, 22)
-    g.fillStyle(0xf9a825) // 누런 두건
-    g.fillRect(18, 2, 28, 8)
-    g.fillStyle(0xb71c1c)
-    g.fillRect(26, 14, 4, 4); g.fillRect(36, 14, 4, 4)
-    g.generateTexture('zombie_yellow_idle', 64, 64)
+    // manifest에 실제 아트가 오면 같은 키로 로드되므로 exists 가드 — 없으면 도형이 아트를 덮어쓴다.
+    if (!this.textures.exists('zombie_yellow_idle')) {
+      g.clear()
+      g.fillStyle(0x7a8a6d)
+      g.fillRect(14, 18, 36, 46)
+      g.fillStyle(0x8a9b7c)
+      g.fillRect(20, 4, 24, 22)
+      g.fillStyle(0xf9a825) // 누런 두건
+      g.fillRect(18, 2, 28, 8)
+      g.fillStyle(0xb71c1c)
+      g.fillRect(26, 14, 4, 4); g.fillRect(36, 14, 4, 4)
+      g.generateTexture('zombie_yellow_idle', 64, 64)
+    }
 
     // ---- 감숙성 내부(안전지대) placeholder — manifest에 실제 아트가 오면 같은 키로 대체되므로 exists 가드 ----
     if (!this.textures.exists('npc_castle_lord')) {

@@ -16,6 +16,23 @@ export type PlayerState =
 /** 앉기(휴식) 기능 — 2026-07-12 기획에서 제거. 코드 보존용 플래그 (차후 부활 시 true) */
 const SIT_ENABLED = false
 
+/**
+ * ↓로 사다리를 잡을 때 발바닥을 발판 표면보다 이만큼 아래로 내린다(px).
+ * 꼭대기 이탈 판정(body.bottom <= yTop + 2)보다 커야 잡자마자 튕겨 나오지 않는다.
+ */
+const LADDER_ENTER_DROP = 10
+
+/** 스프라이트 프레임 크기 — 아트 규격(CHARACTER_ART_SPEC 3장). 바디 오프셋 계산의 기준. */
+const FRAME = 128
+
+/**
+ * 스프라이트 y(=프레임 중심)에서 발바닥(body.bottom)까지의 거리(px, 월드).
+ * 생성자의 body.setOffset 규약과 한 쌍이다 — 바디는 프레임 하단에 정렬되고 발끝은
+ * 바디 하단보다 FOOT_SINK만큼 아래다. **BODY_HEIGHT/2가 아니다**(그렇게 계산하면
+ * 캐릭터가 발판 아래로 박힌다).
+ */
+const FEET_FROM_Y = (FRAME * PLAYER.VISUAL_SCALE) / 2 - PLAYER.FOOT_SINK
+
 interface Ladder {
   zone: Phaser.GameObjects.Zone
   x: number
@@ -84,7 +101,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // offsetY는 발끝이 바디 하단보다 FOOT_SINK만큼 아래(잔디 안쪽)에 오도록 잡는다 — 그래야
     // 지면(잔디 경계)에 서 있어 보인다. 오프셋은 항상 128 프레임 기준 고정(placeholder 64px 방어).
     const S = PLAYER.VISUAL_SCALE
-    const FRAME = 128
     this.setScale(S)
     this.body.setSize(PLAYER.BODY_WIDTH / S, PLAYER.BODY_HEIGHT / S)
     this.body.setOffset(
@@ -104,6 +120,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   setLadders(ladders: Ladder[]) {
     this.ladders = ladders
+  }
+
+  /**
+   * 발바닥(body.bottom)이 월드 worldY에 오도록 순간이동시킨다 (속도도 0으로).
+   *
+   * setY()를 쓰면 안 된다 — 씬 update 중에 스프라이트만 옮겨도 Arcade의 postUpdate가
+   * 바디 이동분을 다시 더해버려 최종 위치가 어긋난다(사다리 꼭대기 무한루프의 원인).
+   * 바디까지 한 번에 맞추는 body.reset()이 정석이다.
+   */
+  private setFeetY(worldY: number) {
+    this.body.reset(this.x, worldY - FEET_FROM_Y)
   }
 
   update(input: InputManager, now: number) {
@@ -382,9 +409,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.currentLadder = ladder
         this.state_ = 'climb'
         this.body.setAllowGravity(false)
-        this.setVelocity(0, 0)
-        this.setX(ladder.x)
-        if (canEnterDown) this.setY(top + PLAYER.BODY_HEIGHT / 2 + 6)
+        if (canEnterDown) {
+          // 발바닥을 발판 표면보다 조금 내려 꼭대기 이탈 판정(yTop+2)을 벗어나게 한다 —
+          // 안 그러면 잡자마자 그 자리에서 다시 튕겨 나온다.
+          this.setFeetY(top + LADDER_ENTER_DROP)
+        } else {
+          // 위로 진입은 위치를 유지한 채 사다리 중앙으로만 스냅한다. 여기서 body.reset을 쓰면
+          // 안 된다 — 진입 직전 프레임의 상승 속도까지 지워져 사다리 맨 아래에서 영영 못 오른다.
+          this.setVelocity(0, 0)
+          this.setX(ladder.x)
+        }
         return true
       }
     }
@@ -408,10 +442,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
       return
     }
-    // 꼭대기 도달 → 발판 위로
+    // 꼭대기 도달 → 발판 위로. 발바닥을 발판 표면(=yTop)에 정확히 올려야 한다.
+    // 조금이라도 아래에 놓으면 중력으로 떨어지는 동안 ↑ 유지 입력이 tryEnterLadder의
+    // 재진입 조건(overlapY)에 걸려 climb으로 되돌아가고, 그 상태가 매 프레임 반복되며
+    // 꼭대기에 갇힌다(좌우 입력은 climb에서 무시되므로 빠져나올 수도 없음).
     if (this.body.bottom <= ladder.yTop + 2) {
       this.exitLadder()
-      this.setY(ladder.yTop - PLAYER.BODY_HEIGHT / 2)
+      this.setFeetY(ladder.yTop)
       return
     }
     // 바닥 도달
