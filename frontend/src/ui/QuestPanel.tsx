@@ -6,7 +6,7 @@ import { useUiStore } from '../stores/uiStore'
  */
 const SAMPLE_QUESTS = [
   { title: '황건적 소탕', desc: '황건당 좀비 10마리 처치', progress: '0 / 10', accent: '#e8b64c' },
-  { title: '촌장의 부탁', desc: '마을 촌장과 대화하기 (근처에서 ↑)', progress: '진행 가능', accent: '#66bb6a' },
+  { title: '수문장의 부탁', desc: '성 밖 수문장과 대화하기 (근처에서 ↑)', progress: '진행 가능', accent: '#66bb6a' },
 ]
 
 export function QuestPanel() {

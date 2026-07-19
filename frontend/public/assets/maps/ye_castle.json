@@ -2,7 +2,7 @@
   "name": "ye_castle",
   "displayName": "감숙성 내부",
   "theme": "castle_interior",
-  "underFloorStyle": "water",
+  "underFloorStyle": "river",
   "worldWidth": 2850,
   "worldHeight": 664,
   "groundY": 536,
@@ -10,7 +10,20 @@
     "x": 360,
     "y": 440
   },
-  "platforms": [],
+  "platforms": [
+    {
+      "x": 640,
+      "y": 430,
+      "width": 160,
+      "kind": "wood"
+    },
+    {
+      "x": 1560,
+      "y": 430,
+      "width": 160,
+      "kind": "wood"
+    }
+  ],
   "obstacles": [],
   "ladders": [],
   "stairs": [],

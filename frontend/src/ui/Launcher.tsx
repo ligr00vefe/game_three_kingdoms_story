@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export const GAME_WINDOW_NAME = 'threeKingdomsStory'
 
-// 기본 시작 창 크기 — 전체화면이 아닌 적당한 사이즈로 시작 (전체화면은 ESC 설정에서 수동 전환)
+// 기본 시작 창 크기 — 게임 비율(16:9)에 맞춘다. 창이 16:9면 Scale.FIT이 여백 없이 꽉 채운다.
+// 창 테두리(크롬) 때문에 내부는 정확히 16:9가 안 나오므로, 게임 창이 뜬 뒤 GameApp이 내부를
+// 16:9로 미세 보정한다(App.tsx). 여기 값은 시작 근사치일 뿐이다.
 const DEFAULT_WINDOW_WIDTH = 1280
-const DEFAULT_WINDOW_HEIGHT = 800
+const DEFAULT_WINDOW_HEIGHT = 720
 
 function openGameWindow(): boolean {
   const url = `${location.pathname}?mode=game`
@@ -24,33 +26,28 @@ function openGameWindow(): boolean {
 }
 
 /**
- * 첫 접속 탭용 런처: 게임을 threeKingdomsStory 새 창(팝업)으로 띄우고 이 탭은 빈 화면이 된다.
- * 브라우저 팝업 차단 정책상 자동 열기가 막히면 시작 버튼 클릭 1회로 연다.
+ * 첫 접속 화면: 로고 + 시작 버튼. 게임은 threeKingdomsStory 새 창(팝업)에서 실행되고,
+ * 이 화면은 "실행중…"으로 바뀐다. 팝업이 차단되면 버튼 화면에 그대로 머문다.
  */
 export function Launcher() {
   const [launched, setLaunched] = useState(false)
 
-  // 자동 열기 시도 — 팝업 차단 시 버튼 대기
-  useEffect(() => {
-    if (openGameWindow()) setLaunched(true)
-  }, [])
-
-  if (launched) {
-    // 요구사항: 게임 실행 후 기존 탭은 빈 화면
-    return <div className="launcher launcher--blank" />
-  }
-
   return (
     <div className="launcher">
-      <h1 className="launcher-title">threeKingdomsStory</h1>
-      <p className="launcher-desc">게임은 새 창에서 실행됩니다</p>
-      <button
-        className="launcher-btn"
-        onClick={() => { if (openGameWindow()) setLaunched(true) }}
-      >
-        게임 시작
-      </button>
-      <p className="launcher-hint">창이 열리지 않으면 브라우저의 팝업 차단을 해제해 주세요</p>
+      <img className="launcher-logo" src="/assets/img/logo/main_logo.png" alt="삼국지 스토리" />
+      {launched ? (
+        <p className="launcher-running">실행중…</p>
+      ) : (
+        <>
+          <button
+            className="launcher-btn"
+            onClick={() => { if (openGameWindow()) setLaunched(true) }}
+          >
+            게임 시작
+          </button>
+          <p className="launcher-hint">창이 열리지 않으면 브라우저의 팝업 차단을 해제해 주세요</p>
+        </>
+      )}
     </div>
   )
 }

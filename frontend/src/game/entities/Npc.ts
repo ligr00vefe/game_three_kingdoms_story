@@ -13,6 +13,9 @@ const BUBBLE_SHOW_MS = 3000
 const INTERACT_RANGE = 60
 // 플레이어(기본 depth 0)보다 뒤에 그려지도록 — 안 그러면 NPC가 캐릭터를 지나갈 때 캐릭터를 가림
 const NPC_DEPTH = -10
+// Phaser Text는 기본 resolution 1로 그려져, FIT 스케일로 화면이 확대되면 텍스트가 뿌옇게 늘어난다.
+// 화면 배율(창/게임)×DPR만큼 고배율로 그려두면 확대돼도 선명하다. 작은 라벨이라 메모리 부담은 무시할 수준.
+const TEXT_RESOLUTION = Math.max(2, Math.ceil(window.devicePixelRatio || 1) * 2)
 
 /**
  * 말풍선 Y오프셋 미세조정(px, 기본 계산값에 더함). 원본 이미지의 여백/비율 차이로 특정
@@ -20,8 +23,26 @@ const NPC_DEPTH = -10
  * 양수 = 더 위로, 음수 = 더 아래로.
  */
 const BUBBLE_OFFSET_ADJUST: Record<string, number> = {
-  npc_castle_lord: 0, // 동탁 — 위치를 옮기려면 이 값을 조정
+  npc_castle_lord: 5, // 동탁 — 말풍선을 조금 더 위로 (양수 = 위로)
 }
+/**
+ * 말풍선 X오프셋 미세조정(px, 머리 중앙 기준). 이미지 안에서 인물이 한쪽으로 치우쳐 그려져
+ * 말풍선이 머리와 좌우로 어긋날 때 그 NPC(textureKey)만 보정한다.
+ * 양수 = 오른쪽, 음수 = 왼쪽.
+ */
+const BUBBLE_OFFSET_X: Record<string, number> = {
+  npc_castle_lord: 5, // 동탁 — 말풍선을 살짝 오른쪽으로 (양수 = 오른쪽)
+}
+
+/**
+ * NPC별 표시 크기 override(px). 여기 없으면 아래 DEFAULT_NPC_SIZE(82px)를 쓴다.
+ * 특정 NPC만 크게/작게 하려면 그 textureKey에 [width, height]를 지정한다.
+ */
+const NPC_DISPLAY_SIZE: Record<string, [number, number]> = {
+  npc_castle_lord: [136, 136],  // 동탁 — 원본 해상도가 커서 크게
+  npc_village_chief: [96, 96],  // 성 밖 수문장 — 크기 조정은 이 값에서
+}
+const DEFAULT_NPC_SIZE = 82
 
 /**
  * 비전투 NPC (GAME_DESIGN 9장): 이름표 + 주기적 말풍선(월드 좌표 부착 = Phaser 담당).
@@ -41,12 +62,9 @@ export class Npc extends Phaser.GameObjects.Sprite {
     super(scene, x, y, def.textureKey)
     this.code = code
     this.def = def
-    // 동탁(npc_castle_lord)은 원본 이미지 해상도가 커서 더 큰 표시 크기가 필요, 나머지 NPC는 기본 64px
-    if (def.textureKey === 'npc_castle_lord') {
-      this.setDisplaySize(136, 136)
-    } else {
-      this.setDisplaySize(82, 82)
-    }
+    // NPC별 표시 크기 — NPC_DISPLAY_SIZE에 있으면 그 값, 없으면 기본 82px
+    const [dw, dh] = NPC_DISPLAY_SIZE[def.textureKey] ?? [DEFAULT_NPC_SIZE, DEFAULT_NPC_SIZE]
+    this.setDisplaySize(dw, dh)
     this.setDepth(NPC_DEPTH)
     scene.add.existing(this)
 
@@ -61,6 +79,7 @@ export class Npc extends Phaser.GameObjects.Sprite {
     scene.add
       .text(x, y + nameTagOffsetY, def.name, {
         fontSize: '12px', color: '#ffff00', backgroundColor: '#00000088', padding: { x: 5, y: 2 },
+        resolution: TEXT_RESOLUTION,
       })
       .setOrigin(0.5)
 
@@ -68,10 +87,13 @@ export class Npc extends Phaser.GameObjects.Sprite {
     // 동탁(136px)은 자연히 더 높게, 작은 NPC(82px)는 더 낮게 위치한다.
     const bubbleOffsetY = this.displayHeight / 2 + 14 + (BUBBLE_OFFSET_ADJUST[def.textureKey] ?? 0)
     this.bubbleText = scene.add
-      .text(0, 0, '', { fontSize: '12px', color: '#333333', wordWrap: { width: 150 } })
+      .text(0, 0, '', {
+        fontSize: '10px', color: '#222222', wordWrap: { width: 130 }, resolution: TEXT_RESOLUTION,
+      })
       .setOrigin(0.5)
+    const bubbleOffsetX = BUBBLE_OFFSET_X[def.textureKey] ?? 0
     const bg = scene.add.graphics()
-    this.bubble = scene.add.container(x, y - bubbleOffsetY, [bg, this.bubbleText]).setVisible(false)
+    this.bubble = scene.add.container(x + bubbleOffsetX, y - bubbleOffsetY, [bg, this.bubbleText]).setVisible(false)
     ;(this.bubble as Phaser.GameObjects.Container & { bg?: Phaser.GameObjects.Graphics }).bg = bg
 
     if (def.bubbles.length > 0) {

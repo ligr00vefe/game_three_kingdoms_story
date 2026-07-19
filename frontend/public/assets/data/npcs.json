@@ -20,7 +20,7 @@
     ]
   },
   "npc_village_chief": {
-    "name": "촌장",
+    "name": "수문장",
     "textureKey": "npc_village_chief",
     "bubbles": ["좀비를 조심하게!", "성 밖은 위험하다네…", "황건 잔당이 아직도…"],
     "dialog": [

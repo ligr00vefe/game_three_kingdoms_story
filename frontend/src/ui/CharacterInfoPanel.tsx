@@ -46,12 +46,8 @@ export function CharacterInfoPanel() {
       {/* 상단: 프리뷰 + 레벨/이름 */}
       <div className="ci-hero">
         <span className="ci-lv">Lv. {g.level}</span>
-        <span className="ci-avatar">
-          <span className="lobby-char-face" />
-          <span className="lobby-char-beard" />
-          <span className="lobby-char-body" style={{ background: char.color }} />
-          <span className="lobby-char-blade" />
-        </span>
+        {/* 대기실과 같은 관우 t1 idle 첫 프레임 — 도형 placeholder를 실제 아트로 교체 */}
+        <span className="ci-avatar" />
         <span className="ci-name">{g.characterName}</span>
         <span className="ci-class">⚔ {char.clazz}</span>
       </div>

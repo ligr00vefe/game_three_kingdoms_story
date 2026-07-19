@@ -26,7 +26,10 @@ export function startGame(parent: HTMLElement): Phaser.Game {
       },
     },
     scale: {
-      mode: Phaser.Scale.FILL,
+      // FIT: 비율(1024×576 = 16:9)을 유지한 채 창에 맞춰 확대/축소하고 남는 곳은 여백으로 둔다.
+      // 예전엔 Phaser.Scale.FILL을 썼는데 Phaser에 없는 값이라 mode가 undefined가 됐고,
+      // 그러면 캔버스가 창 크기에 비율 무시하고 그대로 늘어난다(16:9가 아닌 창에서 화면이 눌림).
+      mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [BootScene, PreloadScene, GameScene],

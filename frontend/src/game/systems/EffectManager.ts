@@ -13,6 +13,8 @@ export class EffectManager {
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
+  private swingPool: Phaser.GameObjects.Group
+  private dashThrustPool: Phaser.GameObjects.Group
   private textPool: Phaser.GameObjects.Group
 
   constructor(scene: Phaser.Scene) {
@@ -23,6 +25,8 @@ export class EffectManager {
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_burst', maxSize: 8 })
+    this.swingPool = scene.add.group({ defaultKey: 'fx_swing', maxSize: 8 })
+    this.dashThrustPool = scene.add.group({ defaultKey: 'fx_dash_thrust', maxSize: 8 })
     this.textPool = scene.add.group({ maxSize: 30 })
   }
 
@@ -76,6 +80,48 @@ export class EffectManager {
       ...(useHit ? { scale: to } : { scaleX: to, x: x + facing * 8 }),
       alpha: 0,
       duration: COMBAT.ATTACK_DURATION_MS * 0.55, ease: 'Cubic.easeOut',
+      onComplete: () => { img.setActive(false).setVisible(false) },
+    })
+  }
+
+  /**
+   * 콤보 2단계 — 휘두르기(반원 참격 호). 전용 아트(fx_swing)가 아직 없으면 찌르기로 폴백한다.
+   * 아트가 들어오면 아래 정렬값(타격 지점 = 호가 지나는 앞끝)을 attack()/skillCharge()처럼 실측해
+   * 맞춰야 한다 — 지금은 근사값이고, 폴백 중에는 쓰이지 않는다.
+   */
+  private static readonly SWING_FX = { originX: 0.5, originY: 0.5 } as const
+  swingArc(x: number, y: number, facing: -1 | 1, hit = false) {
+    if (!this.scene.textures.exists('fx_swing')) { this.attack(x, y, facing, hit); return }
+    const img = this.swingPool.get(x, y) as Phaser.GameObjects.Image | null
+    if (!img) return
+    const spec = EffectManager.SWING_FX
+    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
+    img.setActive(true).setVisible(true)
+    // 위→아래로 내리치듯 살짝 회전하며 커진다
+    img.setPosition(x, y).setAlpha(0.95).setScale(0.7).setFlipX(facing === -1).setAngle(facing * -22)
+    this.scene.tweens.add({
+      targets: img, scale: 1.15, angle: facing * 10, alpha: 0,
+      duration: COMBAT.ATTACK_DURATION_MS * 0.5, ease: 'Cubic.easeOut',
+      onComplete: () => { img.setActive(false).setVisible(false).setAngle(0) },
+    })
+  }
+
+  /**
+   * 콤보 3단계 — 대쉬찌르기(돌진 관통 궤적). 전용 아트(fx_dash_thrust)가 없으면 찌르기로 폴백한다.
+   * 찌르기보다 길게 앞으로 뻗는다. 아트가 들어오면 정렬값을 실측해 맞출 것.
+   */
+  private static readonly DASH_THRUST_FX = { originX: 0.85, originY: 0.5 } as const
+  dashThrust(x: number, y: number, facing: -1 | 1, hit = false) {
+    if (!this.scene.textures.exists('fx_dash_thrust')) { this.attack(x, y, facing, hit); return }
+    const img = this.dashThrustPool.get(x, y) as Phaser.GameObjects.Image | null
+    if (!img) return
+    const spec = EffectManager.DASH_THRUST_FX
+    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
+    img.setActive(true).setVisible(true)
+    img.setPosition(x, y).setAlpha(0.95).setScale(0.6).setFlipX(facing === -1)
+    this.scene.tweens.add({
+      targets: img, scaleX: 1.5, x: x + facing * 20, alpha: 0,
+      duration: COMBAT.ATTACK_DURATION_MS * 0.5, ease: 'Cubic.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })
   }

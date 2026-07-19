@@ -1,6 +1,7 @@
 {
   "name": "stage1_grassland",
   "displayName": "성 밖",
+  "underFloorStyle": "water",
   "worldWidth": 3200,
   "worldHeight": 664,
   "groundY": 536,
@@ -19,7 +20,7 @@
       "x": 820,
       "y": 330,
       "width": 160,
-      "kind": "wood"
+      "kind": "stone"
     },
     {
       "x": 1480,
@@ -31,7 +32,7 @@
       "x": 1720,
       "y": 340,
       "width": 160,
-      "kind": "wood"
+      "kind": "stone"
     },
     {
       "x": 2450,
@@ -43,7 +44,7 @@
       "x": 2700,
       "y": 310,
       "width": 160,
-      "kind": "wood"
+      "kind": "stone"
     }
   ],
   "obstacles": [
@@ -74,16 +75,25 @@
       "kind": "rope"
     }
   ],
+  "decor": [
+    {
+      "kind": "castleOutside",
+      "x": 190,
+      "width": 500,
+      "height": 285,
+      "yOffset": 10
+    }
+  ],
   "npcSpawns": [
     {
       "code": "npc_village_chief",
-      "x": 340,
-      "y": 500
+      "x": 300,
+      "y": 494
     }
   ],
   "portals": [
     {
-      "x": 70,
+      "x": 191,
       "name": "감숙성 내부",
       "targetMap": "map_ye_castle",
       "targetX": 2100,

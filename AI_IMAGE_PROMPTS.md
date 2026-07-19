@@ -223,3 +223,55 @@ Sits flat on the ground line. Side view.
 | D1 바위 | obstacle/rock.png | `obstacle_rock` |
 | D2 수레 | obstacle/cart.png | `obstacle_cart` |
 | D3 바리케이드 | obstacle/barricade.png | `obstacle_barricade` |
+
+## 8. 전투 이펙트 — 기본 공격 3연 콤보 (신규)
+
+기본 공격이 **찌르기 → 휘두르기 → 대쉬찌르기** 3연타로 나뉜다. 1타(찌르기)는 기존
+`fx_attack`(effect_basic_attack.png — 오른쪽 한 점으로 수렴하는 백청색 창격)을 그대로 쓴다.
+2·3타 전용 아트만 새로 만든다. **전용 아트가 없으면 코드가 찌르기 이펙트로 자동 폴백**하므로
+게임은 지금도 돌아간다 — 아래는 콤보를 시각적으로 완성하기 위한 아트다.
+
+**이펙트 공통 규칙**(기존 `fx_attack`과 반드시 통일):
+- **오른쪽을 향한다**(facing=1 기준). 코드가 좌향일 때 flipX로 뒤집는다.
+- **완전 투명 PNG**, 흰 배경 금지. 색은 기존 창격과 같은 **백색~청록(cyan-white) 에너지 광휘**.
+- 캐릭터·무기·배경 없이 **에너지 궤적만**. 텍스트·테두리 없음.
+- "타격 지점"(적에게 닿는 앞끝)이 그림 안 어디인지 **일관돼야** 정렬이 맞는다 — 아래 지정 위치를 지킬 것.
+  아트가 나오면 EffectManager의 `SWING_FX`/`DASH_THRUST_FX` originX/Y를 실측해 맞춘다.
+
+### E1. 휘두르기 참격 호 (콤보 2타)
+- **크기**: 1024×1024 생성 → 512×512 / **투명 PNG**
+- 적용: `fx_swing`. 타격 지점 = **호의 오른쪽 앞끝(볼록한 바깥 가장자리)**
+```
+[STYLE PREFIX — 이펙트용: no characters, no weapon, no background]
+A single crescent slash arc energy effect, transparent PNG, facing RIGHT.
+A wide sweeping sabre slash shaped like a bright cyan-white crescent moon, thick glowing
+leading edge on the RIGHT (outer) side tapering to a thin wispy tail on the inner side,
+soft motion-blur streaks following the curve, tiny sparkle particles flying off the leading edge.
+White-hot core fading to translucent teal at the edges. Clean energy only — no blade, no hand.
+The bright convex edge (the hit point) sits on the RIGHT third of the canvas.
+Do NOT include: any character, weapon, hand, background, text, frame.
+```
+
+### E2. 대쉬찌르기 관통 궤적 (콤보 3타)
+- **크기**: 1280×512 생성 → 640×256 / **투명 PNG** (가로로 긴 캔버스)
+- 적용: `fx_dash_thrust`. 타격 지점 = **오른쪽 끝의 창끝 한 점**
+```
+[STYLE PREFIX — 이펙트용: no characters, no weapon, no background]
+A long horizontal lunging thrust energy streak, transparent PNG, facing RIGHT.
+A sharp piercing spear-thrust trail: many thin cyan-white speed lines rushing to the RIGHT
+and converging to a single brilliant white-hot point at the far RIGHT tip, with a bright
+elongated core and faint after-images/echo streaks trailing to the LEFT to convey a fast dash.
+Longer and sharper than a normal thrust. Clean energy only — no blade, no hand.
+The converging tip (the hit point) touches the RIGHT edge of the canvas.
+Do NOT include: any character, weapon, hand, background, text, frame.
+```
+
+### 전투 이펙트 키 매핑
+
+| 에셋 | 파일명 제안 | manifest 키 | 폴백 |
+|---|---|---|---|
+| E1 휘두르기 호 | fx/effect_swing_arc.png | `fx_swing` | 없으면 `fx_attack`(찌르기)로 자동 대체 |
+| E2 대쉬찌르기 | fx/effect_dash_thrust.png | `fx_dash_thrust` | 없으면 `fx_attack`(찌르기)로 자동 대체 |
+
+> 등록 후: manifest에 위 키 추가 → 게임이 자동으로 폴백 대신 전용 아트를 쓴다. 그 다음
+> EffectManager의 `SWING_FX`/`DASH_THRUST_FX` originX/Y를 아트 실측값으로 조정해 타격 지점을 맞춘다.

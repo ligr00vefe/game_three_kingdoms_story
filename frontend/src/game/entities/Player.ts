@@ -76,8 +76,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private currentAnimKey: string | null = null
 
   // ---- 전투 (Phase 2) ----
-  /** GameScene이 주입: 히트박스 안 몬스터 판정 */
-  onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
+  /** GameScene이 주입: 히트박스 안 몬스터 판정. comboStep(0:찌르기/1:휘두르기/2:대쉬찌르기)로
+   *  단계별 이펙트를 고른다 */
+  onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, comboStep: number) => void
   onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
   /** GameScene이 주입: 공중 액션 이펙트 훅 */
   onAirDash?: (x: number, y: number, facing: -1 | 1) => void
@@ -85,6 +86,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private actionUntil = 0
   private actionHitAt = 0
   private actionHitDone = false
+  /** 콤보: 지금 재생 중인 단계(0~2). 예약 없이 모션이 끝나면 0으로 리셋 */
+  private comboStep = 0
+  /** 콤보: 현재 모션 중 공격키가 눌려 다음 단계가 예약됨 (선입력 버퍼) */
+  private comboQueued = false
+  /** 대쉬찌르기(2단계) 전진을 이 시각까지 유지 — 이후 정지 */
+  private dashLungeUntil = 0
   private skillReadyAt = 0
   private invincibleUntil = 0
   /** 자연 회복 판정용 — 마지막 전투 행동 시각 (GAME_DESIGN 5.2) */
@@ -290,8 +297,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return
     }
 
-    // 기본 공격 (GAME_DESIGN 4.1) — 지상은 정지, 공중은 관성 유지
+    // 기본 공격 (GAME_DESIGN 4.1) — 지상은 정지, 공중은 관성 유지. 콤보 0단계부터 시작.
     if (input.attackJustDown) {
+      this.comboStep = 0
       this.startAction('attack', now)
       return
     }
@@ -472,30 +480,57 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private startAction(kind: 'attack' | 'skill', now: number) {
     this.state_ = kind
     this.lastCombatAt = now
+    this.comboQueued = false // 새 모션 시작 — 이전 예약은 소비됐거나 무효
     const duration = kind === 'attack' ? COMBAT.ATTACK_DURATION_MS : COMBAT.SKILL_DURATION_MS
     const hitAt = kind === 'attack' ? COMBAT.ATTACK_HIT_AT_MS : COMBAT.SKILL_HIT_AT_MS
     this.actionUntil = now + duration
     this.actionHitAt = now + hitAt
     this.actionHitDone = false
-    if (this.body.blocked.down) this.setVelocityX(0) // 공격 중 이동 불가 (지상)
+    // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
+    const isDashLunge = kind === 'attack' && this.comboStep === 2
+    if (this.body.blocked.down) {
+      if (isDashLunge) {
+        this.dashLungeUntil = now + COMBAT.COMBO_DASH_MS
+        this.setVelocityX(this.facing * COMBAT.COMBO_DASH_VX)
+      } else {
+        this.dashLungeUntil = 0
+        this.setVelocityX(0) // 공격 중 이동 불가 (지상)
+      }
+    }
   }
 
-  private updateAction(_input: InputManager, now: number) {
-    if (this.body.blocked.down) this.setVelocityX(0)
+  private updateAction(input: InputManager, now: number) {
+    // 대쉬찌르기 돌진 구간에는 전진 속도를 유지, 그 외에는 지상에서 정지
+    if (this.body.blocked.down && now >= this.dashLungeUntil) this.setVelocityX(0)
+
+    // 선입력 버퍼: 기본 공격 모션 중 공격키를 누르면 다음 콤보 단계를 예약한다(마지막 단계 제외).
+    if (this.state_ === 'attack' && input.attackJustDown && this.comboStep < COMBAT.COMBO_MAX - 1) {
+      this.comboQueued = true
+    }
 
     if (!this.actionHitDone && now >= this.actionHitAt) {
       this.actionHitDone = true
       const hitbox = this.buildHitbox(this.state_ === 'skill')
       if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing)
-      else this.onBasicAttack?.(hitbox, this.facing)
+      else this.onBasicAttack?.(hitbox, this.facing, this.comboStep)
     }
     if (now >= this.actionUntil) {
+      // 예약된 다음 콤보 단계가 있으면 이어서 재생, 없으면 콤보 종료(0단계로 리셋)
+      if (this.state_ === 'attack' && this.comboQueued && this.comboStep < COMBAT.COMBO_MAX - 1) {
+        this.comboStep += 1
+        this.startAction('attack', now)
+        return
+      }
+      this.comboStep = 0
       this.state_ = this.body.blocked.down ? 'idle' : 'jump'
     }
   }
 
   private buildHitbox(isSkill: boolean): Phaser.Geom.Rectangle {
-    const reach = isSkill ? COMBAT.SKILL_REACH : COMBAT.ATTACK_REACH
+    // 대쉬찌르기(2단계)는 돌진하며 찔러 리치가 더 길다
+    const reach = isSkill
+      ? COMBAT.SKILL_REACH
+      : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
     const h = isSkill ? COMBAT.SKILL_HEIGHT : COMBAT.ATTACK_HEIGHT
     const x = this.facing === 1 ? this.x : this.x - reach
     return new Phaser.Geom.Rectangle(x, this.y - h / 2, reach, h)

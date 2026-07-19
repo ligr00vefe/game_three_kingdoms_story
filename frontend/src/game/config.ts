@@ -61,6 +61,15 @@ export const COMBAT = {
   ATTACK_MAX_TARGETS: 3,
   WEAPON_MULTIPLIER: 1.2,       // 청룡언월도 (item_definition effect_json과 일치)
 
+  /** 기본 공격 3연 콤보 (0:찌르기 → 1:휘두르기 → 2:대쉬찌르기).
+   *  공격 모션 중에 공격키를 다시 누르면 다음 단계가 예약돼 이어진다(선입력 버퍼).
+   *  예약 없이 모션이 끝나면 콤보는 0단계로 리셋된다. */
+  COMBO_MAX: 3,
+  COMBO_DASH_VX: 320,           // 2단계(대쉬찌르기) 전진 속도(px/s)
+  COMBO_DASH_MS: 150,           // 전진 유지 시간 — 이후 그 자리에 멈춰 마무리
+  /** 3단계(대쉬찌르기) 리치 — 돌진하며 찌르므로 기본 공격보다 길게 */
+  COMBO_DASH_REACH: 130,
+
   /** 크리티컬 (GAME_DESIGN 4.3) */
   CRIT_CHANCE: 0.05,
   CRIT_MULTIPLIER: 1.5,

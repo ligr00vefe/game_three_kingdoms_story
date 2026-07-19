@@ -28,10 +28,8 @@ import { Launcher, GAME_WINDOW_NAME } from './ui/Launcher'
 import { CharacterSelect } from './ui/CharacterSelect'
 import { LoadingScreen } from './ui/LoadingScreen'
 
-/** 게임 창인지 판별: window.open(name) 또는 ?mode=game */
-const isGameWindow =
-  window.name === GAME_WINDOW_NAME ||
-  new URLSearchParams(location.search).get('mode') === 'game'
+/** 게임 창인지 판별: 런처가 window.open으로 띄우는 URL에 붙는 ?mode=game */
+const isGameWindow = new URLSearchParams(location.search).get('mode') === 'game'
 
 export default function App() {
   if (!isGameWindow) return <Launcher />
@@ -41,6 +39,20 @@ export default function App() {
 function GameApp() {
   const serverStatus = useGameStore((s) => s.serverStatus)
   const screen = useScreenStore((s) => s.screen)
+
+  // 게임 창 내부를 정확히 16:9로 보정 — 창 크롬 때문에 window.open 크기만으로는 딱 안 맞아
+  // Scale.FIT이 위아래(또는 좌우)에 여백을 남긴다. 우리가 연 팝업이라 resizeBy가 허용된다.
+  // (직접 ?mode=game으로 들어와 스크립트가 연 창이 아니면 브라우저가 막으므로 try로 감싼다.)
+  useEffect(() => {
+    const GAME_ASPECT = 16 / 9
+    try {
+      const targetInnerH = Math.round(window.innerWidth / GAME_ASPECT)
+      const delta = targetInnerH - window.innerHeight
+      if (Math.abs(delta) > 2 && Math.abs(delta) < 400) window.resizeBy(0, delta)
+    } catch {
+      /* 스크립트가 연 창이 아니면 resize 불가 — FIT 여백을 감수한다 */
+    }
+  }, [])
 
   useEffect(() => {
     document.title = GAME_WINDOW_NAME

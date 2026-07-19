@@ -13,6 +13,20 @@
   unicode-range: U+30-39;
 }
 
+/*
+ * 로딩 화면 'Now Loading' 등 **영문 표기용** 같은 서체(Baloo 2 ExtraBold)의 라틴 서브셋.
+ * 위 Baloo2Digits는 숫자만 있어 영문자에 못 쓴다 — 그래서 라틴 글리프를 따로 동봉했다.
+ * 한글은 이 폰트에 없으니 폴백(system-ui)으로 넘어간다 — 영문 표기에만 지정할 것.
+ */
+@font-face {
+  font-family: 'Baloo2';
+  src: url('/assets/fonts/Baloo2-ExtraBold-latin.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+2000-206F;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html {
@@ -236,15 +250,13 @@ html, body, #root { height: 100%; }
   gap: 14px;
   background: #101014;
 }
-.launcher--blank { background: #101014; } /* 실행 후 빈 화면 */
-.launcher-title {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #e8b64c;
-  text-shadow: 0 3px 8px #000;
+/* 로고 원본(1536×1024)은 배경이 검정이라 .launcher 배경(#101014)에 그대로 녹아든다.
+   창이 작아도 버튼이 화면 밖으로 밀리지 않도록 세로를 vh로 함께 제한한다. */
+.launcher-logo {
+  width: min(560px, 82vw);
+  max-height: 56vh;
+  object-fit: contain;
 }
-.launcher-desc { font-size: 14px; color: #999; }
 .launcher-btn {
   margin-top: 8px;
   padding: 12px 46px;
@@ -259,6 +271,14 @@ html, body, #root { height: 100%; }
 }
 .launcher-btn:hover { filter: brightness(1.08); }
 .launcher-hint { font-size: 12px; color: #666; }
+/* 실행 후 — 버튼 자리를 대신한다 (버튼의 margin-top과 맞춰 로고가 튀지 않게) */
+.launcher-running {
+  margin-top: 8px;
+  padding: 12px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8b64c;
+}
 
 /* ==================================================================
    미니맵 (좌상단, 메이플 프레임)
@@ -668,10 +688,56 @@ html, body, #root { height: 100%; }
   flex-direction: column;
   align-items: center;
   padding-top: 26px;
-  /* 하늘 → 언덕 그라데이션 배경 (AI 배경 아트 도입 전 placeholder) */
-  background:
-    radial-gradient(ellipse 120% 55% at 50% 108%, #5d8a4a 0%, #7cb45b 34%, transparent 62%),
-    linear-gradient(#a8dde0 0%, #cdeef0 46%, #e8f6e3 70%, #9cc978 100%);
+  /* 스테이지 이미지가 못 덮는 가장자리를 막는 어두운 천막 톤 */
+  background: #1a1410;
+}
+
+/**
+ * 군막사 배경 스테이지. 배경 이미지(1536×1024 = 3:2)와 **같은 비율을 유지한 채** 화면을 덮는다.
+ * .lobby에 background-size:cover를 걸지 않는 이유: cover는 잘려나가는 양이 뷰포트 비율마다
+ * 달라져서, 좌석의 % 좌표가 의자를 벗어난다. 스테이지 자체를 3:2로 잡아야 좌석 %가 이미지에 고정된다.
+ * width = 1.5 × height 를 유지하면서 양방향 모두 최소 100%를 넘도록 max()로 잡는다.
+ */
+.lobby-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 150dvh);
+  height: max(100%, 66.667vw);
+  transform: translate(-50%, -50%);
+  background: url('/assets/img/bg/bg_barracks.jpg') center / 100% 100% no-repeat;
+}
+
+/* 의자 좌석 — 밑변(발/엉덩이)이 좌석 윗면(SEATS.y)에 오도록 -100% 이동 */
+.lobby-seat {
+  position: absolute;
+  transform: translate(-50%, -100%) scale(var(--seat-scale, 1));
+  transform-origin: bottom center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.lobby-seat:hover .lobby-char { transform: translateY(-4px); }
+/* 선택 강조 — 천막의 등불 톤에 맞춘 따뜻한 금빛 (기존 흰색+청록은 막사 배경에서 겉돌았다) */
+.lobby-seat--on .lobby-char {
+  filter: drop-shadow(0 0 12px rgba(255, 198, 92, 0.9));
+}
+.lobby-seat--on .lobby-slot-name {
+  border-color: rgba(240, 205, 130, 0.95);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 160, 0.35),
+    0 0 14px rgba(232, 180, 90, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+}
+.lobby-seat--on .lobby-slot-title { color: #ffdd93; }
+/* 이름표는 좌석 아래(벤치 앞면)에 — 캐릭터를 좌석 윗면에 붙이려면 흐름에서 빼야 한다 */
+.lobby-seat .lobby-slot-name {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 .lobby-top {
   position: absolute;
@@ -696,117 +762,120 @@ html, body, #root { height: 100%; }
   background: rgba(255, 255, 255, 0.72);
   border-radius: 12px;
 }
+/* 어두운 군막사 배경 위 — 밝은 금빛 각인 톤 (기존 연녹색+흰 그림자는 묻혀서 안 보인다) */
 .lobby-title {
+  position: relative;
   font-size: 26px;
   font-weight: 800;
-  color: #2c4a22;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.55);
+  color: #f0d9a8;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
   margin-bottom: 18px;
 }
 
-.lobby-shelves {
-  display: flex;
-  flex-direction: column;
-  gap: 34px;
-  width: min(760px, 72%);
-}
-.lobby-shelf-slots {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: end;
-  padding: 0 26px;
-}
-.lobby-shelf-board {
-  height: 22px;
-  border-radius: 8px;
-  background: linear-gradient(#a9805a, #7c5636);
-  border: 2px solid #5d4027;
-  border-bottom-width: 5px;
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.18);
-}
-.lobby-slot {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 6px 4px;
-  background: transparent;
-  border: none;
-}
-.lobby-slot--char { cursor: pointer; }
-.lobby-slot--char:hover .lobby-char { transform: translateY(-4px); }
-.lobby-slot--on .lobby-char { filter: drop-shadow(0 0 10px #64d8ff); }
-.lobby-slot--on .lobby-slot-name {
-  background: #fff;
-  color: #1c313a;
-  border-color: #64d8ff;
-  box-shadow: 0 0 8px rgba(100, 216, 255, 0.6);
-}
-
-/* CSS placeholder 관우 (대기실용 — AI 일러스트 도입 시 img로 교체) */
+/*
+ * 대기실 관우 — 인게임과 같은 guanwu_t1_idle_r 시트(512×128, 128px 4프레임)의 **첫 프레임**만
+ * 잘라 쓴다. 시트에서 발바닥이 프레임 하단(y=127)에 정렬돼 있으므로, 이 박스의 밑변이 곧
+ * 발바닥 = 좌석면이 된다 (.lobby-seat의 translateY(-100%)와 한 쌍).
+ * span이라 display를 직접 잡아야 한다 — inline이면 width/height가 무시돼 0×0으로 붕괴하고
+ * 좌석 버튼까지 0×0이 되어 클릭이 안 된다.
+ */
 .lobby-char {
-  position: relative;
-  width: 64px; height: 76px;
+  display: block;
+  /* 프레임 128px을 2배로 — 등신 그대로 두면 캐릭터가 63px밖에 안 돼 얼굴이 안 보인다.
+     의자와의 원근 비율보다 가독성을 우선한다. background-size도 같은 배율(512×128 → 1024×256). */
+  width: 256px; height: 256px;
+  background: url('/assets/img/char/guanwu_t1_idle_r.png') 0 0 / 1024px 256px no-repeat;
+  image-rendering: pixelated; /* 도트 아트라 확대/축소 시 뭉개지지 않게 */
   transition: transform 0.15s, filter 0.15s;
 }
-.lobby-char-face {
-  position: absolute; left: 20px; top: 4px;
-  width: 24px; height: 20px;
-  background: #c62828; border-radius: 5px;
+
+/*
+ * 화로대 횃불 — effect_torch_flame.png (1216×332, 152px 8프레임).
+ * 원본 torchlight_demo.png(1536×1024, 흰 배경 RGB)를 그대로는 못 쓴다:
+ *   ① 프레임 간격이 제각각(143~145px 그림 + 불규칙 여백)이라 steps()로 자르면 어긋나고
+ *   ② 알파가 없어 흰 배경이 그대로 딸려온다.
+ * 그래서 흰색을 키잉해 알파를 만들고(경계 1px은 흰색과 섞인 만큼 되돌림),
+ * **받침 밑동을 셀 하단·받침 중심을 셀 중앙**에 맞춰 152×332 격자로 다시 잘라 넣었다.
+ * 흔들리는 불꽃이 아니라 받침을 기준으로 정렬해야 프레임이 넘어가도 화로가 고정돼 보인다.
+ * 그릇 테두리는 셀 하단에서 132px 위 — TORCHES 좌표는 이걸 배경 화로에 맞춘 값이다.
+ */
+.lobby-torch {
+  position: absolute;
+  display: block;
+  /* width는 배경 대비 %로 인라인 지정(TORCHES.w). 높이는 프레임 비율에서 따와야
+     창을 넓혀도 그릇이 배경 화로에 계속 맞는다. */
+  aspect-ratio: 152 / 332;
+  transform: translate(-50%, -100%);
+  /* 800% = 프레임 8장 → 이미지 한 장이 정확히 이 박스 크기가 된다(auto 높이도 332/152로 일치) */
+  background: url('/assets/img/fx/effect_torch_flame.png') 0 0 / 800% auto no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none; /* 좌석 클릭을 가리지 않게 */
+  animation: lobby-torch-flicker 0.64s steps(8) infinite;
+  animation-delay: var(--torch-delay, 0s);
 }
-.lobby-char-beard {
-  position: absolute; left: 24px; top: 20px;
-  width: 16px; height: 9px;
-  background: #1b1b1b; border-radius: 0 0 5px 5px;
+/*
+ * 불빛 번짐 — 어두운 천막이라 이게 없으면 횃불만 오려 붙인 듯 뜬다.
+ * 스프라이트에 drop-shadow를 걸면 실루엣을 따라가 **쇠받침 둘레까지** 빛나므로,
+ * 빛이 나와야 할 불꽃 위치에만 원형 그라데이션을 따로 깐다.
+ */
+.lobby-torch::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 32%; /* 셀 기준 불꽃 중심 */
+  width: 200%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle closest-side, rgba(255, 160, 60, 0.4), rgba(255, 120, 30, 0) 70%);
 }
-.lobby-char-body {
-  position: absolute; left: 14px; top: 28px;
-  width: 36px; height: 44px;
-  border-radius: 7px 7px 4px 4px;
+/*
+ * %로 준 background-position은 "박스 폭 - 이미지 폭"(= -7박스) 기준이라 한 프레임 = 100/7%다.
+ * 그래서 끝값을 8/7×100%로 두면 steps(8)이 0·14.28…·…·100%, 즉 프레임 0~7을 정확히 훑는다
+ * (100%로 두면 12.5% 간격이 돼 프레임 경계가 어긋난다).
+ */
+@keyframes lobby-torch-flicker {
+  to { background-position: 114.2857% 0; }
 }
-.lobby-char-blade {
-  position: absolute; right: 0; top: -6px;
-  width: 5px; height: 66px;
-  background: linear-gradient(#42a5f5 0 22%, #90a4ae 22% 100%);
-  border-radius: 3px;
+@media (prefers-reduced-motion: reduce) {
+  .lobby-torch { animation: none; }
 }
 
-/* 미래 캐릭터 실루엣 (준비 중 슬롯) */
-.lobby-silhouette {
-  width: 52px; height: 68px;
-  background: rgba(255, 255, 255, 0.82);
-  border-radius: 45% 45% 30% 30% / 58% 58% 22% 22%;
-  box-shadow: 0 0 14px rgba(255, 244, 190, 0.9);
-  animation: lobby-glow 2.2s ease-in-out infinite;
-}
-.lobby-silhouette--dim {
-  background: rgba(255, 255, 255, 0.35);
-  box-shadow: 0 0 8px rgba(255, 244, 190, 0.4);
-  animation: none;
-}
-@keyframes lobby-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(255, 244, 190, 0.55); }
-  50% { box-shadow: 0 0 20px rgba(255, 244, 190, 0.95); }
-}
-
+/* 이름표 — 군막사 톤의 황동 명패 (기존 흰 둥근 박스는 천막 배경에서 떠 보였다) */
 .lobby-slot-name {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 76px;
-  padding: 3px 10px;
-  font-size: 12px; font-weight: 800;
-  color: #263238;
-  background: rgba(255, 255, 255, 0.88);
-  border: 2px solid #b0bec5;
-  border-radius: 10px;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  min-width: 84px;
+  padding: 4px 12px;
+  background: linear-gradient(180deg, rgba(46, 36, 24, 0.94), rgba(26, 20, 13, 0.94));
+  border: 1px solid rgba(198, 160, 92, 0.55);
+  border-radius: 2px; /* 각진 마감 — 나무/금속 명패 느낌 */
+  box-shadow:
+    inset 0 1px 0 rgba(228, 196, 130, 0.22),
+    0 3px 10px rgba(0, 0, 0, 0.6);
 }
-.lobby-slot-name small { font-size: 10px; font-weight: 700; color: #78909c; }
-.lobby-slot-name--soon { opacity: 0.75; }
+.lobby-slot-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #e8c47a;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.lobby-slot-lv {
+  font-family: 'Baloo2', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  color: #9c8c6a;
+}
 
 /* 우측 능력치 카드 */
-.lobby-card {
+/* ---- 우측 능력치 두루마리 ----
+   구조: [축] [뷰포트(0fr↔1fr)] [축]. 가운데 트랙만 여닫으면 아래 축은 그리드가 밀어낸다.
+   height:auto는 transition이 안 걸려서 grid-template-rows의 fr을 대신 애니메이션한다
+   (0fr→1fr은 내용 높이를 몰라도 자연 높이까지 펴진다 — 캐릭터마다 글 길이가 달라서 필요).
+   --roll-ms는 CharacterSelect.tsx의 ROLL_MS가 내려준다. 여기 숫자를 직접 적지 말 것. */
+.lobby-side {
   position: absolute;
   right: 22px;
   top: 50%;
@@ -814,67 +883,128 @@ html, body, #root { height: 100%; }
   width: 224px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 16px 16px 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 2px solid #cfe8f3;
-  border-radius: 16px;
-  box-shadow: 0 8px 22px rgba(38, 70, 83, 0.25);
+  gap: 22px; /* 족자 상태창과 게임 시작 버튼 사이 간격 (바짝 붙지 않게 벌림) */
 }
-.lobby-card-lv { font-size: 15px; font-weight: 700; color: #29a8df; text-align: center; }
-.lobby-card-lv b { font-size: 26px; }
+.lobby-scroll {
+  /* 축 위/[뷰포트]/축 아래를 세로로 쌓는다. 여는 애니메이션은 뷰포트 height(px)만 전환하므로
+     여기엔 transition이 없다 — 축은 뷰포트가 밀어내며 같은 속도로 따라온다. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  filter: drop-shadow(0 8px 18px rgba(30, 18, 6, 0.45));
+  /* 롤 이미지에서 양피지는 폭의 가운데 ~79%(양옆 ~10.5%는 나무 손잡이)다. 본문 종이를 그 폭에
+     맞추려고 뷰포트를 이만큼 인셋한다 — 말려있던 종이와 펼쳐진 종이의 폭이 같아진다. */
+  --paper-inset: 10.5%;
+  /* 롤이 페이지보다 좁아 보여서, 축을 좌우로 이만큼 넓혀(bleed) 양피지가 페이지를 덮게 한다.
+     축만 넓히고 페이지 폭은 그대로라 "족자를 늘려 페이지 너비에 맞춘" 결과가 된다. */
+  --rod-bleed: 10px;
+}
+/* 축(두루마리 봉) — parchment_roll.png(1438×145). aspect-ratio로 폭에 맞춰 높이가 따라온다.
+   축은 손잡이까지 포함한 전체 폭(100%)으로 두고, 종이(뷰포트)만 인셋한다.
+   본문 위/아래에 살짝 겹쳐(-margin) 종이 끝단이 봉 밑으로 말려 들어간 것처럼 보이게 한다.
+   아래 봉은 scaleY(-1)로 뒤집어 위 봉과 마주 보게 한다(종이 나오는 방향이 위로 향하게). */
+.scroll-rod {
+  aspect-ratio: 1438 / 145;
+  background: url('/assets/img/standBy/parchment_roll.png') center / 100% 100% no-repeat;
+  position: relative;
+  z-index: 1; /* 본문 끝단 위에 봉이 오도록 */
+  /* 축을 좌우로 bleed만큼 넓혀 양피지가 페이지를 덮게 한다 (음수 마진 = 컨테이너 밖으로 확장) */
+  margin-left: calc(-1 * var(--rod-bleed));
+  margin-right: calc(-1 * var(--rod-bleed));
+}
+.scroll-rod--top { margin-bottom: -7px; }
+.scroll-rod--bottom { margin-top: -7px; transform: scaleY(-1); }
+.scroll-viewport {
+  overflow: hidden; /* 뷰포트 높이 밖으로 나가는 종이를 잘라 "펼쳐지며 드러나는" 연출 */
+  margin: 0 var(--paper-inset); /* 종이를 롤의 양피지 폭에 맞춘다 */
+  transition: height var(--roll-ms) ease; /* 축 이동과 픽셀 단위로 정확히 같은 속도 */
+}
+/* 양피지 본문 — parchment_page.png(1254×1254). 높이가 캐릭터마다 달라 100% 100%로 채운다
+   (paper 텍스처라 약간의 세로 신축은 티가 안 난다). 좌우 가장자리 음영이 두루마리 곡면 그림자로 읽힌다. */
+.scroll-content {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 18px;
+  background: url('/assets/img/standBy/parchment_page.png') center / 100% 100% no-repeat;
+}
+/* 종이와 글자는 뷰포트 클립으로 위→아래로 함께 드러난다(두루마리가 펴지듯). 내용 높이는
+   그대로라 글자가 눌리지 않고, opacity 페이드 없이도 자연스럽다. */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-viewport { transition: none; }
+}
+
+.lobby-card-lv { font-size: 15px; font-weight: 700; color: #8a5a2b; text-align: center; }
+.lobby-card-lv b { font-size: 26px; color: #5b3a17; }
 .lobby-card-name {
   padding: 6px 0;
   font-size: 17px; font-weight: 800; text-align: center;
-  color: #263238;
-  background: #eef7fb;
+  color: #2f1d0b;
+  background: rgba(120, 78, 34, 0.16);
   border-radius: 9px;
 }
-.lobby-card-class { font-size: 12px; font-weight: 800; color: #e05a72; text-align: center; }
-.lobby-card-desc { font-size: 11px; line-height: 1.55; color: #546e7a; }
+.lobby-card-class { font-size: 12px; font-weight: 800; color: #a33b2c; text-align: center; }
+.lobby-card-desc { font-size: 11px; line-height: 1.55; color: #5e4526; }
 .lobby-card-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
+/* 각 능력치는 라벨(위)과 값(아래)을 줄바꿈해 세로로 쌓는다 — 좁은 종이 폭에서 "이동속도 100%"
+   같은 긴 항목이 잘리지 않고 읽힌다. */
 .lobby-stat {
-  display: flex; justify-content: space-between;
-  padding: 5px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 5px 6px;
   font-size: 11px;
-  background: #f2f6f8;
+  background: rgba(120, 78, 34, 0.1);
+  border: 1px solid rgba(120, 78, 34, 0.22);
   border-radius: 6px;
 }
-.lobby-stat span { color: #78909c; font-weight: 700; }
-.lobby-stat b { color: #263238; }
+.lobby-stat span { color: #8a6a3e; font-weight: 700; }
+.lobby-stat b { color: #2f1d0b; font-size: 13px; }
 .lobby-card-skill {
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
   padding: 7px 9px;
-  background: #eef4ea;
+  background: rgba(90, 110, 60, 0.14);
+  border: 1px solid rgba(90, 110, 60, 0.28);
   border-radius: 8px;
-  font-size: 12px; color: #2c4a22;
+  font-size: 12px; color: #35461f;
 }
 .lobby-skill-tag {
   padding: 1px 7px;
   font-size: 10px; font-weight: 800;
-  color: #fff; background: #66965a;
+  color: #f3ead3; background: #5d7040;
   border-radius: 8px;
 }
-.lobby-card-skill small { width: 100%; font-size: 10px; color: #78909c; }
+.lobby-card-skill small { width: 100%; font-size: 10px; color: #6b5836; }
+/* 게임 시작 — start_buttons.png 스프라이트. 한 이미지에 기본(위)·호버(아래 발광) 두 상태가
+   세로로 들어있다. 버튼 칸(양피지+나무테)의 종횡비 1227:285에 맞추고, 배경 위치로 상태를 고른다.
+   background-size 125.2% = 1536/1227 (테두리 여백 밴드가 아니라 버튼 밴드가 버튼 폭을 꽉 채우게).
+   position-y 22.5%/74.7% = 위/아래 밴드의 세로 중심을 버튼 중앙에 맞춘 계산값. */
 .lobby-start {
-  margin-top: 4px;
-  padding: 13px 0;
-  font-size: 19px; font-weight: 800;
-  color: #fff;
-  background: linear-gradient(#5fd0f2, #1fa9dc);
-  border: 2px solid #1288b6;
-  border-radius: 12px;
+  aspect-ratio: 1227 / 285;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 18px 0; /* 세로 정중앙 보정: 위 1px로 글씨를 버튼(양피지) 중심에 맞춤(측정 오프셋 ≈0) */
+  background: url('/assets/img/standBy/start_buttons.png') no-repeat;
+  background-size: 125.2% auto;
+  background-position: center 22.5%;
+  border: 0;
   cursor: pointer;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: 2px;
+  line-height: 1; /* 줄상자를 정상화해야 flex 세로 정렬이 제대로 먹는다 (0.1이면 글자가 위로 뜬다) */
+  color: #35200e;
+  text-shadow: 0 1px 0 rgba(255, 244, 214, 0.35);
+  transition: background-position 0s; /* 상태 전환은 즉시 (발광 프레임 교체) */
 }
-.lobby-start:hover { filter: brightness(1.07); }
+.lobby-start:hover { background-position: center 74.7%; }
 
 /* ==================================================================
-   로딩 화면 (걷는 캐릭터 + Now Loading…)
+   로딩 화면 (Now Loading… + 무작위 게임 안내 문구)
    ================================================================== */
 .loading {
   position: absolute;
@@ -893,13 +1023,17 @@ html, body, #root { height: 100%; }
   flex-direction: column;
   align-items: center;
 }
+/* 데미지 숫자와 같은 서체(Baloo 2 ExtraBold)의 라틴 서브셋 — 둥근 만화풍 */
 .loading-text {
-  font-size: 20px;
+  font-family: 'Baloo2', system-ui, sans-serif;
+  font-size: 40px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   color: #ffd54f;
-  text-shadow: 0 2px 6px #000;
-  margin-bottom: 14px;
+  text-shadow:
+    0 3px 0 #7a4a10,
+    0 5px 14px rgba(0, 0, 0, 0.75);
+  margin-bottom: 26px;
 }
 .loading-dots i {
   font-style: normal;
@@ -912,67 +1046,31 @@ html, body, #root { height: 100%; }
   30% { opacity: 1; }
 }
 
-/* 걷기 placeholder — 몸통 바운스 + 다리 스윙 (스프라이트 도입 전) */
-.load-char {
-  position: relative;
-  width: 64px; height: 78px;
-  animation: load-bob 0.5s ease-in-out infinite;
+/* 안내 문구 — 죽간(竹簡)을 펼친 듯한 가로 띠 */
+.loading-tip-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(860px, 92vw); /* 설명글이 한두 줄로 가로로 길게 흐르도록 (기존 560px는 자주 3줄로 접혔다) */
+  padding: 12px 24px;
+  background: rgba(28, 22, 15, 0.72);
+  border: 1px solid rgba(196, 158, 90, 0.45);
+  border-radius: 4px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
-@keyframes load-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-.load-char-face {
-  position: absolute; left: 20px; top: 2px;
-  width: 24px; height: 20px;
-  background: #c62828; border-radius: 5px;
-}
-.load-char-beard {
-  position: absolute; left: 24px; top: 18px;
-  width: 16px; height: 9px;
-  background: #1b1b1b; border-radius: 0 0 5px 5px;
-}
-.load-char-body {
-  position: absolute; left: 14px; top: 26px;
-  width: 36px; height: 38px;
-  background: #2e7d32; border-radius: 7px 7px 4px 4px;
-}
-.load-char-blade {
-  position: absolute; right: 0; top: -8px;
-  width: 5px; height: 64px;
-  background: linear-gradient(#42a5f5 0 22%, #90a4ae 22% 100%);
+.loading-tip-label {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-family: 'Baloo2', system-ui, sans-serif;
+  font-size: 12px; font-weight: 800; letter-spacing: 1px;
+  color: #1c1610;
+  background: linear-gradient(#e8c47a, #c49e5a);
   border-radius: 3px;
 }
-.load-char-leg {
-  position: absolute; top: 62px;
-  width: 9px; height: 16px;
-  background: #1b5e20; border-radius: 3px;
-  transform-origin: top center;
-}
-.load-char-leg--l { left: 20px; animation: load-step 0.5s ease-in-out infinite; }
-.load-char-leg--r { left: 35px; animation: load-step 0.5s ease-in-out infinite reverse; }
-@keyframes load-step {
-  0%, 100% { transform: rotate(24deg); }
-  50% { transform: rotate(-24deg); }
-}
-
-/* 발밑 지면: 대시가 왼쪽으로 흘러 걷는 느낌 */
-.loading-ground {
-  width: 220px;
-  height: 3px;
-  margin-top: 6px;
-  background: repeating-linear-gradient(90deg, #6d5a41 0 22px, transparent 22px 44px);
-  animation: load-ground 0.6s linear infinite;
-  border-radius: 2px;
-}
-@keyframes load-ground {
-  from { background-position-x: 0; }
-  to { background-position-x: -44px; }
-}
 .loading-tip {
-  margin-top: 22px;
-  font-size: 12px;
-  color: #90939c;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d8cbb2;
 }
 
 /* ==================================================================
@@ -1158,7 +1256,13 @@ html, body, #root { height: 100%; }
   border: 1px solid #a9cfe0; border-radius: 10px;
 }
 .ci-lv { position: absolute; right: 10px; top: 8px; font-size: 13px; font-weight: 800; color: #2a6fa8; }
-.ci-avatar { position: relative; width: 64px; height: 76px; }
+/* 대기실(.lobby-char)과 같은 guanwu_t1_idle_r 시트의 첫 프레임 — 여기선 0.75배(96px)로 쓴다.
+   background-size는 시트 전체(512×128)에 배율을 곱한 값이어야 프레임 1장이 정확히 잘린다. */
+.ci-avatar {
+  width: 96px; height: 96px;
+  background: url('/assets/img/char/guanwu_t1_idle_r.png') 0 0 / 384px 96px no-repeat;
+  image-rendering: pixelated;
+}
 .ci-name { font-size: 15px; font-weight: 800; color: #26323a; }
 .ci-class { font-size: 11px; font-weight: 700; color: #e0587a; }
 .ci-cp {

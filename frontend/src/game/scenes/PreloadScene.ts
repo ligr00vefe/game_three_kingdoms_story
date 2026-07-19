@@ -209,14 +209,16 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0x6f7182); g.fillRect(4, 22, 26, 8); g.fillRect(36, 52, 22, 8); g.fillRect(10, 74, 30, 8)
     g.generateTexture('tile_underfloor_stone', 64, 96)
 
-    // 촌장 NPC: 갈색 도포의 노인 (GAME_DESIGN 7장)
-    g.clear()
-    g.fillStyle(0x8a5a3b); g.fillRect(16, 24, 32, 40)   // 도포
-    g.fillStyle(0xf3d5b5); g.fillRect(22, 8, 20, 18)    // 얼굴
-    g.fillStyle(0xffffff); g.fillRect(26, 22, 12, 8)    // 흰 수염
-    g.fillStyle(0x5d4037); g.fillRect(20, 4, 24, 6)     // 두건
-    g.fillStyle(0x4e342e); g.fillRect(44, 28, 4, 34)    // 지팡이
-    g.generateTexture('npc_village_chief', 64, 64)
+    // 수문장 NPC(성 밖): 실제 아트(npc_gatekeeper_02) 로드 실패 시 폴백 — 갈색 도포 노인 도형
+    if (!this.textures.exists('npc_village_chief')) {
+      g.clear()
+      g.fillStyle(0x8a5a3b); g.fillRect(16, 24, 32, 40)   // 도포
+      g.fillStyle(0xf3d5b5); g.fillRect(22, 8, 20, 18)    // 얼굴
+      g.fillStyle(0xffffff); g.fillRect(26, 22, 12, 8)    // 흰 수염
+      g.fillStyle(0x5d4037); g.fillRect(20, 4, 24, 6)     // 두건
+      g.fillStyle(0x4e342e); g.fillRect(44, 28, 4, 34)    // 지팡이
+      g.generateTexture('npc_village_chief', 64, 64)
+    }
 
     // 점프 대쉬 잔상: 수평 스피드라인
     g.clear()
