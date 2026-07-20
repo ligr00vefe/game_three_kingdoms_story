@@ -218,6 +218,17 @@ const CLOUD_DEPTH_FRONT = -90 // 빠른 구름 — 산 앞
 const MOUNTAIN_SCROLL = 0.08
 
 /**
+ * 감숙성 중경: 언덕+숲 (bg_hill.png, 1983×300, 좌우로 무한 반복).
+ * 먼 산(MOUNTAIN)보다 앞(depth BG_MID), 근경 성벽(bg_inside_wall, BG_NEAR)보다 뒤에 깔린다.
+ * **여기 두 값만 만지면 조절된다:**
+ *   HEIGHT : 화면상 띠 높이(px) = 크기. tileScaleFor가 HEIGHT/원본높이(300)로 균일 배율을 잡으므로,
+ *            300이면 원본 배율, 키우면 언덕·숲이 통째로 커진다(가로도 같이 커져 반복 간격이 넓어짐).
+ *   TOP_Y  : 띠 윗변의 월드 Y(작을수록 위로). 산 아래 하늘 여백을 덮도록 위치를 잡는다.
+ * SCROLL은 시차(산 0.08 < 이 값 < 성벽 0.7). 보통 손댈 필요 없다.
+ */
+const HILL = { SCROLL: 0.15, HEIGHT: 220, TOP_Y: 250 } as const
+
+/**
  * 스테이지 1: 초원 (GAME_DESIGN 7장). 맵은 JSON 데이터 주도.
  * Phase 2 범위 추가: 전투(참격/청룡참), 황건당 좀비, 데미지/경험치/레벨업, 피격/사망.
  */
@@ -398,11 +409,17 @@ export class GameScene extends Phaser.Scene {
       if (this.art('img_castle_mid')) {
         addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 250, map.groundY - 280)
       }
+      // mid: 산과 성벽 사이 중경 언덕+숲 (좌우 무한 반복). 산(BG_FAR/MOUNTAIN_DEPTH)보다 앞,
+      // 성벽(BG_NEAR)보다 뒤라 성벽이 아랫부분을 가리고 산 아래 하늘 여백을 덮는다.
+      // 크기/높이 조절은 위의 HILL 상수에서. addLayer=tileSprite라 가로로 이어 반복된다.
+      if (this.art('bg_hill')) {
+        addLayer('bg_hill', HILL.SCROLL, DEPTH.BG_MID, HILL.HEIGHT, HILL.TOP_Y)
+      }
       // near: 안뜰을 두른 성벽 — bg_inside_wall 5칸 반복, 4번째 칸만 bg_inside_wall_gate.
       // CASTLE_WALL_H를 건물보다 크게 잡아 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
       const wallH = CASTLE_WALL_H
       if (this.art('img_castle_wall')) {
-        addTiledWall('img_castle_wall', 'img_castle_wall_gate', 0.7, DEPTH.BG_NEAR, wallH + 30, map.groundY - wallH - 40, 5, 3)
+        addTiledWall('img_castle_wall', 'img_castle_wall_gate', 0.7, DEPTH.BG_NEAR, wallH + 30, map.groundY - wallH - 43, 5, 3)
       } else {
         addLayer('ph_wall', 0.7, DEPTH.BG_NEAR, wallH + 25, map.groundY - wallH - 33)
       }

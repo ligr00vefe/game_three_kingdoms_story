@@ -70,7 +70,7 @@
   ],
   "portals": [
     {
-      "x": 2455,
+      "x": 2460,
       "name": "성 밖",
       "targetMap": "map_stage1",
       "targetX": 170,
