@@ -26,10 +26,12 @@ export function startGame(parent: HTMLElement): Phaser.Game {
       },
     },
     scale: {
-      // FIT: 비율(1024×576 = 16:9)을 유지한 채 창에 맞춰 확대/축소하고 남는 곳은 여백으로 둔다.
-      // 예전엔 Phaser.Scale.FILL을 썼는데 Phaser에 없는 값이라 mode가 undefined가 됐고,
-      // 그러면 캔버스가 창 크기에 비율 무시하고 그대로 늘어난다(16:9가 아닌 창에서 화면이 눌림).
-      mode: Phaser.Scale.FIT,
+      // RESIZE: 캔버스를 부모 컨테이너(창) 크기에 그대로 맞춘다 → 검은 여백 없음, 왜곡 없음.
+      // 대신 게임이 "창 비율에 맞춰" 보여주는 월드 범위가 달라진다(넓은 창=좌우로 더, 좁은 창=세로로 더).
+      // width/height는 초기값일 뿐 Phaser가 부모 크기에 맞춰 리사이즈한다.
+      // FIT(16:9 고정+레터박스)이나 FILL(늘려 채움=찌그러짐)이 아니라 이 방식을 쓴다.
+      // 카메라는 CAMERA.ZOOM(1.4) 고정이라 스프라이트 픽셀 크기는 일정 — 큰 창일수록 월드가 더 넓게 보인다.
+      mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [BootScene, PreloadScene, GameScene],

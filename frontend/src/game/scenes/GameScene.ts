@@ -388,7 +388,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 300, 80, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 200, 50, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
@@ -396,13 +396,13 @@ export class GameScene extends Phaser.Scene {
       // mid: 멀리 보이는 성벽/망루 (반복) — 실제 아트(img_castle_mid)가 있을 때만.
       // placeholder(ph_bg_mid)는 near 성벽과 겹쳐 "성벽이 둘"로 보여서 castle_interior에선 생략.
       if (this.art('img_castle_mid')) {
-        addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 300, map.groundY - 280)
+        addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 250, map.groundY - 280)
       }
       // near: 안뜰을 두른 성벽 — bg_inside_wall 5칸 반복, 4번째 칸만 bg_inside_wall_gate.
       // CASTLE_WALL_H를 건물보다 크게 잡아 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
       const wallH = CASTLE_WALL_H
       if (this.art('img_castle_wall')) {
-        addTiledWall('img_castle_wall', 'img_castle_wall_gate', 0.7, DEPTH.BG_NEAR, wallH + 25, map.groundY - wallH - 33, 5, 3)
+        addTiledWall('img_castle_wall', 'img_castle_wall_gate', 0.7, DEPTH.BG_NEAR, wallH + 30, map.groundY - wallH - 40, 5, 3)
       } else {
         addLayer('ph_wall', 0.7, DEPTH.BG_NEAR, wallH + 25, map.groundY - wallH - 33)
       }

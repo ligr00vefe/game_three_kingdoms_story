@@ -2,23 +2,23 @@ import { useState } from 'react'
 
 export const GAME_WINDOW_NAME = 'threeKingdomsStory'
 
-// 기본 시작 창 크기 — 게임 비율(16:9)에 맞춘다. 창이 16:9면 Scale.FIT이 여백 없이 꽉 채운다.
-// 창 테두리(크롬) 때문에 내부는 정확히 16:9가 안 나오므로, 게임 창이 뜬 뒤 GameApp이 내부를
-// 16:9로 미세 보정한다(App.tsx). 여기 값은 시작 근사치일 뿐이다.
-const DEFAULT_WINDOW_WIDTH = 1280
-const DEFAULT_WINDOW_HEIGHT = 720
+// 게임 창 고정 크기(16:9). 이 크기로 열고, GameApp이 리사이즈를 이 크기로 되돌려 잠근다(App.tsx).
+// window.open의 width/height는 내부(콘텐츠) 크기 기준이라 게임 화면이 정확히 이 크기가 된다.
+export const GAME_WINDOW_WIDTH = 1280
+export const GAME_WINDOW_HEIGHT = 720
 
 function openGameWindow(): boolean {
   const url = `${location.pathname}?mode=game`
-  const width = Math.min(DEFAULT_WINDOW_WIDTH, screen.availWidth)
-  const height = Math.min(DEFAULT_WINDOW_HEIGHT, screen.availHeight)
+  const width = Math.min(GAME_WINDOW_WIDTH, screen.availWidth)
+  const height = Math.min(GAME_WINDOW_HEIGHT, screen.availHeight)
   const left = Math.max(0, Math.round((screen.availWidth - width) / 2))
   const top = Math.max(0, Math.round((screen.availHeight - height) / 2))
-  // popup 지정 → 탭이 아닌 독립 새 창(적당한 사이즈, 화면 중앙). 같은 이름으로 다시 열면 기존 창 재사용
+  // popup 지정 → 탭이 아닌 독립 새 창(화면 중앙). 같은 이름으로 다시 열면 기존 창 재사용.
+  // resizable=no는 크롬이 대체로 무시하므로 실제 잠금은 App.tsx의 resize 핸들러가 담당한다.
   const win = window.open(
     url,
     GAME_WINDOW_NAME,
-    `popup=yes,left=${left},top=${top},width=${width},height=${height},resizable=yes`,
+    `popup=yes,left=${left},top=${top},width=${width},height=${height},resizable=no`,
   )
   if (!win) return false
   win.focus()

@@ -35,7 +35,7 @@
     },
     {
       "code": "npc_gatekeeper",
-      "x": 2290,
+      "x": 2270,
       "y": 497
     }
   ],
@@ -62,15 +62,15 @@
     },
     {
       "kind": "rightWall",
-      "x": 2890,
+      "x": 2820,
       "width": 536,
       "height": 480,
-      "yOffset": 60
+      "yOffset": 65
     }
   ],
   "portals": [
     {
-      "x": 2483,
+      "x": 2455,
       "name": "성 밖",
       "targetMap": "map_stage1",
       "targetX": 170,

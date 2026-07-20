@@ -126,20 +126,21 @@ export function CharacterSelect() {
           // 빈 자리는 배경의 의자를 그대로 비워 둔다 (실루엣 없이)
           if (slot?.type !== 'char') return null
           const seat = SEATS[i]
-          const def = CHARACTERS[slot.code]
           const on = selected === slot.code
+          // 예고 캐릭터(locked)는 선택·게임시작 불가 — 클릭을 막고 무채색(CSS)으로만 보여 준다.
           return (
             <button
               key={i}
-              className={`lobby-seat ${on ? 'lobby-seat--on' : ''}`}
+              className={`lobby-seat lobby-seat--${slot.code} ${on ? 'lobby-seat--on' : ''} ${slot.locked ? 'lobby-seat--locked' : ''}`}
               style={{ left: `${seat.x}%`, top: `${seat.y}%`, '--seat-scale': seat.scale } as CSSProperties}
-              onClick={() => setSelected(slot.code)}
+              onClick={slot.locked ? undefined : () => setSelected(slot.code)}
+              disabled={slot.locked}
             >
-              {/* 인게임과 같은 관우 t1 idle 시트의 첫 프레임 (CSS로 프레임 1장만 잘라 쓴다) */}
-              <span className="lobby-char" />
+              {/* 캐릭터별 standBy 일러스트 — 코드마다 다른 배경 이미지를 CSS 변형 클래스로 건다 */}
+              <span className={`lobby-char lobby-char--${slot.code}`} />
               <span className="lobby-slot-name">
-                <b className="lobby-slot-title">{def.name}</b>
-                <small className="lobby-slot-lv">Lv.1</small>
+                <b className="lobby-slot-title">{slot.name}</b>
+                <small className="lobby-slot-lv">{slot.locked ? 'Coming Soon' : 'Lv.1'}</small>
               </span>
             </button>
           )

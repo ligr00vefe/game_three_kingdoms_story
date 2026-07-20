@@ -40,7 +40,7 @@ const BUBBLE_OFFSET_X: Record<string, number> = {
  */
 const NPC_DISPLAY_SIZE: Record<string, [number, number]> = {
   npc_castle_lord: [136, 136],  // 동탁 — 원본 해상도가 커서 크게
-  npc_village_chief: [96, 96],  // 성 밖 수문장 — 크기 조정은 이 값에서
+  npc_village_chief: [85, 96],  // 성 밖 수문장 — 원본 1037×1169(비율 0.887)에 맞춤. 키우려면 h를 바꾸고 w = h×0.887
 }
 const DEFAULT_NPC_SIZE = 82
 

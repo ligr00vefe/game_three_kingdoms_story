@@ -25,12 +25,19 @@ export const CHARACTERS: Record<string, CharacterDef> = {
 }
 
 /**
- * 대기실 슬롯 배열: 캐릭터 코드 | null(빈 자리 — 추후 캐릭터가 들어갈 자리).
+ * 대기실 슬롯 정의.
+ * - name: 좌석 이름표에 쓴다 (CHARACTERS에 정식 데이터가 없어도 이름은 표시).
+ * - locked: 아직 플레이 불가한 예고 캐릭터(무채색·선택/게임시작 불가). 관우만 선택 가능.
+ */
+export type LobbySlot = { type: 'char'; code: string; name: string; locked?: boolean } | null
+
+/**
+ * 대기실 슬롯 배열: 슬롯 | null(빈 자리 — 추후 캐릭터가 들어갈 자리).
  * 순서는 군막사 배경의 의자 4개와 1:1로 대응한다 (CharacterSelect의 SEATS와 같은 순서).
  */
-export const LOBBY_SLOTS: ({ type: 'char'; code: string } | null)[] = [
-  { type: 'char', code: 'guanwu' }, // 안쪽 왼쪽 의자
-  null, // 앞쪽 왼쪽 의자
-  null, // 안쪽 오른쪽 의자
-  null, // 앞쪽 오른쪽 의자
+export const LOBBY_SLOTS: LobbySlot[] = [
+  { type: 'char', code: 'guanwu', name: '관우' },              // 안쪽 왼쪽 의자
+  { type: 'char', code: 'zhaoyun', name: '조운', locked: true }, // 앞쪽 왼쪽 의자
+  { type: 'char', code: 'lubu', name: '여포', locked: true },    // 안쪽 오른쪽 의자
+  null,                                                          // 앞쪽 오른쪽 의자
 ]

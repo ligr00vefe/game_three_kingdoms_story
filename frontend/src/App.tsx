@@ -24,7 +24,7 @@ import { NoticeBanner } from './ui/NoticeBanner'
 import { QuestPanel } from './ui/QuestPanel'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { KeySettingsPanel } from './ui/KeySettingsPanel'
-import { Launcher, GAME_WINDOW_NAME } from './ui/Launcher'
+import { Launcher, GAME_WINDOW_NAME, GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT } from './ui/Launcher'
 import { CharacterSelect } from './ui/CharacterSelect'
 import { LoadingScreen } from './ui/LoadingScreen'
 
@@ -40,18 +40,21 @@ function GameApp() {
   const serverStatus = useGameStore((s) => s.serverStatus)
   const screen = useScreenStore((s) => s.screen)
 
-  // 게임 창 내부를 정확히 16:9로 보정 — 창 크롬 때문에 window.open 크기만으로는 딱 안 맞아
-  // Scale.FIT이 위아래(또는 좌우)에 여백을 남긴다. 우리가 연 팝업이라 resizeBy가 허용된다.
-  // (직접 ?mode=game으로 들어와 스크립트가 연 창이 아니면 브라우저가 막으므로 try로 감싼다.)
+  // 게임 창 크기 잠금: 항상 내부(콘텐츠)를 GAME_WINDOW(1280×720)으로 유지한다.
+  // 사용자가 창을 늘리면 그만큼 되돌린다. 팝업 resizable=no는 크롬이 무시하므로 여기서 강제한다.
+  // (우리가 연 팝업이라 resizeBy가 허용된다. 직접 ?mode=game 탭으로 열면 브라우저가 막으므로
+  //  try로 감싼다 — 그 경우엔 Scale.RESIZE가 탭 크기에 맞춰 그냥 꽉 채운다.)
   useEffect(() => {
-    const GAME_ASPECT = 16 / 9
-    try {
-      const targetInnerH = Math.round(window.innerWidth / GAME_ASPECT)
-      const delta = targetInnerH - window.innerHeight
-      if (Math.abs(delta) > 2 && Math.abs(delta) < 400) window.resizeBy(0, delta)
-    } catch {
-      /* 스크립트가 연 창이 아니면 resize 불가 — FIT 여백을 감수한다 */
+    const enforce = () => {
+      const dw = GAME_WINDOW_WIDTH - window.innerWidth
+      const dh = GAME_WINDOW_HEIGHT - window.innerHeight
+      if (Math.abs(dw) > 1 || Math.abs(dh) > 1) {
+        try { window.resizeBy(dw, dh) } catch { /* 스크립트가 연 창이 아니면 무시 */ }
+      }
     }
+    enforce()
+    window.addEventListener('resize', enforce)
+    return () => window.removeEventListener('resize', enforce)
   }, [])
 
   useEffect(() => {
