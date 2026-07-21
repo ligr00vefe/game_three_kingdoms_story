@@ -654,7 +654,7 @@ export class GameScene extends Phaser.Scene {
 
     // ---- 전투 판정 주입 (Player는 몬스터를 직접 모른다) ----
     this.player.onBasicAttack = (hitbox, facing, comboStep) => {
-      // 기본 공격 3연 콤보 — 0:찌르기 / 1:휘두르기 / 2:대쉬찌르기. 단계마다 이펙트만 다르고
+      // 기본 공격 3연 콤보 — 0:찌르기 / 1:휘두르기 / 2:깊게 찌르기. 단계마다 이펙트만 다르고
       // 판정 로직은 공통이다. 판정을 **먼저** 돌려 명중 여부를 알아낸 뒤 이펙트를 고른다 — 둘 다
       // 같은 틱(ATTACK_HIT_AT_MS)이라 "빗나감 → 명중" 전환 없이 바로 맞는 아트를 쓸 수 있다.
       const reach = comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
@@ -670,8 +670,11 @@ export class GameScene extends Phaser.Scene {
       const hit = hits.length > 0
       // 전용 아트(fx_swing / fx_dash_thrust)가 없으면 EffectManager가 찌르기 이펙트로 폴백한다.
       if (comboStep === 1) this.effects.swingArc(fxX, fxY, facing, hit)
-      else if (comboStep === 2) this.effects.dashThrust(fxX, fxY, facing, hit)
-      else this.effects.attack(fxX, fxY, facing, hit)
+      else if (comboStep === 2) {
+        // 깊게 찌르기: 무기 궤적(dashThrust) + 돌진하는 몸에 붙는 이동 잔상(dashTrail)
+        this.effects.dashThrust(fxX, fxY, facing, hit)
+        this.effects.dashTrail(this.player.x, this.player.y, facing)
+      } else this.effects.attack(fxX, fxY, facing, hit)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)

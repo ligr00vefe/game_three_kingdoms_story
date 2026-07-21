@@ -220,12 +220,14 @@ export class PreloadScene extends Phaser.Scene {
       g.generateTexture('npc_village_chief', 64, 64)
     }
 
-    // 점프 대쉬 잔상: 수평 스피드라인
-    g.clear()
-    g.fillStyle(0xffffff, 0.9); g.fillRect(0, 10, 76, 5)
-    g.fillStyle(0x81d4fa, 0.75); g.fillRect(10, 22, 86, 6)
-    g.fillStyle(0xffffff, 0.6); g.fillRect(0, 36, 60, 4)
-    g.generateTexture('fx_dash', 96, 48)
+    // 점프 대쉬 잔상: 수평 스피드라인 — 실제 아트(effect_dash) 로드 실패 시에만 폴백
+    if (!this.textures.exists('fx_dash')) {
+      g.clear()
+      g.fillStyle(0xffffff, 0.9); g.fillRect(0, 10, 76, 5)
+      g.fillStyle(0x81d4fa, 0.75); g.fillRect(10, 22, 86, 6)
+      g.fillStyle(0xffffff, 0.6); g.fillRect(0, 36, 60, 4)
+      g.generateTexture('fx_dash', 96, 48)
+    }
 
     // 이단 점프 하강풍: 아래로 뿜는 바람 (V자 + 구름)
     g.clear()
@@ -247,10 +249,13 @@ export class PreloadScene extends Phaser.Scene {
     g.generateTexture('fx_hit_spark', 32, 32)
 
     // 아이템 아이콘 (32px, ASSET_SPEC) — icon_key와 동일한 텍스처 키
-    g.clear()
-    g.fillStyle(0xffc107); g.fillCircle(16, 16, 10)
-    g.fillStyle(0xffe082); g.fillCircle(13, 13, 4)
-    g.generateTexture('icon_coin', 32, 32)
+    // 코인은 실제 아트(items/coin.png) 로드 성공 시 그대로 두고, 실패 시에만 도형 폴백
+    if (!this.textures.exists('icon_coin')) {
+      g.clear()
+      g.fillStyle(0xffc107); g.fillCircle(16, 16, 10)
+      g.fillStyle(0xffe082); g.fillCircle(13, 13, 4)
+      g.generateTexture('icon_coin', 32, 32)
+    }
 
     g.clear()
     g.fillStyle(0xd32f2f); g.fillRoundedRect(9, 12, 14, 16, 4)

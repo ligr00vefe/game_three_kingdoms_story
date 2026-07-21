@@ -28,6 +28,45 @@ export class EffectManager {
     this.swingPool = scene.add.group({ defaultKey: 'fx_swing', maxSize: 8 })
     this.dashThrustPool = scene.add.group({ defaultKey: 'fx_dash_thrust', maxSize: 8 })
     this.textPool = scene.add.group({ maxSize: 30 })
+
+    // 콤보 이펙트 프레임 애니메이션 등록.
+    // effect_smash는 균등 격자(4×370)라 스프라이트시트로 그대로 쓰지만,
+    // effect_deep_thrust / effect_dash는 프레임이 균등하지 않아(뒤로 갈수록 커짐) 통짜 이미지로 받아
+    // "투명 간격 기준 실제 경계"로 프레임을 직접 정의한다. xs는 각 프레임의 좌우 분할선(픽셀).
+    this.defineStripFrames('fx_dash_thrust', 328, [0, 132, 268, 426, 629, 858, 1121, 1452, 1725]) // 8프레임
+    this.defineStripFrames('fx_dash', 232, [0, 208, 472, 810, 1160, 1526, 2109])                   // 6프레임
+    this.registerAnim('fx_swing_anim', 'fx_swing', 22)             // 4프레임 휘두르기
+    this.registerAnim('fx_dash_thrust_anim', 'fx_dash_thrust', 30) // 8프레임 깊게 찌르기
+    this.registerAnim('fx_dash_anim', 'fx_dash', 30)               // 6프레임 돌진 잔상
+  }
+
+  /**
+   * 통짜 스트립 이미지에 "세로 전체 높이" 프레임을 좌우 분할선(xs)대로 잘라 넣는다.
+   * 프레임이 균등 격자가 아닌 이펙트용 — 각 프레임은 xs[i]~xs[i+1] 폭, 높이는 fullH 전체.
+   * (세로 전체를 쓰므로 프레임마다 세로 정렬이 자동으로 맞고, 내용이 세로로 안 잘린다.)
+   */
+  private defineStripFrames(key: string, fullH: number, xs: number[]) {
+    if (!this.scene.textures.exists(key)) return
+    const tex = this.scene.textures.get(key)
+    if (tex.has('0')) return // 이미 정의됨(재생성/HMR) → 중복 방지
+    for (let i = 0; i < xs.length - 1; i++) {
+      tex.add(i, 0, xs[i], 0, xs[i + 1] - xs[i], fullH)
+    }
+  }
+
+  /** 여러 프레임(스프라이트시트 또는 defineStripFrames로 정의됨)이 있을 때만 1회 재생 애니를 만든다. */
+  private registerAnim(key: string, texture: string, frameRate: number) {
+    if (this.scene.anims.exists(key)) return
+    const tex = this.scene.textures.exists(texture) ? this.scene.textures.get(texture) : null
+    // frameTotal은 __BASE를 포함하므로 실제 프레임 수 = frameTotal - 1. 단일 이미지(폴백)면 부족 → 스킵.
+    if (!tex || tex.frameTotal < 3) return
+    this.scene.anims.create({
+      key,
+      // __BASE(전체 스트립)를 빼고 0 ~ (프레임수-1)만 사용
+      frames: this.scene.anims.generateFrameNumbers(texture, { start: 0, end: tex.frameTotal - 2 }),
+      frameRate,
+      repeat: 0,
+    })
   }
 
   /**
@@ -84,59 +123,72 @@ export class EffectManager {
     })
   }
 
-  /**
-   * 콤보 2단계 — 휘두르기(반원 참격 호). 전용 아트(fx_swing)가 아직 없으면 찌르기로 폴백한다.
-   * 아트가 들어오면 아래 정렬값(타격 지점 = 호가 지나는 앞끝)을 attack()/skillCharge()처럼 실측해
-   * 맞춰야 한다 — 지금은 근사값이고, 폴백 중에는 쓰이지 않는다.
-   */
-  private static readonly SWING_FX = { originX: 0.5, originY: 0.5 } as const
+  /** 스프라이트에 1회 재생 프레임 애니를 걸고, 끝나면 풀로 반환. 재사용 대비 이전 리스너를 먼저 제거한다.
+   *  (이름 주의: 아래에 인자 시그니처가 다른 tween용 playOnce가 따로 있으므로 이 메서드는 별도 이름을 쓴다.) */
+  private playAnimOnce(spr: Phaser.GameObjects.Sprite, animKey: string) {
+    spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => spr.setActive(false).setVisible(false))
+    spr.play(animKey)
+  }
+
+  // 콤보 이펙트 크기: 프레임 "높이"를 이 목표 월드 높이(px)로 맞춰 축소한다.
+  // 프레임을 세로 전체로 잘라서 높이가 프레임마다 같으므로, 높이 기준 스케일이 곧 균일 배율 →
+  // 프레임별 폭(내용)이 비례로 커지며 자연스럽게 성장한다. origin은 분할선 기준 내용 중심.
+  private static readonly SWING = { h: 120, ox: 0.5, oy: 0.48 } as const
+  private static readonly DASH_THRUST = { h: 96, ox: 0.5, oy: 0.52 } as const
+  private static readonly DASH = { h: 56, ox: 0.5, oy: 0.5 } as const
+
+  /** 콤보 2단계 — 휘두르기(effect_smash 4프레임 참격 애니). 시트 미로드 시 찌르기로 폴백. */
   swingArc(x: number, y: number, facing: -1 | 1, hit = false) {
-    if (!this.scene.textures.exists('fx_swing')) { this.attack(x, y, facing, hit); return }
-    const img = this.swingPool.get(x, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    const spec = EffectManager.SWING_FX
-    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
-    img.setActive(true).setVisible(true)
-    // 위→아래로 내리치듯 살짝 회전하며 커진다
-    img.setPosition(x, y).setAlpha(0.95).setScale(0.7).setFlipX(facing === -1).setAngle(facing * -22)
-    this.scene.tweens.add({
-      targets: img, scale: 1.15, angle: facing * 10, alpha: 0,
-      duration: COMBAT.ATTACK_DURATION_MS * 0.5, ease: 'Cubic.easeOut',
-      onComplete: () => { img.setActive(false).setVisible(false).setAngle(0) },
-    })
+    if (!this.scene.anims.exists('fx_swing_anim')) { this.attack(x, y, facing, hit); return }
+    const spr = this.swingPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!spr) return
+    const s = EffectManager.SWING
+    spr.setActive(true).setVisible(true)
+    spr.setOrigin(s.ox, s.oy)
+    spr.setPosition(x, y).setAlpha(0.95).setFlipX(facing === -1).setAngle(0)
+    this.playAnimOnce(spr, 'fx_swing_anim') // 프레임0 확정 후에 실제 프레임 높이로 스케일
+    spr.setScale(s.h / (spr.frame.realHeight || 1))
+  }
+
+  /** 콤보 3단계 — 깊게 찌르기(effect_deep_thrust 8프레임 돌진 관통 애니). 시트 미로드 시 찌르기로 폴백. */
+  dashThrust(x: number, y: number, facing: -1 | 1, hit = false) {
+    if (!this.scene.anims.exists('fx_dash_thrust_anim')) { this.attack(x, y, facing, hit); return }
+    const spr = this.dashThrustPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!spr) return
+    const s = EffectManager.DASH_THRUST
+    spr.setActive(true).setVisible(true)
+    spr.setOrigin(s.ox, s.oy)
+    spr.setPosition(x, y).setAlpha(0.95).setFlipX(facing === -1).setAngle(0)
+    this.playAnimOnce(spr, 'fx_dash_thrust_anim')
+    spr.setScale(s.h / (spr.frame.realHeight || 1))
   }
 
   /**
-   * 콤보 3단계 — 대쉬찌르기(돌진 관통 궤적). 전용 아트(fx_dash_thrust)가 없으면 찌르기로 폴백한다.
-   * 찌르기보다 길게 앞으로 뻗는다. 아트가 들어오면 정렬값을 실측해 맞출 것.
+   * 대쉬 잔상 (점프 2연타 / 깊게 찌르기 돌진) — effect_dash 6프레임 애니.
+   * 시트 미로드(placeholder 단일 이미지) 시엔 정지 이미지를 짧게 뒤로 흘리는 기존 방식으로 폴백.
    */
-  private static readonly DASH_THRUST_FX = { originX: 0.85, originY: 0.5 } as const
-  dashThrust(x: number, y: number, facing: -1 | 1, hit = false) {
-    if (!this.scene.textures.exists('fx_dash_thrust')) { this.attack(x, y, facing, hit); return }
-    const img = this.dashThrustPool.get(x, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    const spec = EffectManager.DASH_THRUST_FX
-    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
-    img.setActive(true).setVisible(true)
-    img.setPosition(x, y).setAlpha(0.95).setScale(0.6).setFlipX(facing === -1)
-    this.scene.tweens.add({
-      targets: img, scaleX: 1.5, x: x + facing * 20, alpha: 0,
-      duration: COMBAT.ATTACK_DURATION_MS * 0.5, ease: 'Cubic.easeOut',
-      onComplete: () => { img.setActive(false).setVisible(false) },
-    })
-  }
-
-  /** 점프 대쉬 잔상 (점프키 2연타) */
   dashTrail(x: number, y: number, facing: -1 | 1) {
-    const img = this.dashPool.get(x - facing * 34, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    img.setActive(true).setVisible(true)
-    img.setPosition(x - facing * 34, y).setAlpha(0.85).setScale(1).setFlipX(facing === -1)
-    this.scene.tweens.add({
-      targets: img, x: x - facing * 70, alpha: 0, scaleX: 1.3,
-      duration: 240, ease: 'Quad.easeOut',
-      onComplete: () => { img.setActive(false).setVisible(false) },
-    })
+    const px = x - facing * 34
+    const spr = this.dashPool.get(px, y) as Phaser.GameObjects.Sprite | null
+    if (!spr) return
+    const s = EffectManager.DASH
+    spr.setActive(true).setVisible(true)
+    spr.setOrigin(s.ox, s.oy)
+    spr.setPosition(px, y).setAlpha(0.85).setFlipX(facing === -1).setAngle(0)
+    if (this.scene.anims.exists('fx_dash_anim')) {
+      this.playAnimOnce(spr, 'fx_dash_anim')
+      spr.setScale(s.h / (spr.frame.realHeight || 1))
+    } else {
+      // 폴백: 단일 placeholder 이미지 — 뒤로 흘리며 사라짐
+      const base = s.h / (spr.frame.realHeight || 1)
+      spr.setScale(base)
+      this.scene.tweens.add({
+        targets: spr, x: x - facing * 70, alpha: 0, scaleX: base * 1.3,
+        duration: 240, ease: 'Quad.easeOut',
+        onComplete: () => { spr.setActive(false).setVisible(false) },
+      })
+    }
   }
 
   /** 이단 점프 하강풍 (↑ + 점프 2연타) — 발밑에서 아래로 뿜어져 나간다 */

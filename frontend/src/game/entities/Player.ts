@@ -76,7 +76,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private currentAnimKey: string | null = null
 
   // ---- 전투 (Phase 2) ----
-  /** GameScene이 주입: 히트박스 안 몬스터 판정. comboStep(0:찌르기/1:휘두르기/2:대쉬찌르기)로
+  /** GameScene이 주입: 히트박스 안 몬스터 판정. comboStep(0:찌르기/1:휘두르기/2:깊게 찌르기)로
    *  단계별 이펙트를 고른다 */
   onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, comboStep: number) => void
   onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
@@ -86,10 +86,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private actionUntil = 0
   private actionHitAt = 0
   private actionHitDone = false
-  /** 콤보: 지금 재생 중인 단계(0~2). 예약 없이 모션이 끝나면 0으로 리셋 */
+  /** 콤보: 지금 재생 중/직전에 낸 단계(0:찌르기 1:휘두르기 2:깊게 찌르기) */
   private comboStep = 0
   /** 콤보: 현재 모션 중 공격키가 눌려 다음 단계가 예약됨 (선입력 버퍼) */
   private comboQueued = false
+  /** 콤보 유지 마감 시각. 이 시각 안에 다시 공격하면 다음 단계로 이어지고, 넘기면 찌르기부터 재시작 */
+  private comboExpiresAt = 0
   /** 대쉬찌르기(2단계) 전진을 이 시각까지 유지 — 이후 정지 */
   private dashLungeUntil = 0
   private skillReadyAt = 0
@@ -297,9 +299,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return
     }
 
-    // 기본 공격 (GAME_DESIGN 4.1) — 지상은 정지, 공중은 관성 유지. 콤보 0단계부터 시작.
+    // 기본 공격 (GAME_DESIGN 4.1) — 지상은 정지, 공중은 관성 유지.
+    // 연속기 시간창(COMBO_WINDOW_MS) 안에 다시 누르면 다음 단계로, 넘겼으면 찌르기(0단계)부터.
     if (input.attackJustDown) {
-      this.comboStep = 0
+      if (now <= this.comboExpiresAt && this.comboStep < COMBAT.COMBO_MAX - 1) this.comboStep += 1
+      else this.comboStep = 0
       this.startAction('attack', now)
       return
     }
@@ -515,13 +519,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       else this.onBasicAttack?.(hitbox, this.facing, this.comboStep)
     }
     if (now >= this.actionUntil) {
-      // 예약된 다음 콤보 단계가 있으면 이어서 재생, 없으면 콤보 종료(0단계로 리셋)
+      // 모션 중 선입력(버퍼)이 있었으면 모션이 끝나는 즉시 다음 단계로 이어 재생
       if (this.state_ === 'attack' && this.comboQueued && this.comboStep < COMBAT.COMBO_MAX - 1) {
         this.comboStep += 1
         this.startAction('attack', now)
         return
       }
-      this.comboStep = 0
+      // 기본 공격이 끝나면 지금부터 COMBO_WINDOW_MS 동안 콤보 유지창을 연다(2초 안에 재입력 시 이어짐).
+      // comboStep은 유지하고, 창 만료/마지막 단계 판정은 다음 공격 입력 때 한다. 스킬은 콤보를 끊는다.
+      if (this.state_ === 'attack') this.comboExpiresAt = now + COMBAT.COMBO_WINDOW_MS
+      else { this.comboStep = 0; this.comboExpiresAt = 0 }
       this.state_ = this.body.blocked.down ? 'idle' : 'jump'
     }
   }

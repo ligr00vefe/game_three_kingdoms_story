@@ -60,6 +60,7 @@ export class ItemDropManager {
     item.setActive(true).setVisible(true)
     item.enableBody(true, x + Phaser.Math.Between(-12, 12), y - 10, true, true)
     item.setTexture(icon)
+    item.setDisplaySize(28, 28) // 실제 아트(예: coin 962px)를 아이콘 규격으로 축소 — 물리 바디(setSize)와 별개
     item.itemCode = code
     item.quantity = quantity
     item.expiresAt = this.scene.time.now + EXPIRE_MS

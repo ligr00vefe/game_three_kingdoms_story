@@ -7,6 +7,7 @@ import { ChatBox } from './ui/ChatBox'
 import { QuickSlots } from './ui/QuickSlots'
 import { ActionBar } from './ui/ActionBar'
 import { Minimap } from './ui/Minimap'
+import { GoldDisplay } from './ui/GoldDisplay'
 import { DeathOverlay } from './ui/DeathOverlay'
 import { fetchHealth } from './api/health'
 import { loadGameState, startAutosave } from './api/game'
@@ -134,6 +135,7 @@ function GameApp() {
           // transform으로만 줄인다 (내부 각 패널의 px 절대값을 일일이 안 고쳐도 됨)
           <div className="ui-overlay">
             <Minimap />
+            <GoldDisplay />
             <NoticeBanner />
             {FEATURES.equipment && <InventoryPanel />}
             {FEATURES.equipment && <EquipmentPanel />}
