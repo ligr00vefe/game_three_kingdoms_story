@@ -226,7 +226,7 @@ const MOUNTAIN_SCROLL = 0.08
  *   TOP_Y  : 띠 윗변의 월드 Y(작을수록 위로). 산 아래 하늘 여백을 덮도록 위치를 잡는다.
  * SCROLL은 시차(산 0.08 < 이 값 < 성벽 0.7). 보통 손댈 필요 없다.
  */
-const HILL = { SCROLL: 0.15, HEIGHT: 220, TOP_Y: 250 } as const
+const HILL = { SCROLL: 0.15, HEIGHT: 200, TOP_Y: 250 } as const
 
 /**
  * 스테이지 1: 초원 (GAME_DESIGN 7장). 맵은 JSON 데이터 주도.
@@ -399,7 +399,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 200, 50, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 140, 150, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
