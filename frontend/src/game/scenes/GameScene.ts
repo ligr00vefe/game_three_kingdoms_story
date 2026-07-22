@@ -668,12 +668,14 @@ export class GameScene extends Phaser.Scene {
       const fxX = this.player.x + facing * dist
       const fxY = this.player.y + 22
       const hit = hits.length > 0
-      // 전용 아트(fx_swing / fx_dash_thrust)가 없으면 EffectManager가 찌르기 이펙트로 폴백한다.
-      if (comboStep === 1) this.effects.swingArc(fxX, fxY, facing, hit)
-      else if (comboStep === 2) {
-        // 깊게 찌르기: 무기 궤적(dashThrust) + 돌진하는 몸에 붙는 이동 잔상(dashTrail)
-        this.effects.dashThrust(fxX, fxY, facing, hit)
-        this.effects.dashTrail(this.player.x, this.player.y, facing)
+      // 세 단계 모두 단일 이미지 이펙트(찌르기와 동일 방식). 전용 아트가 없으면 찌르기로 폴백한다.
+      if (comboStep === 1) {
+        // 휘두르기는 아래 끝을 발밑(지면)에 맞춘다 — origin이 그림 바닥이라 y=발밑이면 바닥에 붙는다.
+        const groundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+        this.effects.swingArc(fxX, groundY, facing, hit)
+      } else if (comboStep === 2) {
+        // 깊게 찌르기는 대쉬로 이미 전진하므로 이펙트를 멀리(fxX) 띄우지 않고 몸(player.x) 앞에서 뻗게 한다.
+        this.effects.dashThrust(this.player.x, fxY, facing, hit)
       } else this.effects.attack(fxX, fxY, facing, hit)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)

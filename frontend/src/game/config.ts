@@ -69,8 +69,9 @@ export const COMBAT = {
   COMBO_WINDOW_MS: 2000,        // 이 시간 안에 다시 공격하면 콤보 유지, 넘기면 찌르기부터 재시작
   COMBO_DASH_VX: 320,           // 2단계(깊게 찌르기) 전진 속도(px/s)
   COMBO_DASH_MS: 150,           // 전진 유지 시간 — 이후 그 자리에 멈춰 마무리
-  /** 3단계(깊게 찌르기) 리치 — 돌진하며 깊게 찌르므로 기본 공격보다 길게 */
-  COMBO_DASH_REACH: 130,
+  /** 3단계(깊게 찌르기) 타격 리치. 대쉬(COMBO_DASH_VX/MS)로 전진해 거리를 좁히지만, 깊게 찔러
+   *  넣는 마무리라 기본 공격(ATTACK_REACH 96)보다는 살짝 길게 잡는다(과했던 기존 130보다는 짧게). */
+  COMBO_DASH_REACH: 115,
 
   /** 크리티컬 (GAME_DESIGN 4.3) */
   CRIT_CHANCE: 0.05,

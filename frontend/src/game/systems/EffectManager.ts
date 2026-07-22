@@ -29,14 +29,19 @@ export class EffectManager {
     this.dashThrustPool = scene.add.group({ defaultKey: 'fx_dash_thrust', maxSize: 8 })
     this.textPool = scene.add.group({ maxSize: 30 })
 
-    // 콤보 이펙트 프레임 애니메이션 등록.
-    // effect_smash는 균등 격자(4×370)라 스프라이트시트로 그대로 쓰지만,
-    // effect_deep_thrust / effect_dash는 프레임이 균등하지 않아(뒤로 갈수록 커짐) 통짜 이미지로 받아
-    // "투명 간격 기준 실제 경계"로 프레임을 직접 정의한다. xs는 각 프레임의 좌우 분할선(픽셀).
-    this.defineStripFrames('fx_dash_thrust', 328, [0, 132, 268, 426, 629, 858, 1121, 1452, 1725]) // 8프레임
+    // 콤보 이펙트 프레임 정의/애니 등록.
+    // 휘두르기(fx_swing)만 프레임 애니 대신 "마지막(가장 큰) 프레임 한 장"을 찌르기처럼 키우며
+    // 페이드아웃한다(comboBurst) — 균등-분할 셀 경계가 그림을 잘라 네모 테두리처럼 보이던 문제 회피.
+    // 깊게 찌르기(fx_dash_thrust)·돌진 잔상(fx_dash)은 프레임 애니로 재생한다(단일 이미지는 대쉬
+    // 동작과 속도가 안 맞았다). 둘 다 단일 이미지라 프레임을 주소로 집으려면 분할선 정의가 필요하다.
+    // fx_dash_thrust: 좌→우로 커지는 관통 시퀀스. 프레임 폭이 f0~f6까지 132→331px로 커지다가
+    //   마지막 프레임(1452~1725)만 273px로 도로 좁아져 "찔렀다 돌아오는" 것처럼 보인다 → 그 끝
+    //   프레임을 빼고 7프레임(f0~f6) 단조 성장으로만 재생한다. 최대 신장(f6)에서 끝나 마무리가 시원하다.
+    this.defineStripFrames('fx_dash_thrust', 328, [0, 132, 268, 426, 629, 858, 1121, 1452]) // 7프레임(끝 프레임 제외)
     this.defineStripFrames('fx_dash', 232, [0, 208, 472, 810, 1160, 1526, 2109])                   // 6프레임
-    this.registerAnim('fx_swing_anim', 'fx_swing', 22)             // 4프레임 휘두르기
-    this.registerAnim('fx_dash_thrust_anim', 'fx_dash_thrust', 30) // 8프레임 깊게 찌르기
+    // 깊게 찌르기: 성장 프레임을 빠르게(frameRate 130) 지나가고 마지막 임팩트 프레임을 6슬롯 더 붙잡아
+    //   "팍!" 하고 꽂히는 타격감을 준다(균등 성장의 '카펫 펴지는' 느낌 제거). 총 ~100ms.
+    this.registerAnimPunch('fx_dash_thrust_anim', 'fx_dash_thrust', 130, 6)
     this.registerAnim('fx_dash_anim', 'fx_dash', 30)               // 6프레임 돌진 잔상
   }
 
@@ -48,7 +53,9 @@ export class EffectManager {
   private defineStripFrames(key: string, fullH: number, xs: number[]) {
     if (!this.scene.textures.exists(key)) return
     const tex = this.scene.textures.get(key)
-    if (tex.has('0')) return // 이미 정의됨(재생성/HMR) → 중복 방지
+    // 이미 정의돼 있으면(재생성/HMR) 지우고 다시 넣는다 — 프레임 수/경계 변경이 항상 반영되게.
+    // (전역 TextureManager는 게임 수명 내내 유지돼, 그냥 두면 예전 프레임이 캐시로 남는다.)
+    for (let i = 0; tex.has(String(i)); i++) tex.remove(String(i))
     for (let i = 0; i < xs.length - 1; i++) {
       tex.add(i, 0, xs[i], 0, xs[i + 1] - xs[i], fullH)
     }
@@ -56,7 +63,9 @@ export class EffectManager {
 
   /** 여러 프레임(스프라이트시트 또는 defineStripFrames로 정의됨)이 있을 때만 1회 재생 애니를 만든다. */
   private registerAnim(key: string, texture: string, frameRate: number) {
-    if (this.scene.anims.exists(key)) return
+    // 이미 있으면 지우고 다시 만든다 — HMR/씬 재시작 후에도 frameRate·프레임 변경이 반영되게.
+    // (전역 anims는 게임 수명 내내 유지돼, 그냥 두면 예전 애니가 그대로 캐시된다.)
+    if (this.scene.anims.exists(key)) this.scene.anims.remove(key)
     const tex = this.scene.textures.exists(texture) ? this.scene.textures.get(texture) : null
     // frameTotal은 __BASE를 포함하므로 실제 프레임 수 = frameTotal - 1. 단일 이미지(폴백)면 부족 → 스킵.
     if (!tex || tex.frameTotal < 3) return
@@ -67,6 +76,21 @@ export class EffectManager {
       frameRate,
       repeat: 0,
     })
+  }
+
+  /**
+   * 임팩트 강조형 1회 재생 애니 — 성장 프레임을 frameRate로 빠르게 지나간 뒤, 마지막(임팩트) 프레임을
+   * holdFrames만큼 더 붙잡아 "팍!" 하고 꽂히는 타격감을 준다(균등 성장의 '카펫 펴지는' 느낌 제거).
+   * 프레임 애니는 이징이 없으므로, 임팩트 프레임을 여러 슬롯 복제해 '멈춤(hold)'으로 강약을 만든다.
+   */
+  private registerAnimPunch(key: string, texture: string, frameRate: number, holdFrames: number) {
+    if (this.scene.anims.exists(key)) this.scene.anims.remove(key)
+    const tex = this.scene.textures.exists(texture) ? this.scene.textures.get(texture) : null
+    if (!tex || tex.frameTotal < 3) return
+    const last = tex.frameTotal - 2 // __BASE 제외한 마지막 실제 프레임(임팩트)
+    const growth = this.scene.anims.generateFrameNumbers(texture, { start: 0, end: last })
+    const hold = Array.from({ length: holdFrames }, () => ({ key: texture, frame: last }))
+    this.scene.anims.create({ key, frames: [...growth, ...hold], frameRate, repeat: 0 })
   }
 
   /**
@@ -131,37 +155,66 @@ export class EffectManager {
     spr.play(animKey)
   }
 
-  // 콤보 이펙트 크기: 프레임 "높이"를 이 목표 월드 높이(px)로 맞춰 축소한다.
-  // 프레임을 세로 전체로 잘라서 높이가 프레임마다 같으므로, 높이 기준 스케일이 곧 균일 배율 →
-  // 프레임별 폭(내용)이 비례로 커지며 자연스럽게 성장한다. origin은 분할선 기준 내용 중심.
-  private static readonly SWING = { h: 120, ox: 0.5, oy: 0.48 } as const
-  private static readonly DASH_THRUST = { h: 96, ox: 0.5, oy: 0.52 } as const
-  private static readonly DASH = { h: 56, ox: 0.5, oy: 0.5 } as const
+  // 콤보 이펙트 파라미터. h=목표 월드 높이(px), ox/oy=origin.
+  // 휘두르기(SWING)만 마지막 프레임 한 장을 from→to로 키우며 사라진다(comboBurst). oy=0.99는
+  //   마지막 참격 프레임에서 그림 아래 끝이 프레임 높이의 ~99.3%라, 그 지점을 origin으로 잡고
+  //   y를 발밑(지면)으로 주면 아래 끝이 바닥에 붙고 성장은 위로만 자란다.
+  // 깊게 찌르기(DASH_THRUST)는 8프레임 관통 애니를 재생한다. 대쉬로 이미 전진하므로 멀리 띄우지 않고
+  //   몸 앞(front px)에서 시작해 앞으로 뻗는다. ox=꼬리(왼끝) 기준이라 앞으로 자라고, stretch로 가로만
+  //   더 늘여 얇고 긴 찌르기로 보이게 한다(세로 h는 그대로 → 과하지 않게).
+  private static readonly SWING = { h: 128, ox: 0.5, oy: 0.99, from: 0.9, to: 1.15 } as const
+  private static readonly DASH_THRUST = { h: 88, ox: 0.05, oy: 0.5, stretch: 1.8, front: 14 } as const
+  // 돌진 잔상(dashTrail)은 프레임 애니라 성장 트윈값이 필요 없다. back=몸 중심에서 뒤로 뺀 거리(px).
+  private static readonly DASH = { h: 56, ox: 0.5, oy: 0.5, back: 12 } as const
 
-  /** 콤보 2단계 — 휘두르기(effect_smash 4프레임 참격 애니). 시트 미로드 시 찌르기로 폴백. */
-  swingArc(x: number, y: number, facing: -1 | 1, hit = false) {
-    if (!this.scene.anims.exists('fx_swing_anim')) { this.attack(x, y, facing, hit); return }
-    const spr = this.swingPool.get(x, y) as Phaser.GameObjects.Sprite | null
+  /**
+   * 콤보 단일-이미지 이펙트 — 스트립/시트의 "마지막(가장 큰) 프레임" 한 장을 찌르기(attack)처럼
+   * 키우며 페이드아웃한다. 프레임 애니 대신 통짜 한 장이라 균등-분할 셀 경계가 그림을 잘라
+   * 네모 테두리처럼 보이던 문제가 없다. 텍스처 미로드/폴백(프레임 부족) 시 찌르기로 폴백.
+   */
+  private comboBurst(
+    pool: Phaser.GameObjects.Group, textureKey: string,
+    s: { h: number; ox: number; oy: number; from: number; to: number },
+    x: number, y: number, facing: -1 | 1, hit: boolean,
+  ) {
+    const tex = this.scene.textures.exists(textureKey) ? this.scene.textures.get(textureKey) : null
+    // frameTotal은 __BASE(전체 이미지)를 포함 → 실제 프레임이 2개 미만이면 아직 미로드/placeholder
+    if (!tex || tex.frameTotal < 3) { this.attack(x, y, facing, hit); return }
+    const spr = pool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!spr) return
-    const s = EffectManager.SWING
     spr.setActive(true).setVisible(true)
-    spr.setOrigin(s.ox, s.oy)
-    spr.setPosition(x, y).setAlpha(0.95).setFlipX(facing === -1).setAngle(0)
-    this.playAnimOnce(spr, 'fx_swing_anim') // 프레임0 확정 후에 실제 프레임 높이로 스케일
-    spr.setScale(s.h / (spr.frame.realHeight || 1))
+    spr.setFrame(tex.frameTotal - 2) // __BASE 제외한 마지막 실제 프레임(가장 큰 그림)
+    spr.setOrigin(s.ox, s.oy).setAngle(0).setFlipX(facing === -1)
+    const base = s.h / (spr.frame.realHeight || 1)
+    spr.setPosition(x, y).setAlpha(0.95).setScale(base * s.from)
+    this.scene.tweens.add({
+      targets: spr, scale: base * s.to, alpha: 0,
+      duration: COMBAT.ATTACK_DURATION_MS * 0.55, ease: 'Cubic.easeOut',
+      onComplete: () => { spr.setActive(false).setVisible(false) },
+    })
   }
 
-  /** 콤보 3단계 — 깊게 찌르기(effect_deep_thrust 8프레임 돌진 관통 애니). 시트 미로드 시 찌르기로 폴백. */
+  /** 콤보 2단계 — 휘두르기. effect_smash의 마지막 참격 프레임 한 장을 키우며 사라지게 한다. */
+  swingArc(x: number, y: number, facing: -1 | 1, hit = false) {
+    this.comboBurst(this.swingPool, 'fx_swing', EffectManager.SWING, x, y, facing, hit)
+  }
+
+  /** 콤보 3단계 — 깊게 찌르기(effect_deep_thrust 8프레임 돌진 관통 애니). 시트 미로드 시 찌르기로 폴백.
+   *  GameScene에서 dashTrail 없이 이 하나만 호출한다 — 이펙트 1개. */
   dashThrust(x: number, y: number, facing: -1 | 1, hit = false) {
     if (!this.scene.anims.exists('fx_dash_thrust_anim')) { this.attack(x, y, facing, hit); return }
     const spr = this.dashThrustPool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!spr) return
     const s = EffectManager.DASH_THRUST
+    const px = x + facing * s.front // 몸 중심(x)에서 앞으로 살짝 — 꼬리를 앞손 위치에 둔다
     spr.setActive(true).setVisible(true)
-    spr.setOrigin(s.ox, s.oy)
-    spr.setPosition(x, y).setAlpha(0.95).setFlipX(facing === -1).setAngle(0)
+    // 꼬리(왼끝) origin. 좌향은 flipX와 함께 origin도 뒤집어(1-ox) 꼬리가 앞손에 오게 한다(attack와 동일 규약).
+    spr.setOrigin(facing === 1 ? s.ox : 1 - s.ox, s.oy)
+    spr.setPosition(px, y).setAlpha(0.95).setFlipX(facing === -1).setAngle(0)
     this.playAnimOnce(spr, 'fx_dash_thrust_anim')
-    spr.setScale(s.h / (spr.frame.realHeight || 1))
+    // 세로는 h에 맞추고 가로만 stretch배 늘여 얇고 긴 찌르기로 (8프레임 모두 세로 전체라 높이 동일)
+    const base = s.h / (spr.frame.realHeight || 1)
+    spr.setScale(base * s.stretch, base)
   }
 
   /**
@@ -169,10 +222,10 @@ export class EffectManager {
    * 시트 미로드(placeholder 단일 이미지) 시엔 정지 이미지를 짧게 뒤로 흘리는 기존 방식으로 폴백.
    */
   dashTrail(x: number, y: number, facing: -1 | 1) {
-    const px = x - facing * 34
+    const s = EffectManager.DASH
+    const px = x - facing * s.back // 몸통 뒤로 살짝 — 잔상이 몸에서 너무 떨어지지 않게
     const spr = this.dashPool.get(px, y) as Phaser.GameObjects.Sprite | null
     if (!spr) return
-    const s = EffectManager.DASH
     spr.setActive(true).setVisible(true)
     spr.setOrigin(s.ox, s.oy)
     spr.setPosition(px, y).setAlpha(0.85).setFlipX(facing === -1).setAngle(0)
