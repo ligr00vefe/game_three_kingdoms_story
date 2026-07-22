@@ -21,12 +21,15 @@ const ACTION_HANDLERS: Partial<Record<GameAction, () => void>> = {
   screenshot: () => EventBus.emit(GameEvents.REQUEST_SCREENSHOT),
 }
 
+/** 단축키 안내바에서 숨길 액션 (키 자체는 유효 — 표시 버튼만 제거) */
+const HIDDEN_ACTIONS: ReadonlySet<GameAction> = new Set(['pickup', 'sit', 'item', 'equip', 'quest'])
+
 export function QuickSlots() {
   const bindings = useKeybindingStore((s) => s.bindings)
 
   return (
     <div className="quickslots" title="단축키 안내 — 누르면 해당 기능이 실행됩니다">
-      {ALL_ACTIONS.map((action) => {
+      {ALL_ACTIONS.filter((action) => !HIDDEN_ACTIONS.has(action)).map((action) => {
         const code = keyForAction(bindings, action)
         const info = ACTION_INFO[action]
         const handler = ACTION_HANDLERS[action]

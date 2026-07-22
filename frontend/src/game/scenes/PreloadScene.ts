@@ -30,6 +30,7 @@ export class PreloadScene extends Phaser.Scene {
     // 맵 데이터 (데이터 주도 — 스테이지 추가는 JSON 추가만으로)
     this.load.json('map_stage1', 'assets/maps/stage1_grassland.json')
     this.load.json('map_ye_castle', 'assets/maps/ye_castle.json')
+    this.load.json('map_defense', 'assets/maps/defense_arena.json')
     // 몬스터 정의 (데이터 주도 — GAME_DESIGN 6장)
     this.load.json('monster_defs', 'assets/data/monsters.json')
     this.load.json('npc_defs', 'assets/data/npcs.json')
@@ -284,6 +285,30 @@ export class PreloadScene extends Phaser.Scene {
     g.fillStyle(0xfbc02d); g.fillEllipse(16, 13, 16, 9)
     g.fillStyle(0xf57f17); g.fillRect(4, 18, 8, 3)
     g.generateTexture('icon_turban_cap', 32, 32)
+
+    // 디펜스: 바리케이트(나무 방벽) — 실제 아트(img_barricade)가 오면 같은 키로 대체되므로 exists 가드
+    if (!this.textures.exists('img_barricade')) {
+      g.clear()
+      g.fillStyle(0x6d4c41); g.fillRect(0, 8, 72, 44)              // 통나무 벽
+      g.fillStyle(0x8d6e63); g.fillRect(0, 8, 72, 6)               // 윗면 하이라이트
+      g.fillStyle(0x4e342e)                                        // 세로 통나무 이음새
+      for (let x = 8; x < 72; x += 16) g.fillRect(x, 8, 3, 44)
+      g.fillStyle(0x5d4037); g.fillRect(0, 26, 72, 6)              // 가로 지지대
+      g.fillStyle(0x3e2723); g.fillTriangle(4, 8, 14, 8, 9, -2)   // 뾰족한 상단 말뚝
+      g.fillTriangle(58, 8, 68, 8, 63, -2)
+      g.generateTexture('img_barricade', 72, 60)
+    }
+
+    // 디펜스: 기지 미니어처(임시 도형) — 성 모형 + 붉은 깃발
+    g.clear()
+    g.fillStyle(0x9e9e9e); g.fillRect(6, 40, 76, 60)               // 성벽 몸체
+    g.fillStyle(0xbdbdbd); g.fillRect(6, 40, 76, 8)               // 윗면
+    g.fillStyle(0x757575)                                          // 흉벽(총안)
+    for (let x = 6; x < 82; x += 20) g.fillRect(x, 28, 12, 12)
+    g.fillStyle(0x6d4c41); g.fillRect(38, 60, 14, 40)            // 성문
+    g.fillStyle(0x4e342e); g.fillRect(60, 6, 4, 34)              // 깃대
+    g.fillStyle(0xd32f2f); g.fillTriangle(64, 8, 64, 24, 84, 16) // 붉은 깃발
+    g.generateTexture('ph_base', 90, 100)
 
     g.destroy()
   }

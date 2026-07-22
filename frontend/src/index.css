@@ -1424,3 +1424,248 @@ html, body, #root { height: 100%; }
 .quest-item-title { font-size: 12px; font-weight: 800; margin-bottom: 3px; }
 .quest-item-desc { font-size: 11px; color: #b0b3bc; line-height: 1.45; }
 .quest-item-progress { margin-top: 4px; font-size: 10px; font-weight: 700; color: #80cbc4; text-align: right; }
+
+/* ==================== 포탈 선택 메뉴 (수문장 옆) ==================== */
+.portal-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 14, 0.5);
+  z-index: 40;
+}
+.portal-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 280px;
+  padding: 20px;
+  background: linear-gradient(#2c2d33, #1c1d22);
+  border: 1px solid #6a6c75;
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+.portal-menu-title { font-size: 18px; font-weight: 800; color: #ffd54f; }
+.portal-menu-desc { font-size: 13px; color: #b0b3bc; margin-bottom: 4px; }
+.portal-menu-btn {
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: #37474f;
+  border: 1px solid #546e7a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.portal-menu-btn:hover { background: #455a64; }
+.portal-menu-btn--accent { background: #a83232; border-color: #c14b3a; }
+.portal-menu-btn--accent:hover { background: #c0392b; }
+.portal-menu-close {
+  margin-top: 2px;
+  padding: 7px;
+  font-size: 12px;
+  color: #b0b3bc;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.portal-menu-close:hover { color: #eee; }
+
+/* ==================== 디펜스 HUD ==================== */
+/* 배치 모드 중엔 오버레이가 클릭을 통과시켜 Phaser 캔버스가 클릭을 받는다 */
+.ui-overlay--pass { pointer-events: none; }
+.ui-overlay--pass .def-place-hint { pointer-events: auto; }
+/* 배치 중 일시정지 메뉴가 열려도 버튼은 눌려야 한다 (안전망) */
+.ui-overlay--pass .def-pause-backdrop { pointer-events: auto; }
+
+.def-top {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 18px;
+  background: rgba(16, 16, 22, 0.78);
+  border: 1px solid #e8b64c66;
+  border-radius: 12px;
+  pointer-events: none;
+}
+.def-stage { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #e8b64c; }
+.def-timer { font-weight: 800; line-height: 1; }
+.def-timer--wait { font-size: 15px; color: #90caf9; }
+.def-timer--combat { font-size: 26px; color: #fff; text-shadow: 0 2px 4px #000; }
+.def-timer-num { font-size: 22px; color: #fff; }
+.def-info { display: flex; align-items: center; gap: 14px; margin-top: 2px; }
+.def-zombies { font-size: 12px; font-weight: 700; color: #cddc39; }
+.def-basehp { display: flex; align-items: center; gap: 6px; }
+.def-basehp-label { font-size: 11px; color: #90caf9; }
+.def-basehp-track {
+  width: 90px; height: 8px;
+  background: #263238;
+  border: 1px solid #000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.def-basehp-fill { height: 100%; background: linear-gradient(#64b5f6, #1e88e5); transition: width 0.2s; }
+
+.def-buy-btn {
+  position: absolute;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 34px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1b1b1f;
+  background: linear-gradient(#ffd54f, #e8b64c);
+  border: 1px solid #a1801f;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.def-buy-btn:hover { filter: brightness(1.08); }
+
+.def-place-hint {
+  position: absolute;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(20, 20, 26, 0.9);
+  border: 1px dashed #66bb6a;
+  border-radius: 10px;
+}
+.def-place-cancel {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #616161;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.def-place-cancel:hover { background: #757575; }
+
+.def-shop-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 14, 0.5);
+  z-index: 40;
+}
+.def-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  padding: 18px;
+  background: linear-gradient(#2c2d33, #1c1d22);
+  border: 1px solid #6a6c75;
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+.def-shop-title { font-size: 16px; font-weight: 800; color: #ffd54f; }
+.def-shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+  background: #2b3640;
+  border: 1px solid #546e7a;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.def-shop-item:hover:not(:disabled) { background: #37474f; }
+.def-shop-item:disabled { opacity: 0.5; cursor: not-allowed; }
+.def-shop-icon { font-size: 34px; line-height: 1; }
+.def-shop-name { font-size: 14px; font-weight: 700; color: #fff; }
+.def-shop-price { font-size: 13px; font-weight: 800; color: #ffd54f; }
+.def-shop-warn { font-size: 12px; color: #ff8a80; }
+.def-shop-close {
+  padding: 7px;
+  font-size: 12px;
+  color: #b0b3bc;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.def-shop-close:hover { color: #eee; }
+
+.def-banner {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 40px;
+  border-radius: 16px;
+  pointer-events: none;
+}
+.def-banner--victory { background: rgba(20, 40, 20, 0.82); border: 1px solid #66bb6a; }
+.def-banner-title { font-size: 26px; font-weight: 800; color: #a5d6a7; text-shadow: 0 2px 6px #000; }
+.def-banner-sub { font-size: 13px; color: #dcedc8; }
+
+.def-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 10, 10, 0.7);
+  z-index: 40;
+}
+.def-overlay-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 40px;
+  background: linear-gradient(#33232a, #1d1418);
+  border: 1px solid #a83232;
+  border-radius: 16px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.7);
+}
+.def-overlay-title { font-size: 30px; font-weight: 800; color: #ff8a80; text-shadow: 0 2px 6px #000; }
+.def-overlay-sub { font-size: 14px; color: #d7ccce; }
+.def-overlay-btn {
+  margin-top: 4px;
+  padding: 11px 28px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: #a83232;
+  border: 1px solid #c14b3a;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.def-overlay-btn:hover { background: #c0392b; }
+
+/* 디펜스 ESC 일시정지 메뉴 — 내부 박스는 settings-menu 스타일 재사용, 배경만 별도(최상단) */
+.def-pause-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 45;
+}

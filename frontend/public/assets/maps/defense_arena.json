@@ -1,0 +1,20 @@
+{
+  "name": "defense_arena",
+  "displayName": "황건적 방어전",
+  "underFloorStyle": "water",
+  "worldWidth": 3200,
+  "worldHeight": 664,
+  "groundY": 536,
+  "playerSpawn": {
+    "x": 520,
+    "y": 440
+  },
+  "platforms": [],
+  "obstacles": [],
+  "ladders": [],
+  "stairs": [],
+  "npcSpawns": [],
+  "monsterSpawns": [],
+  "underFloorHeight": 96,
+  "portals": []
+}

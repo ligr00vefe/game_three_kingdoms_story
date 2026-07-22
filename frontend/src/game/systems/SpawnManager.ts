@@ -46,6 +46,19 @@ export class SpawnManager {
     }
   }
 
+  /**
+   * 지정 위치에 몬스터 1마리를 즉시 스폰하고 반환한다 (디펜스 웨이브용).
+   * registerArea의 자동 리젠 경로를 타지 않고, 호출부(DefenseManager)가 onDied로 웨이브를 관리한다.
+   * acquire를 재사용하므로 스폰된 몬스터는 spawner.monsters에 포함되어 전투 판정(resolveAttack)에 잡힌다.
+   */
+  spawnAt(code: string, x: number, xMin: number, xMax: number, onDied: (m: Monster) => void): Monster {
+    const m = this.acquire(code)
+    m.def = this.defs[code]
+    m.onDied = onDied
+    m.spawnAt(x, this.groundY, xMin, xMax, SPAWN.RISE_DURATION_MS)
+    return m
+  }
+
   private acquire(code: string): Monster {
     const idle = this.pool.pop()
     if (idle) return idle

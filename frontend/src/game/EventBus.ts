@@ -65,6 +65,12 @@ export const GameEvents = {
   MAP_INFO: 'game:map-info',
   /** 미니맵용 플레이어 위치 (약 100ms 간격) {x, y} */
   PLAYER_MOVED: 'game:player-moved',
+  /** 수문장 옆 포탈 선택 메뉴 열기 요청 (성밖 타깃 payload {targetMap, targetX, targetY}) */
+  PORTAL_MENU: 'game:portal-menu',
+  /** 디펜스 상태 브로드캐스트 (phase/타이머/스테이지/좀비수/기지HP) — DefenseHud가 구독 */
+  DEFENSE_STATE: 'game:defense-state',
+  /** 디펜스가 아닌 맵으로 진입 — 디펜스 HUD를 강제로 끈다 (성밖/감숙성엔 현황판·구매 버튼 없음) */
+  DEFENSE_END: 'game:defense-end',
   // React → Phaser
   USE_ITEM: 'ui:use-item',
   REVIVE: 'ui:revive',
@@ -74,6 +80,16 @@ export const GameEvents = {
   CAST_SKILL: 'ui:cast-skill',
   /** 채팅 입력/설정 패널이 열린 동안 게임 키 입력 차단 (boolean) */
   INPUT_BLOCK: 'ui:input-block',
+  /** 포탈 메뉴에서 "성밖으로" 선택 — 보관된 타깃으로 이동 */
+  PORTAL_GO_OUTSIDE: 'ui:portal-go-outside',
+  /** 포탈 메뉴에서 "탐험하기" 선택 — 디펜스 게임 진입 */
+  PORTAL_ENTER_DEFENSE: 'ui:portal-enter-defense',
+  /** 바리케이트 배치 대기 모드 on/off (boolean) — 켜지면 게임 클릭으로 설치 */
+  DEFENSE_PLACE_MODE: 'ui:defense-place-mode',
+  /** 디펜스 종료 후 감숙성으로 복귀 */
+  DEFENSE_EXIT: 'ui:defense-exit',
+  /** 디펜스 ESC 일시정지 메뉴 on/off (boolean) — 씬을 pause/resume 한다 */
+  DEFENSE_PAUSE: 'ui:defense-pause',
   // 음향 훅 (지금은 구현하지 않음 — 자리만 확보, DEVELOPMENT_PLAN "이후" 항목)
   SFX: 'sfx:play',
 } as const

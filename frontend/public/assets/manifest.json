@@ -38,10 +38,10 @@
     "fx_level_up": "assets/img/fx/effect_level_up.png",
     "icon_coin": "assets/img/items/coin.png",
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",
-    "fx_dash": "assets/img/fx/effect_dash.png"
+    "fx_dash": "assets/img/fx/effect_dash.png",
+    "fx_swing": "assets/img/fx/effect_smash.png"
   },
   "spritesheets": {
-    "fx_swing":       { "url": "assets/img/fx/effect_smash.png",       "frameWidth": 370, "frameHeight": 537 },
     "bg_river_anim":      { "url": "assets/img/bg/bg_river_animation.png",   "frameWidth": 1350, "frameHeight": 291.25 },
     "zombie_yellow_idle": { "url": "assets/img/monster/zombie_yellow_idle.png", "frameWidth": 64, "frameHeight": 64 },
     "zombie_yellow_run":  { "url": "assets/img/monster/zombie_yellow_run.png",  "frameWidth": 64, "frameHeight": 64 },

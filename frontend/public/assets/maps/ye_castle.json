@@ -72,6 +72,7 @@
     {
       "x": 2460,
       "name": "성 밖",
+      "menu": true,
       "targetMap": "map_stage1",
       "targetX": 170,
       "targetY": 440

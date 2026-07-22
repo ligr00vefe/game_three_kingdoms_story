@@ -7,6 +7,7 @@ import type { Monster, MonsterDef, MonsterTarget } from '../entities/Monster'
 import { InputManager } from '../systems/InputManager'
 import { EffectManager } from '../systems/EffectManager'
 import { SpawnManager } from '../systems/SpawnManager'
+import { DefenseManager } from '../systems/DefenseManager'
 import { ItemDropManager } from '../systems/ItemDropManager'
 import type { DropDef } from '../systems/ItemDropManager'
 import { rollBasicDamage, rollSkillDamage } from '../systems/combat'
@@ -32,6 +33,8 @@ interface PortalDef {
   targetMap: string
   targetX: number
   targetY?: number
+  /** true면 즉시 이동 대신 선택 메뉴(성밖으로/탐험하기)를 연다 (감숙성 수문장 옆 포탈) */
+  menu?: boolean
 }
 
 interface MapData {
@@ -245,6 +248,11 @@ export class GameScene extends Phaser.Scene {
   private spawnOverride: { x: number; y: number } | null = null
   private portals: PortalDef[] = []
   private transitioning = false
+  /** 게임 모드 — 'defense'면 디펜스 시스템(DefenseManager) 활성, 일반 포탈/스폰 대신 웨이브 진행 */
+  private mode: 'normal' | 'defense' = 'normal'
+  private defense?: DefenseManager
+  /** menu 포탈에서 "성밖으로" 선택 시 이동할 타깃 (PORTAL_MENU emit 시 보관) */
+  private menuPortalTarget: PortalDef | null = null
   /** 하늘에 떠서 가로로 흘러가는 구름들 — update()에서 x를 밀고 band 밖으로 나가면 반대쪽에서 재진입 */
   private clouds: { img: Phaser.GameObjects.Image; speed: number; halfW: number }[] = []
   /** 구름이 화면에 잡힐 수 있는 월드 X 우측 한계 (스크롤계수·뷰포트로 산출, 순환 기준) */
@@ -281,10 +289,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 게임 시작(기본: 감숙성 내부 안전지대) 또는 포탈 이동(scene.restart)의 진입 데이터 */
-  init(data: { mapKey?: string; spawnX?: number; spawnY?: number }) {
+  init(data: { mapKey?: string; spawnX?: number; spawnY?: number; mode?: 'normal' | 'defense' }) {
     this.mapKey = data.mapKey ?? 'map_ye_castle'
     this.spawnOverride =
       data.spawnX !== undefined ? { x: data.spawnX, y: data.spawnY ?? 440 } : null
+    this.mode = data.mode ?? 'normal'
+    this.defense = undefined
+    this.menuPortalTarget = null
     this.transitioning = false
     this.npcs = []
     this.portals = []
@@ -399,7 +410,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 200, 50, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 200, 90, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
@@ -669,11 +680,15 @@ export class GameScene extends Phaser.Scene {
       const fxY = this.player.y + 22
       const hit = hits.length > 0
       // 전용 아트(fx_swing / fx_dash_thrust)가 없으면 EffectManager가 찌르기 이펙트로 폴백한다.
-      if (comboStep === 1) this.effects.swingArc(fxX, fxY, facing, hit)
-      else if (comboStep === 2) {
-        // 깊게 찌르기: 무기 궤적(dashThrust) + 돌진하는 몸에 붙는 이동 잔상(dashTrail)
-        this.effects.dashThrust(fxX, fxY, facing, hit)
-        this.effects.dashTrail(this.player.x, this.player.y, facing)
+      if (comboStep === 1) {
+        // 휘두르기(내려찍기): 적 위치(변동→흔들림)가 아니라 플레이어 앞에 고정하고,
+        // 밑변을 바닥(groundY)에 맞춰 참격이 땅에서 끝나게 한다(땅 밑으로 뚫지 않도록).
+        this.effects.swingArc(this.player.x + facing * 42, this.map.groundY, facing, hit)
+      } else if (comboStep === 2) {
+        // 깊게 찌르기: 꼬리를 몸에 고정해 대쉬 사거리까지 길게 뻗는 찌르기 **하나만**.
+        // (dashTrail 속도선 잔상은 2개 모션으로 보여서 제거 — 사용자 확정)
+        // 시작점을 몸 안쪽(-facing*12)으로 당겨 찌르기가 몸에 더 붙어 나가게 한다.
+        this.effects.dashThrust(this.player.x - facing * 12, fxY, facing, hit)
       } else this.effects.attack(fxX, fxY, facing, hit)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
@@ -708,9 +723,22 @@ export class GameScene extends Phaser.Scene {
 
     // ---- 몬스터 ----
     const defs = this.cache.json.get('monster_defs') as Record<string, MonsterDef & { drops?: DropDef[] }>
-    this.spawner = new SpawnManager(this, defs, map.groundY, [solids])
+    // 디펜스 모드: 좀비가 부딪혀 막히는 구조물(기지/바리케이트) 그룹을 몬스터 충돌 대상에 포함.
+    // 그룹 참조라 나중에 설치되는 바리케이트도 자동으로 충돌한다(플레이어는 통과 — collider 미설정).
+    const structures = this.mode === 'defense' ? this.physics.add.staticGroup() : null
+    const monsterCollide = structures ? [solids, structures] : [solids]
+    this.spawner = new SpawnManager(this, defs, map.groundY, monsterCollide)
     for (const area of map.monsterSpawns) {
       this.spawner.registerArea(area.code, area.xMin, area.xMax, area.max)
+    }
+    // 디펜스 오케스트레이션 (웨이브/타이머/바리케이트/기지/승패)
+    if (this.mode === 'defense' && structures) {
+      this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget)
+      this.setupDefenseInput()
+    } else {
+      // 디펜스가 아닌 맵(성밖/감숙성)에서는 디펜스 HUD(현황판·구매 버튼)를 확실히 끈다.
+      // 성밖과 디펜스는 배경만 공유할 뿐 서로 다른 맵/모드다 (설정 분리 — 향후 디자인 분화 대비).
+      EventBus.emit(GameEvents.DEFENSE_END)
     }
 
     // ---- 카메라 ----
@@ -735,6 +763,12 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
     EventBus.on(GameEvents.CAST_SKILL, this.handleCastSkill, this)
     EventBus.on(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
+    // ---- 포탈 메뉴 / 디펜스 커맨드 (React → Phaser) ----
+    EventBus.on(GameEvents.PORTAL_GO_OUTSIDE, this.handlePortalGoOutside, this)
+    EventBus.on(GameEvents.PORTAL_ENTER_DEFENSE, this.handlePortalEnterDefense, this)
+    EventBus.on(GameEvents.DEFENSE_PLACE_MODE, this.handleDefensePlaceMode, this)
+    EventBus.on(GameEvents.DEFENSE_EXIT, this.handleDefenseExit, this)
+    EventBus.on(GameEvents.DEFENSE_PAUSE, this.handleDefensePause, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GameEvents.LEVEL_UP, this.handleLevelUp, this)
       EventBus.off(GameEvents.PLAYER_DIED, this.handleDeath, this)
@@ -745,6 +779,12 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
       EventBus.off(GameEvents.CAST_SKILL, this.handleCastSkill, this)
       EventBus.off(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
+      EventBus.off(GameEvents.PORTAL_GO_OUTSIDE, this.handlePortalGoOutside, this)
+      EventBus.off(GameEvents.PORTAL_ENTER_DEFENSE, this.handlePortalEnterDefense, this)
+      EventBus.off(GameEvents.DEFENSE_PLACE_MODE, this.handleDefensePlaceMode, this)
+      EventBus.off(GameEvents.DEFENSE_EXIT, this.handleDefenseExit, this)
+      EventBus.off(GameEvents.DEFENSE_PAUSE, this.handleDefensePause, this)
+      this.defense?.destroy()
     })
 
     // ---- 미니맵 데이터 (React Minimap이 구독) ----
@@ -802,6 +842,57 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.restart({ mapKey: p.targetMap, spawnX: p.targetX, spawnY: p.targetY ?? 440 })
+    })
+  }
+
+  /** 페이드아웃 후 지정 맵/모드로 재시작 (디펜스 진입/복귀 공통) */
+  private transitionTo(data: { mapKey: string; spawnX?: number; spawnY?: number; mode?: 'normal' | 'defense' }) {
+    if (this.transitioning) return
+    this.transitioning = true
+    this.player.setVelocityX(0)
+    this.cameras.main.fadeOut(300, 0, 0, 0)
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart(data))
+  }
+
+  /** 포탈 메뉴 "성밖으로": 보관된 성밖 타깃으로 이동 */
+  private handlePortalGoOutside = () => {
+    if (this.menuPortalTarget) this.usePortal(this.menuPortalTarget)
+  }
+
+  /** 포탈 메뉴 "탐험하기": 디펜스 아레나로 진입 */
+  private handlePortalEnterDefense = () => {
+    this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 520, spawnY: 440 })
+  }
+
+  /** 디펜스 종료 후 감숙성 수문장 앞으로 복귀 */
+  private handleDefenseExit = () => {
+    // 일시정지 상태에서 나가면 fadeOut 트윈이 안 도니 먼저 재개한다
+    if (this.scene.isPaused()) this.scene.resume()
+    // 사망으로 패배했든 아니든, 디펜스를 떠날 땐 HP/MP·사망 상태를 원복해 감숙성에서 멀쩡히 시작
+    const store = useGameStore.getState()
+    store.setStats({ hp: store.maxHp, mp: store.maxMp })
+    store.setPlayerDead(false)
+    this.transitionTo({ mapKey: 'map_ye_castle', spawnX: 2400, spawnY: 440 })
+  }
+
+  /** 디펜스 ESC 일시정지 메뉴: 씬을 pause/resume (좀비·타이머·트윈 모두 정지). 디펜스 모드에서만 유효. */
+  private handleDefensePause = (paused: boolean) => {
+    if (!this.defense) return
+    if (paused) this.scene.pause()
+    else if (this.scene.isPaused()) this.scene.resume()
+  }
+
+  /** 바리케이트 배치 대기 모드 토글 (구매 창에서 바리케이트 선택 시 on) */
+  private handleDefensePlaceMode = (placing: boolean) => {
+    if (this.defense) this.defense.placing = placing
+  }
+
+  /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치 시도 */
+  private setupDefenseInput() {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      if (!this.defense || !this.defense.placing) return
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+      this.defense.placeBarricade(world.x)
     })
   }
 
@@ -899,6 +990,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleDeath = () => {
+    // 디펜스 모드: 캐릭터 사망 = 패배 (부활 오버레이 대신 디펜스 패배 오버레이). HP는 나갈 때 복구.
+    if (this.defense) { this.defense.playerDied(); return }
     useGameStore.getState().setPlayerDead(true)
     this.cameras.main.fadeOut(400, 60, 60, 60)
   }
@@ -980,7 +1073,15 @@ export class GameScene extends Phaser.Scene {
     if (this.input_.upJustDown && !this.player.climbing && !this.transitioning) {
       const portal = this.portals.find((p) => Math.abs(this.player.x - p.x) < PORTAL_RANGE)
       if (portal && this.player.body.blocked.down) {
-        this.usePortal(portal)
+        // menu 포탈이면 즉시 이동 대신 선택 메뉴(성밖으로/탐험하기)를 연다
+        if (portal.menu) {
+          this.menuPortalTarget = portal
+          EventBus.emit(GameEvents.PORTAL_MENU, {
+            targetMap: portal.targetMap, targetX: portal.targetX, targetY: portal.targetY ?? 440,
+          })
+        } else {
+          this.usePortal(portal)
+        }
       } else {
         for (let i = 0; i < this.npcs.length; i++) {
           const npc = this.npcs[i]
@@ -998,9 +1099,14 @@ export class GameScene extends Phaser.Scene {
     // 몬스터 AI — update() 안에서 할당/클로저 생성 최소화 (성능 규칙 3)
     const monsters = this.spawner.monsters
     const now = this.time.now
-    for (let i = 0; i < monsters.length; i++) {
-      const m = monsters[i]
-      if (m.active) m.update(this.playerTarget, now)
+    if (this.defense) {
+      // 디펜스: 좀비별 타깃(플레이어 근접 시 플레이어, 아니면 기지)을 매니저가 골라 넘긴다
+      this.defense.updateMonsters(monsters, now)
+    } else {
+      for (let i = 0; i < monsters.length; i++) {
+        const m = monsters[i]
+        if (m.active) m.update(this.playerTarget, now)
+      }
     }
 
     // 채팅 말풍선: 플레이어를 따라다니다 시간이 되면 숨김
