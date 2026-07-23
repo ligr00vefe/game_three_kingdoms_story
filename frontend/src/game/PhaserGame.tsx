@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import type Phaser from 'phaser'
 import { startGame } from './main'
 
 /**

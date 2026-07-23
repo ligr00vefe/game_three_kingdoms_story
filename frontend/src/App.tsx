@@ -14,6 +14,8 @@ import { loadGameState, startAutosave } from './api/game'
 import { useGameStore } from './stores/gameStore'
 import { useUiStore } from './stores/uiStore'
 import { useScreenStore } from './stores/screenStore'
+import { useDefenseStore } from './stores/defenseStore'
+import { EventBus, GameEvents } from './game/EventBus'
 import { FEATURES } from './features'
 import { InventoryPanel } from './ui/InventoryPanel'
 import { EquipmentPanel } from './ui/EquipmentPanel'
@@ -21,6 +23,8 @@ import { CharacterInfoPanel } from './ui/CharacterInfoPanel'
 import { SkillPanel } from './ui/SkillPanel'
 import { useKeybindingStore } from './stores/keybindingStore'
 import { DialogBox } from './ui/DialogBox'
+import { PortalMenu } from './ui/PortalMenu'
+import { DefenseHud } from './ui/DefenseHud'
 import { NoticeBanner } from './ui/NoticeBanner'
 import { QuestPanel } from './ui/QuestPanel'
 import { SettingsMenu } from './ui/SettingsMenu'
@@ -40,6 +44,8 @@ export default function App() {
 function GameApp() {
   const serverStatus = useGameStore((s) => s.serverStatus)
   const screen = useScreenStore((s) => s.screen)
+  // 바리케이트 배치 중엔 오버레이를 클릭 통과(pointer-events:none)시켜 Phaser 캔버스가 클릭을 받게 한다
+  const placing = useDefenseStore((s) => s.placing)
 
   // 게임 창 크기 잠금: 항상 내부(콘텐츠)를 GAME_WINDOW(1280×720)으로 유지한다.
   // 사용자가 창을 늘리면 그만큼 되돌린다. 팝업 resizable=no는 크롬이 무시하므로 여기서 강제한다.
@@ -93,6 +99,16 @@ function GameApp() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (useScreenStore.getState().screen !== 'game') return
+      // 디펜스 모드: 일반 설정 메뉴 대신 전용 일시정지 메뉴(게임으로/대기실로/포기하기)를 토글
+      const def = useDefenseStore.getState()
+      if (def.active) {
+        // ESC 우선순위: 일시정지 닫기 → 배치 취소 → 구매창 닫기 → 일시정지 열기
+        if (def.pauseOpen) def.setPauseOpen(false)
+        else if (def.placing) { def.setPlacing(false); EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false) }
+        else if (def.purchaseOpen) def.setPurchaseOpen(false)
+        else def.setPauseOpen(true)
+        return
+      }
       const ui = useUiStore.getState()
       if (ui.keySettingsOpen) ui.setKeySettingsOpen(false)
       else if (ui.settingsOpen) ui.setSettingsOpen(false)
@@ -133,7 +149,7 @@ function GameApp() {
         {screen === 'game' && (
           // 작은 창에서도 전체 인터페이스가 다 보이도록 축소 — 좌표계는 그대로 두고
           // transform으로만 줄인다 (내부 각 패널의 px 절대값을 일일이 안 고쳐도 됨)
-          <div className="ui-overlay">
+          <div className={`ui-overlay${placing ? ' ui-overlay--pass' : ''}`}>
             <Minimap />
             <GoldDisplay />
             <NoticeBanner />
@@ -143,6 +159,8 @@ function GameApp() {
             <SkillPanel />
             <QuestPanel />
             <DialogBox />
+            <PortalMenu />
+            <DefenseHud />
             <DeathOverlay />
             {/* ---- 하단 인터페이스 (메이플 스타일) ---- */}
             <ChatBox />
