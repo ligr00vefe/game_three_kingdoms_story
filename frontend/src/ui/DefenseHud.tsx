@@ -125,6 +125,13 @@ export function DefenseHud() {
         )}
       </div>
 
+      {/* Wave 시작 5초 전 경고 — 깜빡이며 임박을 알린다 */}
+      {phase === 'wait' && timeLeftMs > 0 && timeLeftMs <= 5000 && (
+        <div className="def-wave-warning" role="alert">
+          ⚠ 곧 Wave가 시작됩니다. Warning...!
+        </div>
+      )}
+
       {/* 배치 안내 (바리케이트 배치 대기 중) */}
       {placing && (
         <div className="def-place-hint">

@@ -74,6 +74,8 @@ export class DefenseManager {
   private spawnEvent?: Phaser.Time.TimerEvent
   /** 바리케이트 배치 대기 모드 (구매 창에서 바리케이트 선택 시 on) */
   placing = false
+  /** 배치 미리보기 고스트(마우스를 따라다니는 반투명 바리케이트). 배치 모드에서만 표시. */
+  private ghost?: Phaser.GameObjects.Image
 
   /** structureTarget: 좀비가 진격/공격하는 "맨 오른쪽 생존 구조물". 매 프레임 재생성 방지용 단일 객체. */
   private structureTarget: MonsterTarget
@@ -126,11 +128,15 @@ export class DefenseManager {
     this.phase = 'combat'
     this.phaseEndsAt = this.scene.time.now + DEFENSE.COMBAT_MS
     this.placing = false
+    this.hidePlacementPreview()
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
-    // 좀비 순차 스폰
+    // 좀비 순차 스폰. 첫 마리는 아래에서 즉시 스폰하므로 타이머는 나머지(waveTotal-1)만 담당한다.
+    // repeat=N은 콜백을 N+1회 실행하므로, 나머지 waveTotal-1회를 원하면 repeat=waveTotal-2.
+    // (예전엔 repeat=waveTotal-1이라 타이머가 waveTotal회 + 즉시 1회 = waveTotal+1마리를 스폰,
+    //  승리 조건(waveTotal 처치)은 1마리 남았는데 먼저 충족돼 조기 클리어되던 버그가 있었다.)
     this.spawnEvent = this.scene.time.addEvent({
       delay: DEFENSE.SPAWN_INTERVAL_MS,
-      repeat: this.waveTotal - 1,
+      repeat: Math.max(0, this.waveTotal - 2),
       callback: () => this.spawnOne(),
     })
     // 첫 마리는 즉시
@@ -291,19 +297,48 @@ export class DefenseManager {
     })
   }
 
+  /** 바리케이트 배치 가능 x 범위 (기지 앞쪽~스폰존 앞). placeBarricade와 미리보기가 공유한다. */
+  private placeMinX() { return DEFENSE.BASE_X + 70 }
+  private placeMaxX() { return this.worldWidth - 120 }
+
+  /** 이 위치에 지금 바리케이트를 설치할 수 있는가 (대기 단계 + 배치 모드 + 배치존 안 + 골드 충분). */
+  private canPlaceAt(worldX: number): boolean {
+    if (this.phase !== 'wait' || !this.placing) return false
+    if (worldX < this.placeMinX() || worldX > this.placeMaxX()) return false
+    return useGameStore.getState().gold >= DEFENSE.BARRICADE_COST
+  }
+
   /** 바리케이트 설치 (대기 단계 + 배치 모드 + 골드 충분 + 배치존 안). GameScene 포인터에서 호출. */
   placeBarricade(worldX: number): boolean {
-    if (this.phase !== 'wait' || !this.placing) return false
-    const minX = DEFENSE.BASE_X + 70
-    const maxX = this.worldWidth - 120
-    if (worldX < minX || worldX > maxX) return false
+    if (!this.canPlaceAt(worldX)) return false
     const gold = useGameStore.getState().gold
-    if (gold < DEFENSE.BARRICADE_COST) return false
     useGameStore.getState().setStats({ gold: gold - DEFENSE.BARRICADE_COST })
     this.addStructure(worldX, DEFENSE.BARRICADE_HP, false, 'img_barricade', 44, 64, 40)
     this.placing = false
+    this.hidePlacementPreview()
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
     return true
+  }
+
+  /** 배치 미리보기 갱신 — 마우스(월드 x) 위치에 반투명 바리케이트를 그려 설치 지점을 예고한다.
+   *  배치존 밖/골드 부족이면 붉게, 설치 가능하면 초록빛으로 표시한다. */
+  updatePlacementPreview(worldX: number) {
+    if (!this.placing || this.phase !== 'wait') { this.hidePlacementPreview(); return }
+    if (!this.ghost) {
+      // origin을 밑변(0.5,1)에 둬 y=groundY면 실제 설치될 바리케이트와 바닥 정렬이 같다.
+      this.ghost = this.scene.add.image(0, 0, 'img_barricade')
+        .setOrigin(0.5, 1).setDisplaySize(44, 64).setDepth(6)
+    }
+    // 배치존을 벗어나도 고스트는 실제 커서 위치에 그려 "여긴 안 됨"을 색으로 알린다(범위 안내).
+    const shownX = Phaser.Math.Clamp(worldX, this.placeMinX() - 40, this.placeMaxX() + 40)
+    const valid = this.canPlaceAt(worldX)
+    this.ghost.setVisible(true).setPosition(shownX, this.groundY)
+      .setAlpha(valid ? 0.55 : 0.4).setTint(valid ? 0x8affa0 : 0xff6b6b)
+  }
+
+  /** 배치 미리보기 숨김 (배치 모드 종료/전투 시작 시). */
+  hidePlacementPreview() {
+    this.ghost?.setVisible(false)
   }
 
   // ---- 상태 브로드캐스트 ----
@@ -326,6 +361,8 @@ export class DefenseManager {
   destroy() {
     this.tickEvent?.remove()
     this.spawnEvent?.remove()
+    this.ghost?.destroy()
+    this.ghost = undefined
     for (const s of this.structures) { s.hpBar.destroy() }
     this.structures = []
   }

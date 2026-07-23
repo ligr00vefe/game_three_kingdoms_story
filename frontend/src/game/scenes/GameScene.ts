@@ -882,15 +882,29 @@ export class GameScene extends Phaser.Scene {
 
   /** 바리케이트 배치 대기 모드 토글 (구매 창에서 바리케이트 선택 시 on) */
   private handleDefensePlaceMode = (placing: boolean) => {
-    if (this.defense) this.defense.placing = placing
+    if (!this.defense) return
+    this.defense.placing = placing
+    if (placing) {
+      // 배치 모드 진입 즉시 현재 커서 위치에 미리보기를 띄운다(마우스를 움직이기 전에도 보이게).
+      const p = this.input.activePointer
+      const world = this.cameras.main.getWorldPoint(p.x, p.y)
+      this.defense.updatePlacementPreview(world.x)
+    } else {
+      this.defense.hidePlacementPreview()
+    }
   }
 
-  /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치 시도 */
+  /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치, 마우스 이동 시 설치 미리보기 갱신 */
   private setupDefenseInput() {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (!this.defense || !this.defense.placing) return
       const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
       this.defense.placeBarricade(world.x)
+    })
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+      if (!this.defense || !this.defense.placing) return
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+      this.defense.updatePlacementPreview(world.x)
     })
   }
 
