@@ -71,6 +71,12 @@ export const TITLES: readonly { tier: number; name: string; minLevel: number }[]
   { tier: 5, name: '무신', minLevel: 21 },
 ] as const
 
+/**
+ * 전직(외형 상승) 최소 레벨. 이 레벨 미만이면 관청에서 "아직 부족하다"고 돌려보낸다.
+ * 외형 티어는 더 이상 레벨로 자동 상승하지 않고(gameStore.jobTier), 관청 전직으로만 오른다.
+ */
+export const PROMOTION_MIN_LEVEL = 5
+
 /** 레벨 → 외형 티어 (1~5). 아트가 준비된 티어만 실제로 바뀐다. */
 export function tierForLevel(level: number): number {
   let tier = TITLES[0].tier
@@ -78,6 +84,12 @@ export function tierForLevel(level: number): number {
     if (level >= t.minLevel) tier = t.tier
   }
   return tier
+}
+
+/** 티어 → 직책 이름 (전직 패널 표시용). 범위를 벗어나면 마지막 직책. */
+export function titleForTier(tier: number): string {
+  const t = TITLES.find((x) => x.tier === tier)
+  return t ? t.name : TITLES[TITLES.length - 1].name
 }
 
 /** 레벨 → 직책 이름 (UI 표시용) */

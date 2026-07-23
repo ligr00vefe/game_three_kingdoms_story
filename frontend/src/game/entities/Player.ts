@@ -4,7 +4,7 @@ import { EventBus, GameEvents } from '../EventBus'
 import { useGameStore } from '../../stores/gameStore'
 import { InputManager } from '../systems/InputManager'
 import {
-  createPlayerAnims, tierForLevel, textureKey, PLAYER_FALLBACK_TEX,
+  createPlayerAnims, textureKey, PLAYER_FALLBACK_TEX,
   type AnimAction,
 } from '../systems/playerAnimations'
 
@@ -120,10 +120,23 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.refreshTier()
   }
 
-  /** 현재 레벨에 맞는 외형 티어로 애니메이션을 재구성 (생성 시 + 레벨업 시 호출) */
+  /**
+   * 외형 티어로 애니메이션을 재구성 (생성 시 + 전직 시 호출).
+   * 티어는 레벨이 아니라 gameStore.jobTier(관청 전직으로만 상승)를 따른다 — 레벨업만으로
+   * 외형이 바뀌던 자동 전직을 제거. 목표 티어의 아트가 아직 없으면 tier1로 폴백해
+   * placeholder(큐빅)로 떨어지며 캐릭터가 보도 아래로 추락하던 버그를 막는다.
+   */
   refreshTier() {
-    this.tier = tierForLevel(useGameStore.getState().level)
-    this.availableAnims = createPlayerAnims(this.scene, this.tier)
+    const desired = Math.max(1, useGameStore.getState().jobTier)
+    let anims = createPlayerAnims(this.scene, desired)
+    if (anims.size === 0 && desired !== 1) {
+      // 아트 미준비 티어 — 외형은 1티어로 유지 (전직 데이터가 들어오면 자동으로 살아난다)
+      this.tier = 1
+      anims = createPlayerAnims(this.scene, 1)
+    } else {
+      this.tier = desired
+    }
+    this.availableAnims = anims
     this.currentAnimKey = null // 다음 updateAnimation에서 새 티어 텍스처로 강제 갱신
   }
 

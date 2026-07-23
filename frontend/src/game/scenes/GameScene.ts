@@ -12,6 +12,7 @@ import { ItemDropManager } from '../systems/ItemDropManager'
 import type { DropDef } from '../systems/ItemDropManager'
 import { rollBasicDamage, rollSkillDamage } from '../systems/combat'
 import { gainExp } from '../systems/progression'
+import { PROMOTION_MIN_LEVEL } from '../systems/playerAnimations'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
@@ -933,9 +934,35 @@ export class GameScene extends Phaser.Scene {
     return candidates
   }
 
+  /**
+   * NPC 상호작용 분기. 관청 전공관(npc_officer)은 전직 창구라 레벨에 따라 다르게 응대한다:
+   * - 레벨 < PROMOTION_MIN_LEVEL: "아직 부족하다"고 돌려보낸다(대사).
+   * - 레벨 이상: 전직 신청 창(PromotionPanel)을 연다(단, 외형 아트 미준비로 버튼은 비활성).
+   * 그 외 일반 NPC는 기존 대화창을 연다.
+   */
+  private interactWithNpc(npc: Npc) {
+    if (npc.code === 'npc_officer') {
+      const level = useGameStore.getState().level
+      if (level < PROMOTION_MIN_LEVEL) {
+        EventBus.emit(GameEvents.OPEN_DIALOG, {
+          code: npc.code, name: npc.def.name,
+          lines: [
+            '전공관이 명부를 훑어보더니 고개를 젓는다.',
+            `아직 전직을 하기에는 부족하네… 전공을 더 쌓고 오게. (Lv ${PROMOTION_MIN_LEVEL} 이상 필요)`,
+          ],
+        })
+      } else {
+        EventBus.emit(GameEvents.OPEN_PROMOTION)
+      }
+      return
+    }
+    EventBus.emit(GameEvents.OPEN_DIALOG, { code: npc.code, name: npc.def.name, lines: npc.def.dialog })
+  }
+
   private handleLevelUp = () => {
     this.effects.levelUp(this.player)
-    // 레벨 구간이 바뀌면 외형 티어 스프라이트로 교체 (character-progression-pivot)
+    // 외형은 레벨업으로 자동 변경하지 않는다 — 관청 전직(jobTier)으로만 바뀐다.
+    // refreshTier는 jobTier 기준이라 여기선 사실상 동일 티어 재확인(전직 직후 갱신용으로 유지).
     this.player.refreshTier()
   }
 
@@ -1098,7 +1125,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < this.npcs.length; i++) {
           const npc = this.npcs[i]
           if (npc.isPlayerNear(this.player.x, this.player.y)) {
-            EventBus.emit(GameEvents.OPEN_DIALOG, { code: npc.code, name: npc.def.name, lines: npc.def.dialog })
+            this.interactWithNpc(npc)
             break
           }
         }

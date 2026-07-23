@@ -29,6 +29,11 @@
   "stairs": [],
   "npcSpawns": [
     {
+      "code": "npc_officer",
+      "x": 920,
+      "y": 485
+    },
+    {
       "code": "npc_castle_lord",
       "x": 1220,
       "y": 480

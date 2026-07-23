@@ -10,6 +10,8 @@ interface GameState {
   /** 하단 상태바/채팅에 표시되는 캐릭터 이름 (서버 연동 전 임시 고정) */
   characterName: string
   level: number
+  /** 외형(직책) 티어 — 레벨과 분리. 관청 전직으로만 상승한다(자동 아님). 아트 준비 전까지 1 고정. */
+  jobTier: number
   hp: number
   maxHp: number
   mp: number
@@ -39,6 +41,7 @@ export const useGameStore = create<GameState>()(
   subscribeWithSelector((set) => ({
     characterName: '관우',
     level: 1,
+    jobTier: 1,
     hp: 100,
     maxHp: 100,
     mp: 50,

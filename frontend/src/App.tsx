@@ -23,6 +23,7 @@ import { CharacterInfoPanel } from './ui/CharacterInfoPanel'
 import { SkillPanel } from './ui/SkillPanel'
 import { useKeybindingStore } from './stores/keybindingStore'
 import { DialogBox } from './ui/DialogBox'
+import { PromotionPanel } from './ui/PromotionPanel'
 import { PortalMenu } from './ui/PortalMenu'
 import { DefenseHud } from './ui/DefenseHud'
 import { NoticeBanner } from './ui/NoticeBanner'
@@ -159,6 +160,7 @@ function GameApp() {
             <SkillPanel />
             <QuestPanel />
             <DialogBox />
+            <PromotionPanel />
             <PortalMenu />
             <DefenseHud />
             <DeathOverlay />

@@ -171,6 +171,18 @@ export class PreloadScene extends Phaser.Scene {
       g.fillRect(30, 0, 4, 4)
       g.generateTexture('npc_castle_lord', 64, 64)
     }
+    if (!this.textures.exists('npc_officer')) {
+      // 전공관: 청록 관복 + 두루마리(전공 명부)를 든 문관
+      g.clear()
+      g.fillStyle(0x2f6f6a); g.fillRect(14, 22, 36, 42)   // 청록 관복
+      g.fillStyle(0xe8b64c); g.fillRect(14, 40, 36, 4)    // 금띠
+      g.fillStyle(0xf3d5b5); g.fillRect(22, 8, 20, 16)    // 얼굴
+      g.fillStyle(0x263238); g.fillRect(26, 20, 12, 4)    // 수염
+      g.fillStyle(0x37474f); g.fillRect(18, 2, 28, 8); g.fillRect(30, 0, 4, 4) // 관모
+      g.fillStyle(0xf5f0e1); g.fillRect(8, 34, 8, 22)     // 손에 든 두루마리
+      g.fillStyle(0xbca87a); g.fillRect(8, 34, 8, 3); g.fillRect(8, 53, 8, 3)
+      g.generateTexture('npc_officer', 64, 64)
+    }
     if (!this.textures.exists('npc_gatekeeper')) {
       // 문지기: 병사 갑주 + 장창
       g.clear()

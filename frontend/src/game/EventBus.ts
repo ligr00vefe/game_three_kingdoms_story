@@ -60,6 +60,8 @@ export const GameEvents = {
   /** 하단 단축키 버튼 등에서 스크린샷 요청 (GameScene가 캡처) */
   REQUEST_SCREENSHOT: 'ui:request-screenshot',
   OPEN_DIALOG: 'game:open-dialog',
+  /** 관청 전직 신청 창 열기 (레벨 조건 충족 시) — PromotionPanel이 구독 */
+  OPEN_PROMOTION: 'game:open-promotion',
   ITEM_PICKED: 'game:item-picked',
   /** 미니맵용 맵 요약 정보 {name, worldWidth, worldHeight, groundY, platforms, ladders, npcs} */
   MAP_INFO: 'game:map-info',
