@@ -12,7 +12,6 @@ import { ItemDropManager } from '../systems/ItemDropManager'
 import type { DropDef } from '../systems/ItemDropManager'
 import { rollBasicDamage, rollSkillDamage } from '../systems/combat'
 import { gainExp } from '../systems/progression'
-import { PROMOTION_MIN_LEVEL } from '../systems/playerAnimations'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
@@ -411,7 +410,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 140, 150, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 250, 120, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
@@ -761,6 +760,7 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
     EventBus.on(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
     EventBus.on(GameEvents.CAST_SKILL, this.handleCastSkill, this)
+    EventBus.on(GameEvents.PROMOTED, this.handlePromoted, this)
     EventBus.on(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
     // ---- 포탈 메뉴 / 디펜스 커맨드 (React → Phaser) ----
     EventBus.on(GameEvents.PORTAL_GO_OUTSIDE, this.handlePortalGoOutside, this)
@@ -777,6 +777,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
       EventBus.off(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
       EventBus.off(GameEvents.CAST_SKILL, this.handleCastSkill, this)
+      EventBus.off(GameEvents.PROMOTED, this.handlePromoted, this)
       EventBus.off(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
       EventBus.off(GameEvents.PORTAL_GO_OUTSIDE, this.handlePortalGoOutside, this)
       EventBus.off(GameEvents.PORTAL_ENTER_DEFENSE, this.handlePortalEnterDefense, this)
@@ -935,28 +936,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * NPC 상호작용 분기. 관청 전공관(npc_officer)은 전직 창구라 레벨에 따라 다르게 응대한다:
-   * - 레벨 < PROMOTION_MIN_LEVEL: "아직 부족하다"고 돌려보낸다(대사).
-   * - 레벨 이상: 전직 신청 창(PromotionPanel)을 연다(단, 외형 아트 미준비로 버튼은 비활성).
-   * 그 외 일반 NPC는 기존 대화창을 연다.
+   * NPC 상호작용 분기 (↑키). 두 종류뿐이다:
+   * - 메인 NPC(npcs.json의 main: true — 동탁 등): 시네마틱 대화창. 암전 + 우하단 전신
+   *   일러스트 + 선택지로 전직 같은 용무를 처리한다 (대사/분기는 data/dialogues.ts).
+   * - 그 외(문지기·수문장): 하단에 한 줄씩 뜨는 단순 대화창.
    */
   private interactWithNpc(npc: Npc) {
-    if (npc.code === 'npc_officer') {
-      const level = useGameStore.getState().level
-      if (level < PROMOTION_MIN_LEVEL) {
-        EventBus.emit(GameEvents.OPEN_DIALOG, {
-          code: npc.code, name: npc.def.name,
-          lines: [
-            '전공관이 명부를 훑어보더니 고개를 젓는다.',
-            `아직 전직을 하기에는 부족하네… 전공을 더 쌓고 오게. (Lv ${PROMOTION_MIN_LEVEL} 이상 필요)`,
-          ],
-        })
-      } else {
-        EventBus.emit(GameEvents.OPEN_PROMOTION)
-      }
+    if (npc.def.main) {
+      EventBus.emit(GameEvents.OPEN_CINEMATIC, {
+        code: npc.code, name: npc.def.name, portrait: npc.def.portrait, fallbackLines: npc.def.dialog,
+      })
       return
     }
     EventBus.emit(GameEvents.OPEN_DIALOG, { code: npc.code, name: npc.def.name, lines: npc.def.dialog })
+  }
+
+  /** 전직 성사 → 새 직책 외형으로 갱신 + 승급 연출 (아트 미준비 티어면 외형은 1티어 유지) */
+  private handlePromoted = () => {
+    this.player.refreshTier()
+    this.effects.levelUp(this.player)
   }
 
   private handleLevelUp = () => {

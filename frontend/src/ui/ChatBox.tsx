@@ -26,7 +26,8 @@ export function ChatBox() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter') return
       const ui = useUiStore.getState()
-      if (ui.settingsOpen || ui.keySettingsOpen || ui.chatFocused) return
+      // 시네마틱 대화 중엔 Enter가 대화를 넘기는 키라 채팅으로 가져가지 않는다
+      if (ui.settingsOpen || ui.keySettingsOpen || ui.chatFocused || ui.cinematicOpen) return
       e.preventDefault()
       inputRef.current?.focus()
     }

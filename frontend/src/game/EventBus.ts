@@ -59,9 +59,13 @@ export const GameEvents = {
   TOGGLE_MINIMAP: 'game:toggle-minimap',
   /** 하단 단축키 버튼 등에서 스크린샷 요청 (GameScene가 캡처) */
   REQUEST_SCREENSHOT: 'ui:request-screenshot',
+  /** 단순 대화(문지기·수문장 등) — 하단 한 줄씩 {code, name, lines}. DialogBox가 구독 */
   OPEN_DIALOG: 'game:open-dialog',
-  /** 관청 전직 신청 창 열기 (레벨 조건 충족 시) — PromotionPanel이 구독 */
-  OPEN_PROMOTION: 'game:open-promotion',
+  /**
+   * 메인 NPC 시네마틱 대화(동탁 등) — 화면 암전 + 우하단 전신 일러스트 + 선택지.
+   * payload {code, name, portrait, fallbackLines}. CinematicDialog가 구독한다.
+   */
+  OPEN_CINEMATIC: 'game:open-cinematic',
   ITEM_PICKED: 'game:item-picked',
   /** 미니맵용 맵 요약 정보 {name, worldWidth, worldHeight, groundY, platforms, ladders, npcs} */
   MAP_INFO: 'game:map-info',
@@ -80,6 +84,8 @@ export const GameEvents = {
   CHAT_BUBBLE: 'ui:chat-bubble',
   /** 퀵슬롯 스킬 발동 요청 */
   CAST_SKILL: 'ui:cast-skill',
+  /** 전직 성사(대화에서 jobTier 상승) — GameScene이 외형을 갱신하고 승급 연출을 띄운다 */
+  PROMOTED: 'ui:promoted',
   /** 채팅 입력/설정 패널이 열린 동안 게임 키 입력 차단 (boolean) */
   INPUT_BLOCK: 'ui:input-block',
   /** 포탈 메뉴에서 "성밖으로" 선택 — 보관된 타깃으로 이동 */

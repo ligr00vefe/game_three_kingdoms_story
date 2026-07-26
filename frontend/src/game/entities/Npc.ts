@@ -6,6 +6,14 @@ export interface NpcDef {
   textureKey: string
   bubbles: string[]
   dialog: string[]
+  /**
+   * 메인 NPC 여부. true면 ↑ 상호작용 시 하단 한 줄 대화가 아니라 시네마틱 대화창
+   * (암전 + 전신 일러스트 + 선택지)이 열린다. 대사/선택지는 data/dialogues.ts가 정의하고,
+   * 스크립트가 없으면 아래 dialog를 한 노드로 재생한다.
+   */
+  main?: boolean
+  /** 시네마틱 대화용 전신 일러스트 경로 (React가 직접 <img>로 표시 — Phaser 텍스처 아님) */
+  portrait?: string
 }
 
 const BUBBLE_EVERY_MS = 8000

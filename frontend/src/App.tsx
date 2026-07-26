@@ -23,7 +23,7 @@ import { CharacterInfoPanel } from './ui/CharacterInfoPanel'
 import { SkillPanel } from './ui/SkillPanel'
 import { useKeybindingStore } from './stores/keybindingStore'
 import { DialogBox } from './ui/DialogBox'
-import { PromotionPanel } from './ui/PromotionPanel'
+import { CinematicDialog } from './ui/CinematicDialog'
 import { PortalMenu } from './ui/PortalMenu'
 import { DefenseHud } from './ui/DefenseHud'
 import { NoticeBanner } from './ui/NoticeBanner'
@@ -111,6 +111,8 @@ function GameApp() {
         return
       }
       const ui = useUiStore.getState()
+      // 시네마틱 대화 중 ESC는 대화만 닫는다 (CinematicDialog가 처리 — 설정 메뉴로 넘기지 않음)
+      if (ui.cinematicOpen) return
       if (ui.keySettingsOpen) ui.setKeySettingsOpen(false)
       else if (ui.settingsOpen) ui.setSettingsOpen(false)
       else if (ui.questOpen) ui.toggleQuest()
@@ -128,7 +130,7 @@ function GameApp() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (useScreenStore.getState().screen !== 'game') return
       const ui = useUiStore.getState()
-      if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen) return
+      if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen || ui.cinematicOpen) return
       const action = useKeybindingStore.getState().bindings[e.code]
       if (action === 'equip') { if (FEATURES.equipment) { e.preventDefault(); ui.toggleEquip() } }
       else if (action === 'stats') { e.preventDefault(); ui.toggleStats() }
@@ -160,7 +162,7 @@ function GameApp() {
             <SkillPanel />
             <QuestPanel />
             <DialogBox />
-            <PromotionPanel />
+            <CinematicDialog />
             <PortalMenu />
             <DefenseHud />
             <DeathOverlay />

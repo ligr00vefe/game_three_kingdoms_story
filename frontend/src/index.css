@@ -229,85 +229,112 @@ html, body, #root { height: 100%; }
 }
 .dialog-next:hover { background: #5c6bc0; }
 
-/* 관청 전직 신청 창 */
-.promo-backdrop {
+/* ---- 메인 NPC 시네마틱 대화 (동탁 등) ----
+   화면 암전 + 우하단 전신 일러스트(fade-left) + 하단 대화창, 그 위에 선택지.
+   좌표는 .ui-overlay 좌표계(축소 전) 기준이라 일러스트 크기는 %로 잡는다. */
+.cine-overlay {
   position: absolute;
   inset: 0;
+  z-index: 42;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: pointer;
+  animation: cine-dim-in 260ms ease-out both;
+}
+@keyframes cine-dim-in {
+  from { background-color: rgba(0, 0, 0, 0); }
+  to   { background-color: rgba(0, 0, 0, 0.72); }
+}
+
+/* 전신 일러스트: 오른쪽 아래에서 왼쪽으로 밀려 들어오며 페이드인 (fade-left) */
+.cine-portrait {
+  position: absolute;
+  right: 2%;
+  bottom: 24px;
+  height: 78%;
+  max-width: 46%;
+  object-fit: contain;
+  object-position: right bottom;
+  filter: drop-shadow(-6px 0 18px rgba(0, 0, 0, 0.75));
+  user-select: none;
+  animation: cine-portrait-in 420ms cubic-bezier(0.16, 0.9, 0.3, 1) both;
+}
+@keyframes cine-portrait-in {
+  from { opacity: 0; transform: translateX(90px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 대화창 + 선택지 묶음 — 선택지가 항상 대화창 위에 쌓인다 */
+.cine-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  width: min(880px, 84%);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 40;
-  pointer-events: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  animation: cine-box-in 300ms ease-out both;
 }
-.promo-panel {
-  width: min(440px, 88vw);
-  padding: 22px 24px;
-  background: linear-gradient(#1b1c24, #14151b);
-  border: 1px solid #e8b64c88;
-  border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-  color: #eceff1;
-  text-align: center;
+@keyframes cine-box-in {
+  from { opacity: 0; transform: translate(-50%, 18px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }
-.promo-title {
-  font-size: 18px; font-weight: 800; letter-spacing: 1px;
+
+.cine-box {
+  padding: 14px 18px 10px;
+  background: linear-gradient(rgba(18, 18, 24, 0.94), rgba(10, 10, 14, 0.96));
+  border: 1px solid #e8b64c77;
+  border-radius: 12px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.7);
+}
+.cine-name {
+  font-size: 15px; font-weight: 800; letter-spacing: 1px;
   color: #e8b64c;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
-.promo-story {
-  font-size: 13px; line-height: 1.6; color: #cfd8dc;
-  margin-bottom: 16px;
+.cine-text {
+  min-height: 46px;
+  font-size: 15px; line-height: 1.6; color: #f1f1f1;
+  text-shadow: 0 1px 2px #000;
+  white-space: pre-wrap;
 }
-.promo-ranks {
-  display: flex; align-items: center; justify-content: center; gap: 14px;
-  margin-bottom: 14px;
+.cine-hint {
+  display: block;
+  text-align: right;
+  font-size: 11px; color: #90a4ae;
+  min-height: 14px;
 }
-.promo-rank {
-  min-width: 108px;
-  padding: 10px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #ffffff1a;
+
+/* 선택지 — "1. 전직 문의" 형태. 자체 폭에 맞춰 왼쪽 정렬로 쌓는다 */
+.cine-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: flex-start;
+  min-width: 240px;
+  list-style: none;
+}
+.cine-choice {
+  display: block;
+  width: 100%;
+  padding: 9px 16px;
+  text-align: left;
+  font-size: 14px; font-weight: 700;
+  color: #e3e6ea;
+  background: rgba(16, 16, 22, 0.92);
+  border: 1px solid #ffffff2a;
   border-radius: 10px;
-}
-.promo-rank--next { border-color: #e8b64c66; }
-.promo-rank-label { font-size: 10px; color: #90a4ae; margin-bottom: 4px; }
-.promo-rank-name { font-size: 16px; font-weight: 800; color: #fff; }
-.promo-rank--next .promo-rank-name { color: #ffd54f; }
-.promo-arrow { color: #e8b64c; font-size: 14px; }
-.promo-note {
-  font-size: 12px; line-height: 1.5; color: #b0bec5;
-  margin-bottom: 18px;
-}
-.promo-note b { color: #ffd54f; }
-.promo-apply {
-  display: block;
-  width: 100%;
-  padding: 12px;
-  font-size: 15px; font-weight: 800;
-  color: #263238;
-  background: linear-gradient(#ffd54f, #e8b64c);
-  border: 1px solid #a1801f; border-radius: 10px;
-  cursor: pointer;
-  margin-bottom: 10px;
-}
-.promo-apply:disabled {
-  background: #37474f;
-  color: #78909c;
-  border-color: #263238;
-  cursor: not-allowed;
-}
-.promo-close {
-  display: block;
-  width: 100%;
-  padding: 9px;
-  font-size: 13px; font-weight: 700;
-  color: #cfd8dc;
-  background: transparent;
-  border: 1px solid #ffffff2a; border-radius: 10px;
   cursor: pointer;
 }
-.promo-close:hover { background: #ffffff12; }
+.cine-choice-no { color: #90a4ae; margin-right: 6px; }
+.cine-choice--on {
+  color: #fff8e1;
+  background: linear-gradient(rgba(232, 182, 76, 0.28), rgba(232, 182, 76, 0.14));
+  border-color: #e8b64c;
+  box-shadow: 0 0 12px rgba(232, 182, 76, 0.28);
+}
+.cine-choice--on .cine-choice-no { color: #ffd54f; }
 
 .game-loading {
   height: 100%;

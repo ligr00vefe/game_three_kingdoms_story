@@ -4,7 +4,7 @@ import { EventBus, GameEvents } from '../game/EventBus'
 
 /**
  * UI 패널 열림 상태 저장소.
- * - 설정(ESC)/단축키 세팅/채팅 입력 중에는 게임 키 입력을 차단한다 (INPUT_BLOCK)
+ * - 설정(ESC)/단축키 세팅/채팅 입력/메인 NPC 시네마틱 대화 중에는 게임 키 입력을 차단한다 (INPUT_BLOCK)
  * - 퀘스트/미니맵은 게임을 막지 않는 비모달 (메이플 방식)
  */
 interface UiState {
@@ -16,6 +16,8 @@ interface UiState {
   statsOpen: boolean
   skillbookOpen: boolean
   chatFocused: boolean
+  /** 메인 NPC 시네마틱 대화 중 (CinematicDialog가 갱신) — 대화 중엔 게임 키 입력을 막는다 */
+  cinematicOpen: boolean
   setSettingsOpen: (open: boolean) => void
   setKeySettingsOpen: (open: boolean) => void
   toggleQuest: () => void
@@ -24,6 +26,7 @@ interface UiState {
   toggleStats: () => void
   toggleSkillbook: () => void
   setChatFocused: (focused: boolean) => void
+  setCinematicOpen: (open: boolean) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -36,6 +39,7 @@ export const useUiStore = create<UiState>()(
     statsOpen: false,
     skillbookOpen: false,
     chatFocused: false,
+    cinematicOpen: false,
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setKeySettingsOpen: (keySettingsOpen) => set({ keySettingsOpen }),
     toggleQuest: () => set((s) => ({ questOpen: !s.questOpen })),
@@ -44,12 +48,13 @@ export const useUiStore = create<UiState>()(
     toggleStats: () => set((s) => ({ statsOpen: !s.statsOpen })),
     toggleSkillbook: () => set((s) => ({ skillbookOpen: !s.skillbookOpen })),
     setChatFocused: (chatFocused) => set({ chatFocused }),
+    setCinematicOpen: (cinematicOpen) => set({ cinematicOpen }),
   })),
 )
 
 // 모달 상태 변화 → Phaser 키 입력 차단 통지
 useUiStore.subscribe(
-  (s) => s.settingsOpen || s.keySettingsOpen || s.chatFocused,
+  (s) => s.settingsOpen || s.keySettingsOpen || s.chatFocused || s.cinematicOpen,
   (blocked) => EventBus.emit(GameEvents.INPUT_BLOCK, blocked),
 )
 
