@@ -30,6 +30,11 @@ const DEFENSE = {
   STRUCT_AGGRO_X: 62,
   /** 기지 x (맨 왼쪽) */
   BASE_X: 130,
+  /** 기지(성 모형) 렌더 깊이. 액터(플레이어·좀비, 기본 depth 0)보다 **뒤**, 배경/보행로
+   *  (GameScene DEPTH.GROUND=-50 이하)보다는 앞. 성 모형이 캐릭터를 가리지 않고
+   *  캐릭터가 성문 앞에 서 있는 것처럼 보인다. 바리케이트는 플레이어가 뒤에 숨는 엄폐물이라
+   *  액터와 같은 깊이(0)로 그대로 둔다. */
+  BASE_DEPTH: -10,
   /** 승리 후 다음 스테이지 대기까지의 연출 여유 */
   VICTORY_DELAY_MS: 2_500,
 } as const
@@ -111,6 +116,8 @@ export class DefenseManager {
     this.base = this.addStructure(
       DEFENSE.BASE_X, DEFENSE.BASE_HP, true, baseArt ? 'img_castle_base' : 'ph_base', baseArt ? 130 : 70, 92, 50,
     )
+    // HP바(depth 5)는 그대로 액터 위에 남겨 성 모형 뒤로 숨지 않게 한다.
+    this.base.spr.setDepth(DEFENSE.BASE_DEPTH)
 
     // 매 100ms 카운트다운/전환 틱
     this.tickEvent = this.scene.time.addEvent({ delay: 100, loop: true, callback: () => this.tick() })
