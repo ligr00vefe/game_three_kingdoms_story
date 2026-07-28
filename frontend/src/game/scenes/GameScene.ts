@@ -103,7 +103,8 @@ const NEAR_ART = {
   /** 폐허 건물 반복을 성 모형(왼쪽 castle_outside)에서 이만큼 오른쪽으로 띄워 시작한다(월드 px).
    *  이 값보다 왼쪽(0~startX)은 폐허 건물이 안 깔려, 성 모형과 겹치지 않는 빈 간격이 생긴다.
    *  키우면 성 모형과 더 멀어지고, 줄이면 가까워진다. (near 레이어는 scrollFactor 0.55라
-   *  성 모형과 1:1로 붙지 않고 시차가 있으니, 눈으로 보며 맞추는 값이다.) */
+   *  성 모형과 1:1로 붙지 않고 시차가 있으니, 눈으로 보며 맞추는 값이다.)
+   *  castleOutside decor가 있는 맵에만 적용 — 성 모형이 없는 맵(디펜스 아레나)은 0부터 반복. */
   startX: 480,
 } as const
 
@@ -455,8 +456,10 @@ export class GameScene extends Phaser.Scene {
         const s = NEAR_ART.screenH / (NEAR_ART.contentBottom - NEAR_ART.contentTop)
         const layerH = NEAR_ART.canvasH * s
         const topY = map.groundY + NEAR_ART.sink - NEAR_ART.contentBottom * s
-        // NEAR_ART.startX만큼 오른쪽에서 반복 시작 → 왼쪽 성 모형(castle_outside)과 간격을 둔다.
-        addLayer(nearKey, 0.55, DEPTH.BG_NEAR, layerH, topY, NEAR_ART.startX)
+        // 성 모형(castleOutside decor)이 있는 맵만 NEAR_ART.startX만큼 오른쪽에서 반복 시작해
+        // 성 모형과 간격을 둔다. 없는 맵(디펜스 아레나)은 맵 왼쪽 끝(0)부터 바로 반복.
+        const nearStartX = map.decor?.some((d) => d.kind === 'castleOutside') ? NEAR_ART.startX : 0
+        addLayer(nearKey, 0.55, DEPTH.BG_NEAR, layerH, topY, nearStartX)
       } else {
         addLayer(nearKey, 0.55, DEPTH.BG_NEAR, 220, map.groundY - 200)
       }

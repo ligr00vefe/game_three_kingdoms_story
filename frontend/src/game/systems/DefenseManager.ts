@@ -6,8 +6,9 @@ import { useGameStore } from '../../stores/gameStore'
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
 const DEFENSE = {
-  /** 대기 단계(바리케이트 설치) 시간 */
-  WAIT_MS: 30_000,
+  /** 대기 단계(바리케이트 설치) 시간. DefenseHud의 WAVE_WARNING_MS와 맞물린다 —
+   *  이 값을 늘리면 경고가 대기 후반에만 뜨고, 줄이면 대기 내내 떠 있는다. */
+  WAIT_MS: 10_000,
   /** 본 전투 시간 */
   COMBAT_MS: 180_000,
   /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 10, stage2 = 11 …) */
@@ -103,8 +104,13 @@ export class DefenseManager {
       receiveHit: (attack: number) => self.damageRightmost(attack),
     }
 
-    // 기지(맨 왼쪽 미니어처) 생성
-    this.base = this.addStructure(DEFENSE.BASE_X, DEFENSE.BASE_HP, true, 'ph_base', 70, 92, 50)
+    // 기지(맨 왼쪽 성 아티팩트) 생성 — 실제 아트(castle_model_01, 404×286)가 있으면 원본 비율
+    // (92 × 404/286 ≈ 130)로 그리고, 없으면 도형 placeholder(ph_base) 폴백.
+    // bodyW는 표시 폭보다 좁게 유지 — 좀비가 STRUCT_AGGRO_X(62px) 안에서 멈춰야 기지를 때린다.
+    const baseArt = this.scene.textures.exists('img_castle_base')
+    this.base = this.addStructure(
+      DEFENSE.BASE_X, DEFENSE.BASE_HP, true, baseArt ? 'img_castle_base' : 'ph_base', baseArt ? 130 : 70, 92, 50,
+    )
 
     // 매 100ms 카운트다운/전환 틱
     this.tickEvent = this.scene.time.addEvent({ delay: 100, loop: true, callback: () => this.tick() })

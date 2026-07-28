@@ -23,6 +23,10 @@ const DEFEAT_MSG: Record<'base' | 'death' | 'timeout', string> = {
 
 const BARRICADE_COST = 30
 
+/** Wave 임박 경고를 띄우기 시작하는 남은 대기시간(ms).
+ *  DefenseManager의 DEFENSE.WAIT_MS와 같은 값이면 대기 단계 내내 경고가 울린다. */
+const WAVE_WARNING_MS = 10_000
+
 /** ms → "M:SS" */
 function fmt(ms: number) {
   const total = Math.ceil(ms / 1000)
@@ -125,8 +129,8 @@ export function DefenseHud() {
         )}
       </div>
 
-      {/* Wave 시작 5초 전 경고 — 깜빡이며 임박을 알린다 */}
-      {phase === 'wait' && timeLeftMs > 0 && timeLeftMs <= 5000 && (
+      {/* Wave 임박 경고 — 깜빡이며 임박을 알린다 (대기 10초 내내) */}
+      {phase === 'wait' && timeLeftMs > 0 && timeLeftMs <= WAVE_WARNING_MS && (
         <div className="def-wave-warning" role="alert">
           ⚠ 곧 Wave가 시작됩니다. Warning...!
         </div>

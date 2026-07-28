@@ -1621,30 +1621,32 @@ html, body, #root { height: 100%; }
 }
 .def-basehp-fill { height: 100%; background: linear-gradient(#64b5f6, #1e88e5); transition: width 0.2s; }
 
-/* Wave 임박 경고 — 대기 종료 5초 전 깜빡이는 붉은 경고 배너 */
+/* Wave 임박 경고 — 대기 단계 내내 깜빡이는 붉은 경고 배너.
+   top은 위 .def-top 상태창(top 8px + 높이 82px = 아래변 90px)보다 30px 아래로 잡은 값이다.
+   상태창 내용이 늘어나면 이 값도 같이 키워야 한다. */
 .def-wave-warning {
   position: absolute;
-  top: 84px;
+  top: 120px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 26px;
-  font-size: 20px;
+  padding: 16px 40px;
+  font-size: 30px;
   font-weight: 900;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   white-space: nowrap;
   color: #fff;
   background: rgba(150, 20, 20, 0.9);
-  border: 2px solid #ff5252;
-  border-radius: 10px;
+  border: 3px solid #ff5252;
+  border-radius: 14px;
   text-shadow: 0 2px 6px #000;
-  box-shadow: 0 0 18px rgba(255, 60, 60, 0.6);
+  box-shadow: 0 0 26px rgba(255, 60, 60, 0.6);
   pointer-events: none;
   animation: def-wave-warning-blink 0.6s steps(1, end) infinite;
 }
 @keyframes def-wave-warning-blink {
-  0%   { opacity: 1;    box-shadow: 0 0 22px rgba(255, 60, 60, 0.85); }
-  50%  { opacity: 0.25; box-shadow: 0 0 6px rgba(255, 60, 60, 0.3); }
-  100% { opacity: 1;    box-shadow: 0 0 22px rgba(255, 60, 60, 0.85); }
+  0%   { opacity: 1;    box-shadow: 0 0 32px rgba(255, 60, 60, 0.85); }
+  50%  { opacity: 0.25; box-shadow: 0 0 8px rgba(255, 60, 60, 0.3); }
+  100% { opacity: 1;    box-shadow: 0 0 32px rgba(255, 60, 60, 0.85); }
 }
 
 .def-buy-btn {
