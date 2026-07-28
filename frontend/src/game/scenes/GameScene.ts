@@ -103,7 +103,8 @@ const NEAR_ART = {
   /** 폐허 건물 반복을 성 모형(왼쪽 castle_outside)에서 이만큼 오른쪽으로 띄워 시작한다(월드 px).
    *  이 값보다 왼쪽(0~startX)은 폐허 건물이 안 깔려, 성 모형과 겹치지 않는 빈 간격이 생긴다.
    *  키우면 성 모형과 더 멀어지고, 줄이면 가까워진다. (near 레이어는 scrollFactor 0.55라
-   *  성 모형과 1:1로 붙지 않고 시차가 있으니, 눈으로 보며 맞추는 값이다.) */
+   *  성 모형과 1:1로 붙지 않고 시차가 있으니, 눈으로 보며 맞추는 값이다.)
+   *  castleOutside decor가 있는 맵에만 적용 — 성 모형이 없는 맵(디펜스 아레나)은 0부터 반복. */
   startX: 480,
 } as const
 
@@ -219,17 +220,6 @@ const CLOUD_DEPTH_FRONT = -90 // 빠른 구름 — 산 앞
 // 산·구름의 패럴랙스 계수(공유). 구름을 산과 같은 값으로 묶어 카메라 이동 시 산과 함께 거의
 // 정지한 듯 움직이게 한다 (구름만 크면 걸을 때 산보다 빨리 미끄러져 "빠르다"고 느껴진다).
 const MOUNTAIN_SCROLL = 0.08
-
-/**
- * 감숙성 중경: 언덕+숲 (bg_hill.png, 1983×300, 좌우로 무한 반복).
- * 먼 산(MOUNTAIN)보다 앞(depth BG_MID), 근경 성벽(bg_inside_wall, BG_NEAR)보다 뒤에 깔린다.
- * **여기 두 값만 만지면 조절된다:**
- *   HEIGHT : 화면상 띠 높이(px) = 크기. tileScaleFor가 HEIGHT/원본높이(300)로 균일 배율을 잡으므로,
- *            300이면 원본 배율, 키우면 언덕·숲이 통째로 커진다(가로도 같이 커져 반복 간격이 넓어짐).
- *   TOP_Y  : 띠 윗변의 월드 Y(작을수록 위로). 산 아래 하늘 여백을 덮도록 위치를 잡는다.
- * SCROLL은 시차(산 0.08 < 이 값 < 성벽 0.7). 보통 손댈 필요 없다.
- */
-const HILL = { SCROLL: 0.15, HEIGHT: 200, TOP_Y: 250 } as const
 
 /**
  * 스테이지 1: 초원 (GAME_DESIGN 7장). 맵은 JSON 데이터 주도.
@@ -410,7 +400,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 250, 120, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 350, 110, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
@@ -419,12 +409,6 @@ export class GameScene extends Phaser.Scene {
       // placeholder(ph_bg_mid)는 near 성벽과 겹쳐 "성벽이 둘"로 보여서 castle_interior에선 생략.
       if (this.art('img_castle_mid')) {
         addLayer('img_castle_mid', 0.35, DEPTH.BG_MID, 250, map.groundY - 280)
-      }
-      // mid: 산과 성벽 사이 중경 언덕+숲 (좌우 무한 반복). 산(BG_FAR/MOUNTAIN_DEPTH)보다 앞,
-      // 성벽(BG_NEAR)보다 뒤라 성벽이 아랫부분을 가리고 산 아래 하늘 여백을 덮는다.
-      // 크기/높이 조절은 위의 HILL 상수에서. addLayer=tileSprite라 가로로 이어 반복된다.
-      if (this.art('bg_hill')) {
-        addLayer('bg_hill', HILL.SCROLL, DEPTH.BG_MID, HILL.HEIGHT, HILL.TOP_Y)
       }
       // near: 안뜰을 두른 성벽 — bg_inside_wall 5칸 반복, 4번째 칸만 bg_inside_wall_gate.
       // CASTLE_WALL_H를 건물보다 크게 잡아 성벽 상단이 건물 지붕 위로 드러나 보이게 한다.
@@ -439,7 +423,7 @@ export class GameScene extends Phaser.Scene {
       addLayer(this.art('bg_sky') ? 'bg_sky' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
       // 감숙성 내부와 동일한 원경 산 능선을 성 밖에도 적용 (⑤⑥ 톤 일관성)
       if (this.art('bg_mountain')) {
-        addTiledLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 300, 80, 1)
+        addTiledLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 380, 130, 1)
       }
       // 예전엔 중경에 'bg_mountains'(도형 placeholder — PreloadScene에 삼각형 산으로 무조건 생성됨)를
       // 폴백으로 썼는데, 그 키로 실제 아트가 로드되는 일이 없어 항상 삼각형이 보였다. 실제 아트가
@@ -455,8 +439,10 @@ export class GameScene extends Phaser.Scene {
         const s = NEAR_ART.screenH / (NEAR_ART.contentBottom - NEAR_ART.contentTop)
         const layerH = NEAR_ART.canvasH * s
         const topY = map.groundY + NEAR_ART.sink - NEAR_ART.contentBottom * s
-        // NEAR_ART.startX만큼 오른쪽에서 반복 시작 → 왼쪽 성 모형(castle_outside)과 간격을 둔다.
-        addLayer(nearKey, 0.55, DEPTH.BG_NEAR, layerH, topY, NEAR_ART.startX)
+        // 성 모형(castleOutside decor)이 있는 맵만 NEAR_ART.startX만큼 오른쪽에서 반복 시작해
+        // 성 모형과 간격을 둔다. 없는 맵(디펜스 아레나)은 맵 왼쪽 끝(0)부터 바로 반복.
+        const nearStartX = map.decor?.some((d) => d.kind === 'castleOutside') ? NEAR_ART.startX : 0
+        addLayer(nearKey, 0.55, DEPTH.BG_NEAR, layerH, topY, nearStartX)
       } else {
         addLayer(nearKey, 0.55, DEPTH.BG_NEAR, 220, map.groundY - 200)
       }
@@ -1131,7 +1117,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 드랍 아이템: 만료/자동획득/Z 줍기
-    this.drops.update(this.player.x, this.player.y, this.input_.pickupJustDown, this.time.now)
+    this.drops.update(this.player.x, this.player.y, this.input_.pickupJustDown, this.time.now, delta)
 
     // 몬스터 AI — update() 안에서 할당/클로저 생성 최소화 (성능 규칙 3)
     const monsters = this.spawner.monsters

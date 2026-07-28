@@ -6,8 +6,9 @@ import { useGameStore } from '../../stores/gameStore'
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
 const DEFENSE = {
-  /** 대기 단계(바리케이트 설치) 시간 */
-  WAIT_MS: 30_000,
+  /** 대기 단계(바리케이트 설치) 시간. DefenseHud의 WAVE_WARNING_MS와 맞물린다 —
+   *  이 값을 늘리면 경고가 대기 후반에만 뜨고, 줄이면 대기 내내 떠 있는다. */
+  WAIT_MS: 10_000,
   /** 본 전투 시간 */
   COMBAT_MS: 180_000,
   /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 10, stage2 = 11 …) */
@@ -29,6 +30,11 @@ const DEFENSE = {
   STRUCT_AGGRO_X: 62,
   /** 기지 x (맨 왼쪽) */
   BASE_X: 130,
+  /** 기지(성 모형) 렌더 깊이. 액터(플레이어·좀비, 기본 depth 0)보다 **뒤**, 배경/보행로
+   *  (GameScene DEPTH.GROUND=-50 이하)보다는 앞. 성 모형이 캐릭터를 가리지 않고
+   *  캐릭터가 성문 앞에 서 있는 것처럼 보인다. 바리케이트는 플레이어가 뒤에 숨는 엄폐물이라
+   *  액터와 같은 깊이(0)로 그대로 둔다. */
+  BASE_DEPTH: -10,
   /** 승리 후 다음 스테이지 대기까지의 연출 여유 */
   VICTORY_DELAY_MS: 2_500,
 } as const
@@ -103,8 +109,15 @@ export class DefenseManager {
       receiveHit: (attack: number) => self.damageRightmost(attack),
     }
 
-    // 기지(맨 왼쪽 미니어처) 생성
-    this.base = this.addStructure(DEFENSE.BASE_X, DEFENSE.BASE_HP, true, 'ph_base', 70, 92, 50)
+    // 기지(맨 왼쪽 성 아티팩트) 생성 — 실제 아트(castle_model_01, 404×286)가 있으면 원본 비율
+    // (92 × 404/286 ≈ 130)로 그리고, 없으면 도형 placeholder(ph_base) 폴백.
+    // bodyW는 표시 폭보다 좁게 유지 — 좀비가 STRUCT_AGGRO_X(62px) 안에서 멈춰야 기지를 때린다.
+    const baseArt = this.scene.textures.exists('img_castle_base')
+    this.base = this.addStructure(
+      DEFENSE.BASE_X, DEFENSE.BASE_HP, true, baseArt ? 'img_castle_base' : 'ph_base', baseArt ? 130 : 70, 92, 50,
+    )
+    // HP바(depth 5)는 그대로 액터 위에 남겨 성 모형 뒤로 숨지 않게 한다.
+    this.base.spr.setDepth(DEFENSE.BASE_DEPTH)
 
     // 매 100ms 카운트다운/전환 틱
     this.tickEvent = this.scene.time.addEvent({ delay: 100, loop: true, callback: () => this.tick() })
