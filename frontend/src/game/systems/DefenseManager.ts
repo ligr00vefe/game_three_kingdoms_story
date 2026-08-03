@@ -50,6 +50,7 @@ interface Structure {
 
 type Phase = 'idle' | 'wait' | 'combat' | 'victory' | 'defeat'
 type DefeatReason = 'base' | 'death' | 'timeout'
+export type BarricadeCommandResult = 'PLACED' | 'NOT_WAIT_PHASE' | 'NOT_ENOUGH_GOLD'
 
 /**
  * 스테이지 디펜스 게임 오케스트레이션.
@@ -331,6 +332,15 @@ export class DefenseManager {
     this.hidePlacementPreview()
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
     return true
+  }
+
+  /** 자연어 명령용 설치 경로. UI 배치 모드를 열지 않고 현재 캐릭터 앞의 안전 범위에 즉시 설치한다. */
+  placeBarricadeByCommand(worldX: number): BarricadeCommandResult {
+    if (this.phase !== 'wait') return 'NOT_WAIT_PHASE'
+    if (useGameStore.getState().gold < DEFENSE.BARRICADE_COST) return 'NOT_ENOUGH_GOLD'
+    const safeX = Phaser.Math.Clamp(worldX, this.placeMinX(), this.placeMaxX())
+    this.placing = true
+    return this.placeBarricade(safeX) ? 'PLACED' : 'NOT_WAIT_PHASE'
   }
 
   /** 배치 미리보기 갱신 — 마우스(월드 x) 위치에 반투명 바리케이트를 그려 설치 지점을 예고한다.

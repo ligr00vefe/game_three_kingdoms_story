@@ -18,7 +18,7 @@ spring:
 
   flyway:
     enabled: true
-    locations: classpath:db/migrationcd 
+    locations: classpath:db/migration
     baseline-on-migrate: false
 
 server:
@@ -37,3 +37,10 @@ management:
 logging:
   level:
     org.hibernate.SQL: debug
+
+# 무료 로컬 AI 전용. 외부/유료 API fallback은 두지 않는다.
+game:
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+      model: ${OLLAMA_MODEL:qwen3:4b}

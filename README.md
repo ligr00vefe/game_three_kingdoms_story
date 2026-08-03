@@ -7,6 +7,7 @@
 | `DEVELOPMENT_PLAN.md` | 기술 스택, 아키텍처, 리스크, 작업 순서 |
 | `GAME_DESIGN.md` | 게임 기능 명세 (동작 정의의 기준 문서) |
 | `ASSET_SPEC.md` | 에셋 해상도/네이밍/라이선스 규격 |
+| `AI_COMMAND_SYSTEM.md` | 무료 관우 자연어 명령 시스템과 안전 규칙 |
 
 구조: 루트 = Spring Boot 4.1.0 백엔드 (Gradle Wrapper 포함, Java 17) · `frontend/` Vite 8 + React 19 + TS + Phaser 3.90
 백엔드 패키지: `com.project.threekingdoms`

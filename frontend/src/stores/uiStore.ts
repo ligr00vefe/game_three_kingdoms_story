@@ -10,6 +10,7 @@ import { EventBus, GameEvents } from '../game/EventBus'
 interface UiState {
   settingsOpen: boolean
   keySettingsOpen: boolean
+  commandHelpOpen: boolean
   questOpen: boolean
   minimapOpen: boolean
   equipOpen: boolean
@@ -20,6 +21,7 @@ interface UiState {
   cinematicOpen: boolean
   setSettingsOpen: (open: boolean) => void
   setKeySettingsOpen: (open: boolean) => void
+  setCommandHelpOpen: (open: boolean) => void
   toggleQuest: () => void
   toggleMinimap: () => void
   toggleEquip: () => void
@@ -33,6 +35,7 @@ export const useUiStore = create<UiState>()(
   subscribeWithSelector((set) => ({
     settingsOpen: false,
     keySettingsOpen: false,
+    commandHelpOpen: false,
     questOpen: false,
     minimapOpen: true,
     equipOpen: false,
@@ -42,6 +45,7 @@ export const useUiStore = create<UiState>()(
     cinematicOpen: false,
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setKeySettingsOpen: (keySettingsOpen) => set({ keySettingsOpen }),
+    setCommandHelpOpen: (commandHelpOpen) => set({ commandHelpOpen }),
     toggleQuest: () => set((s) => ({ questOpen: !s.questOpen })),
     toggleMinimap: () => set((s) => ({ minimapOpen: !s.minimapOpen })),
     toggleEquip: () => set((s) => ({ equipOpen: !s.equipOpen })),
@@ -54,7 +58,7 @@ export const useUiStore = create<UiState>()(
 
 // 모달 상태 변화 → Phaser 키 입력 차단 통지
 useUiStore.subscribe(
-  (s) => s.settingsOpen || s.keySettingsOpen || s.chatFocused || s.cinematicOpen,
+  (s) => s.settingsOpen || s.keySettingsOpen || s.commandHelpOpen || s.chatFocused || s.cinematicOpen,
   (blocked) => EventBus.emit(GameEvents.INPUT_BLOCK, blocked),
 )
 

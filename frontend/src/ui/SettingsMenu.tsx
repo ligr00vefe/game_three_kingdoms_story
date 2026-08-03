@@ -52,6 +52,15 @@ export function SettingsMenu() {
           className="settings-item"
           onClick={() => {
             useUiStore.getState().setSettingsOpen(false)
+            useUiStore.getState().setCommandHelpOpen(true)
+          }}
+        >
+          📜 관우 명령 도움말 (F1)
+        </button>
+        <button
+          className="settings-item"
+          onClick={() => {
+            useUiStore.getState().setSettingsOpen(false)
             useUiStore.getState().setKeySettingsOpen(true)
           }}
         >

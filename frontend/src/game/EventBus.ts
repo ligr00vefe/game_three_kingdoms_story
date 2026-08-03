@@ -82,6 +82,10 @@ export const GameEvents = {
   REVIVE: 'ui:revive',
   /** 채팅 전송 시 플레이어 머리 위 말풍선 (string) */
   CHAT_BUBBLE: 'ui:chat-bubble',
+  /** 채팅으로 입력한 관우 명령 원문 (string) */
+  GUAN_YU_COMMAND: 'ui:guan-yu-command',
+  /** 관우의 명령 응답/대기 대사 ({text:string}) */
+  GUAN_YU_REPLY: 'game:guan-yu-reply',
   /** 퀵슬롯 스킬 발동 요청 */
   CAST_SKILL: 'ui:cast-skill',
   /** 전직 성사(대화에서 jobTier 상승) — GameScene이 외형을 갱신하고 승급 연출을 띄운다 */

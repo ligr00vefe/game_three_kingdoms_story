@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { COMBAT, PLAYER } from '../config'
 import { EventBus, GameEvents } from '../EventBus'
 import { useGameStore } from '../../stores/gameStore'
-import { InputManager } from '../systems/InputManager'
 import {
   createPlayerAnims, textureKey, PLAYER_FALLBACK_TEX,
   type AnimAction,
@@ -12,6 +11,17 @@ import {
 export type PlayerState =
   | 'idle' | 'walk' | 'jump' | 'jumpdash' | 'climb' | 'sit'
   | 'attack' | 'skill' | 'hit' | 'dead'
+
+/** 수동 키와 관우 자율 제어기가 공유하는 최소 입력 계약. */
+export interface PlayerControl {
+  left: boolean
+  right: boolean
+  up: boolean
+  down: boolean
+  jumpJustDown: boolean
+  attackJustDown: boolean
+  sitJustDown: boolean
+}
 
 /** 앉기(휴식) 기능 — 2026-07-12 기획에서 제거. 코드 보존용 플래그 (차후 부활 시 true) */
 const SIT_ENABLED = false
@@ -155,7 +165,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.body.reset(this.x, worldY - FEET_FROM_Y)
   }
 
-  update(input: InputManager, now: number) {
+  update(input: PlayerControl, now: number) {
     switch (this.state_) {
       case 'climb':
         this.updateClimb(input)
@@ -264,7 +274,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ---------- 일반 상태 (idle / walk / jump) ----------
-  private updateNormal(input: InputManager, now: number) {
+  private updateNormal(input: PlayerControl, now: number) {
     const onGround = this.body.blocked.down
     if (onGround) {
       this.airJumpUsed = false
@@ -395,7 +405,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.state_ = 'idle'
   }
 
-  private updateSit(input: InputManager, now: number) {
+  private updateSit(input: PlayerControl, now: number) {
     this.setVelocityX(0)
     // 발판이 사라지는 등 공중에 뜨면 해제
     if (!this.body.blocked.down) {
@@ -450,7 +460,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return false
   }
 
-  private updateClimb(input: InputManager) {
+  private updateClimb(input: PlayerControl) {
     const ladder = this.currentLadder!
     if (input.up) this.setVelocityY(-PLAYER.CLIMB_SPEED)
     else if (input.down) this.setVelocityY(PLAYER.CLIMB_SPEED)
@@ -516,7 +526,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  private updateAction(input: InputManager, now: number) {
+  private updateAction(input: PlayerControl, now: number) {
     // 대쉬찌르기 돌진 구간에는 전진 속도를 유지, 그 외에는 지상에서 정지
     if (this.body.blocked.down && now >= this.dashLungeUntil) this.setVelocityX(0)
 

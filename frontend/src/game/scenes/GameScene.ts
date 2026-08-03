@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { EventBus, GameEvents } from '../EventBus'
 import { Player } from '../entities/Player'
+import type { PlayerControl } from '../entities/Player'
 import { Npc } from '../entities/Npc'
 import type { NpcDef } from '../entities/Npc'
 import type { Monster, MonsterDef, MonsterTarget } from '../entities/Monster'
@@ -17,6 +18,10 @@ import { useInventoryStore } from '../../stores/inventoryStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
 import { FEATURES } from '../../features'
 import { drawSpeechBubble } from '../utils/bubble'
+import { GuanYuController } from '../ai/GuanYuController'
+import { parseLocalCommand } from '../ai/localCommandParser'
+import type { GuanYuCommand } from '../ai/commands'
+import { interpretWithLocalAi } from '../../api/command'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -26,6 +31,8 @@ import { drawSpeechBubble } from '../utils/bubble'
 const PLAYER_HEAD_TOP_OFFSET = (128 / 2 - 68) * PLAYER.VISUAL_SCALE
 /** 말풍선 꼬리 끝과 머리 사이 여백(px) */
 const CHAT_BUBBLE_GAP = 6
+/** 기존 키보드 포탈/NPC 상호작용 반경 (px) */
+const PORTAL_RANGE = 44
 
 interface PortalDef {
   x: number
@@ -172,9 +179,6 @@ const PLATFORM_ART = {
   },
 } as const
 
-/** 포탈 상호작용 반경 (px) */
-const PORTAL_RANGE = 44
-
 /**
  * 보행로 텍스처별 발디딤 면(캐릭터가 서는 지면선) 보정치(px, 월드 좌표, 아래로 +).
  * 원본마다 캔버스 높이도, "밟는 면"이 그려진 픽셀 행도 달라 groundY에 원점을 그냥 맞추면
@@ -256,6 +260,14 @@ export class GameScene extends Phaser.Scene {
   private chatBubbleBg?: Phaser.GameObjects.Graphics
   private chatBubbleUntil = 0
   private chatBubbleH = 0
+  /** 자연어 명령이 전환하는 고수준 상태 머신. 실제 이동/공격은 Player가 계속 담당한다. */
+  private guanYu = new GuanYuController()
+  /** 매 프레임 할당 없이 키보드와 대화 명령 입력을 합치는 단일 객체. */
+  private readonly hybridControl: PlayerControl = {
+    left: false, right: false, up: false, down: false,
+    jumpJustDown: false, attackJustDown: false, sitJustDown: false,
+  }
+  private commandRequestId = 0
 
   /** AI 생성 아트가 로드됐는지 — 없으면 placeholder 폴백 (Phase 7) */
   private art(key: string) {
@@ -280,6 +292,8 @@ export class GameScene extends Phaser.Scene {
 
   /** 게임 시작(기본: 감숙성 내부 안전지대) 또는 포탈 이동(scene.restart)의 진입 데이터 */
   init(data: { mapKey?: string; spawnX?: number; spawnY?: number; mode?: 'normal' | 'defense' }) {
+    // 이전 맵에서 아직 응답 중인 로컬 AI 요청이 새 맵에 명령을 적용하지 못하게 무효화한다.
+    this.commandRequestId += 1
     this.mapKey = data.mapKey ?? 'map_ye_castle'
     this.spawnOverride =
       data.spawnX !== undefined ? { x: data.spawnX, y: data.spawnY ?? 440 } : null
@@ -289,6 +303,13 @@ export class GameScene extends Phaser.Scene {
     this.transitioning = false
     this.npcs = []
     this.portals = []
+    // scene.restart는 GameScene 인스턴스 필드를 보존하지만 이전 씬의 GameObject는 파괴한다.
+    // 참조를 비우지 않으면 디펜스 진입 후 파괴된 말풍선을 계속 갱신해 화면에 나타나지 않는다.
+    this.chatBubble = undefined
+    this.chatBubbleText = undefined
+    this.chatBubbleBg = undefined
+    this.chatBubbleUntil = 0
+    this.chatBubbleH = 0
     // scene.restart로 재진입해도 이전 구름 참조가 남지 않도록 초기화 (필드 초기값은 생성자에서 한 번만 실행됨)
     this.clouds = []
     this.cloudBandRight = 0
@@ -745,6 +766,7 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.ITEM_PICKED, this.handleItemPicked, this)
     EventBus.on(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
     EventBus.on(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
+    EventBus.on(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
     EventBus.on(GameEvents.CAST_SKILL, this.handleCastSkill, this)
     EventBus.on(GameEvents.PROMOTED, this.handlePromoted, this)
     EventBus.on(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
@@ -762,6 +784,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.ITEM_PICKED, this.handleItemPicked, this)
       EventBus.off(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
       EventBus.off(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
+      EventBus.off(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
       EventBus.off(GameEvents.CAST_SKILL, this.handleCastSkill, this)
       EventBus.off(GameEvents.PROMOTED, this.handlePromoted, this)
       EventBus.off(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
@@ -789,6 +812,19 @@ export class GameScene extends Phaser.Scene {
     this.time.addEvent({
       delay: 100, loop: true, callback: () => {
         EventBus.emit(GameEvents.PLAYER_MOVED, { x: this.player.x, y: this.player.y })
+      },
+    })
+
+    // 대기 대사는 승인된 로컬 문장만 순환한다. 외부 API/로컬 모델 호출이 전혀 없다.
+    const idleLines = ['주공, 명령을 내려주십시오.', '소장은 준비되어 있습니다.', '어디를 지키면 되겠습니까?']
+    let idleLine = 0
+    this.time.addEvent({
+      delay: 30_000,
+      startAt: 22_000,
+      loop: true,
+      callback: () => {
+        if (this.guanYu.state !== 'STANDBY' && this.guanYu.state !== 'HOLDING') return
+        this.emitGuanYuReply(idleLines[idleLine++ % idleLines.length])
       },
     })
 
@@ -983,6 +1019,159 @@ export class GameScene extends Phaser.Scene {
     this.chatBubbleUntil = this.time.now + 3000
   }
 
+  private commandTargets(): Record<string, number> {
+    const targets: Record<string, number> = {}
+    targets.world_min = 24
+    targets.world_max = this.map.worldWidth - 24
+    // 감숙성 안에서는 시작 지점을 마을/본진, 성 밖에서는 귀환 포탈을 본진 방향으로 본다.
+    targets.main_castle = this.mapKey === 'map_ye_castle'
+      ? this.player.x
+      : (this.portals[0]?.x ?? this.map.playerSpawn.x)
+    targets.castle_gate = this.mapKey === 'map_ye_castle'
+      ? (this.portals[0]?.x ?? 2460)
+      : (this.portals[0]?.x ?? 191)
+    // 장소 명령은 모델/파서가 좌표를 만들지 않고 승인된 장소 ID만 사용한다.
+    const routePortalX = this.portals[0]?.x ?? this.player.x
+    targets.castle_outside = routePortalX
+    targets.outside_combat = routePortalX
+    targets.defense_arena = this.mode === 'defense' ? this.player.x : routePortalX
+    for (const npc of this.npcs) targets[npc.code] = npc.x
+    return targets
+  }
+
+  /** 채팅 원문 → 무료 로컬 파서 → 검증된 상태 전환. 유료 API 호출 경로는 존재하지 않는다. */
+  private handleGuanYuCommand = async (text: string) => {
+    // 로컬 명령도 이전의 느린 AI 요청을 취소하는 논리적 경계가 된다.
+    const requestId = ++this.commandRequestId
+    let command = parseLocalCommand(text)
+    if (command.action === 'UNSUPPORTED' && command.reason === 'LOCAL_PARSER_NO_MATCH') {
+      this.emitGuanYuReply('잠시 기다려 주십시오. 명을 헤아리고 있습니다.')
+      const stats = useGameStore.getState()
+      command = await interpretWithLocalAi(text, {
+        mapKey: this.mapKey,
+        mode: this.mode,
+        characterState: this.guanYu.state,
+        hp: stats.hp,
+        maxHp: stats.maxHp,
+      })
+      // 연속 명령은 가장 최근 요청만 실행한다.
+      if (requestId !== this.commandRequestId || !this.scene.isActive()) return
+    }
+    if (command.action === 'STATUS') {
+      const stats = useGameStore.getState()
+      this.emitGuanYuReply(`현재 체력은 ${stats.hp}/${stats.maxHp}, 상태는 ${this.guanYu.state}입니다.`)
+      return
+    }
+    if (command.action === 'ANSWER_GAME_QUESTION' || command.action === 'UNSUPPORTED') {
+      this.emitGuanYuReply(command.reply)
+      return
+    }
+    if (command.action === 'PLACE_BARRICADE') {
+      if (!this.defense) {
+        this.emitGuanYuReply('이곳에서는 수행할 수 없습니다.')
+        return
+      }
+      const result = this.defense.placeBarricadeByCommand(this.player.x + this.player.facing * 120)
+      if (result === 'PLACED') this.emitGuanYuReply(command.reply)
+      else if (result === 'NOT_ENOUGH_GOLD') this.emitGuanYuReply('방벽을 설치할 골드가 부족합니다.')
+      else this.emitGuanYuReply('방벽은 전투 대기 시간에만 설치할 수 있습니다.')
+      return
+    }
+    if (command.action === 'ELIMINATE_CASTLE_INFILTRATORS' && !this.defense) {
+      this.emitGuanYuReply('이곳에는 성을 향해 침투하는 적이 없습니다.')
+      return
+    }
+    const accepted = this.guanYu.execute(command, this.player.x, this.commandTargets())
+    this.emitGuanYuReply(accepted ? command.reply : this.invalidTargetReply(command))
+  }
+
+  private invalidTargetReply(command: GuanYuCommand) {
+    if (command.action === 'TALK_TO_NPC') return '그 인물은 현재 이곳에 없습니다.'
+    return '그 장소는 현재 지도에서 찾을 수 없습니다.'
+  }
+
+  private emitGuanYuReply(text: string) {
+    const safeText = text.trim().slice(0, 80)
+    EventBus.emit(GameEvents.GUAN_YU_REPLY, { text: safeText })
+    this.handleChatBubble(safeText)
+  }
+
+  private handleCommandArrival(targetId: string) {
+    if (targetId === 'main_castle') {
+      // 귀환 완료 후에는 이전 맵의 포탈 좌표를 추적하지 않고 성문 앞에서 그대로 정지한다.
+      this.guanYu.execute({
+        action: 'HOLD', priority: 'HIGH', reply: '감숙성 성문 앞에서 대기하겠습니다.',
+      }, this.player.x, this.commandTargets())
+      if (this.mapKey === 'map_ye_castle') return
+      if (this.mode === 'defense') {
+        if (this.scene.isPaused()) this.scene.resume()
+        this.transitionTo({ mapKey: 'map_ye_castle', spawnX: 2400, spawnY: 440 })
+        return
+      }
+      const returnPortal = this.portals[0]
+      if (returnPortal) this.usePortal(returnPortal)
+      return
+    }
+    if (targetId === 'defense_arena') {
+      if (this.mode === 'defense') return
+      this.guanYu.execute({
+        action: 'HOLD', priority: 'NORMAL', reply: '아레나에서 명을 기다리겠습니다.',
+      }, this.player.x, this.commandTargets())
+      this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 520, spawnY: 440 })
+      return
+    }
+    if (targetId !== 'castle_outside' && targetId !== 'outside_combat') return
+    if (this.mode === 'defense') {
+      if (this.scene.isPaused()) this.scene.resume()
+      this.guanYu.execute({
+        action: targetId === 'outside_combat' ? 'CONTINUE_AUTO_COMBAT' : 'HOLD',
+        priority: 'NORMAL', reply: '성 밖으로 이동하겠습니다.',
+      }, this.player.x, this.commandTargets())
+      this.transitionTo({ mapKey: 'map_stage1', spawnX: 170, spawnY: 440 })
+      return
+    }
+    if (this.mapKey === 'map_stage1') {
+      if (targetId === 'outside_combat') {
+        this.guanYu.execute({
+          action: 'CONTINUE_AUTO_COMBAT', priority: 'NORMAL', reply: '적을 찾아 싸우겠습니다.',
+        }, this.player.x, this.commandTargets())
+      }
+      return
+    }
+    const exitPortal = this.portals[0]
+    if (!exitPortal) return
+    if (targetId === 'outside_combat') {
+      // controller는 scene.restart 뒤에도 유지되므로 성 밖 도착 즉시 자동전투를 시작한다.
+      this.guanYu.execute({
+        action: 'CONTINUE_AUTO_COMBAT', priority: 'NORMAL', reply: '적을 찾아 싸우겠습니다.',
+      }, this.player.x, this.commandTargets())
+    }
+    this.usePortal(exitPortal)
+  }
+
+  /**
+   * 키보드와 대화 명령의 공존 규칙:
+   * - 방향키를 누르는 동안은 키보드 방향이 AI 이동보다 우선한다.
+   * - 공격/점프 등 순간 입력은 AI 입력과 합친다.
+   * - 키를 놓으면 이전 대화 명령 상태를 이어서 수행한다.
+   */
+  private updateHybridControl() {
+    const ai = this.guanYu.control
+    const manualDirection = this.input_.left || this.input_.right || this.input_.up || this.input_.down
+    this.hybridControl.left = manualDirection ? this.input_.left : ai.left
+    this.hybridControl.right = manualDirection ? this.input_.right : ai.right
+    this.hybridControl.up = manualDirection ? this.input_.up : ai.up
+    this.hybridControl.down = manualDirection ? this.input_.down : ai.down
+    this.hybridControl.jumpJustDown = this.input_.jumpJustDown || ai.jumpJustDown
+    this.hybridControl.attackJustDown = this.input_.attackJustDown || ai.attackJustDown
+    this.hybridControl.sitJustDown = this.input_.sitJustDown || ai.sitJustDown
+  }
+
+  private hasManualGameplayInput() {
+    return this.input_.left || this.input_.right || this.input_.up || this.input_.down ||
+      this.input_.jumpJustDown || this.input_.attackJustDown || this.input_.sitJustDown
+  }
+
   /** 퀵슬롯 스킬 발동 요청 (숫자키) — 실제 시전 가능 여부는 Player가 판정 */
   private handleCastSkill = () => {
     this.player.queueSkill()
@@ -996,6 +1185,10 @@ export class GameScene extends Phaser.Scene {
     if (blocked) {
       kb.resetKeys()
       this.input_.clearAll()
+    } else {
+      // HTML 채팅 입력에 포커스를 줬다가 해제한 뒤 Phaser 루프가 blur/sleep 상태로
+      // 남는 브라우저가 있다. 명령 처리와 디펜스 타이머가 즉시 이어지도록 깨운다.
+      this.game.loop.wake()
     }
   }
 
@@ -1069,7 +1262,19 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     this.input_.update(this.time.now)
-    this.player.update(this.input_, this.time.now)
+    if (this.hasManualGameplayInput()) this.guanYu.cancelForManualControl()
+    const previousGuanYuState = this.guanYu.state
+    this.guanYu.update(this.player, this.spawner.monsters)
+    const arrivedCommandTarget = this.guanYu.consumeArrival()
+    if (arrivedCommandTarget) this.handleCommandArrival(arrivedCommandTarget)
+    this.updateHybridControl()
+    this.player.update(this.hybridControl, this.time.now)
+
+    // NPC에게 이동 명령으로 도착하면 기존 대화 시스템을 그대로 연다.
+    if (previousGuanYuState === 'MOVING_TO_NPC' && this.guanYu.state === 'HOLDING') {
+      const npc = this.npcs.find((candidate) => candidate.isPlayerNear(this.player.x, this.player.y))
+      if (npc) this.interactWithNpc(npc)
+    }
 
     // 하늘 구름 흘리기 — band 우측 끝을 완전히 벗어나면 왼쪽 밖으로 되돌려 반대쪽에서 재진입(심리스 순환)
     if (this.clouds.length > 0) {
@@ -1092,27 +1297,19 @@ export class GameScene extends Phaser.Scene {
       this.npcs[i].setPlayerOverlap(this.npcs[i].isPlayerNear(this.player.x, this.player.y))
     }
 
-    // ↑ 상호작용: 포탈 우선, 그다음 NPC 대화 (포탈/NPC는 맵에서 겹치지 않게 배치)
+    // 기존 키보드 상호작용 유지: ↑ 포탈 우선, 그다음 NPC 대화.
     if (this.input_.upJustDown && !this.player.climbing && !this.transitioning) {
-      const portal = this.portals.find((p) => Math.abs(this.player.x - p.x) < PORTAL_RANGE)
+      const portal = this.portals.find((candidate) => Math.abs(this.player.x - candidate.x) < PORTAL_RANGE)
       if (portal && this.player.body.blocked.down) {
-        // menu 포탈이면 즉시 이동 대신 선택 메뉴(성밖으로/탐험하기)를 연다
         if (portal.menu) {
           this.menuPortalTarget = portal
           EventBus.emit(GameEvents.PORTAL_MENU, {
             targetMap: portal.targetMap, targetX: portal.targetX, targetY: portal.targetY ?? 440,
           })
-        } else {
-          this.usePortal(portal)
-        }
+        } else this.usePortal(portal)
       } else {
-        for (let i = 0; i < this.npcs.length; i++) {
-          const npc = this.npcs[i]
-          if (npc.isPlayerNear(this.player.x, this.player.y)) {
-            this.interactWithNpc(npc)
-            break
-          }
-        }
+        const npc = this.npcs.find((candidate) => candidate.isPlayerNear(this.player.x, this.player.y))
+        if (npc) this.interactWithNpc(npc)
       }
     }
 

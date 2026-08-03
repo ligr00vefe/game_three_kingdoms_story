@@ -21,6 +21,14 @@ export function ChatBox() {
     if (log) log.scrollTop = log.scrollHeight
   }, [messages])
 
+  useEffect(() => {
+    const onReply = (payload: { text: string }) => {
+      useChatStore.getState().addMessage({ kind: 'guanYu', author: '관우', text: payload.text })
+    }
+    EventBus.on(GameEvents.GUAN_YU_REPLY, onReply)
+    return () => { EventBus.off(GameEvents.GUAN_YU_REPLY, onReply) }
+  }, [])
+
   // 전역 Enter → 채팅 입력 포커스 (모달이 열려 있으면 무시)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -35,10 +43,19 @@ export function ChatBox() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  const releaseChatFocus = () => {
+    // blur 이벤트에만 의존하면 Phaser가 잠든 프레임에서 입력 차단 해제가 늦어질 수 있다.
+    useUiStore.getState().setChatFocused(false)
+    inputRef.current?.blur()
+  }
+
   const submit = () => {
     const input = inputRef.current
     if (!input) return
     const text = input.value.trim()
+    input.value = ''
+    // 명령을 게임에 보내기 전에 키 입력 차단과 브라우저 입력 포커스를 먼저 해제한다.
+    releaseChatFocus()
     if (text) {
       useChatStore.getState().addMessage({
         kind: 'player',
@@ -46,9 +63,8 @@ export function ChatBox() {
         text,
       })
       EventBus.emit(GameEvents.CHAT_BUBBLE, text) // 플레이어 머리 위 말풍선
+      EventBus.emit(GameEvents.GUAN_YU_COMMAND, text)
     }
-    input.value = ''
-    input.blur()
   }
 
   return (
@@ -56,7 +72,7 @@ export function ChatBox() {
       <div ref={logRef} className="chat-log">
         {messages.map((m) => (
           <p key={m.id} className={`chat-msg chat-msg--${m.kind}`}>
-            {m.kind === 'player' ? `${m.author} : ${m.text}` : m.text}
+            {m.kind === 'system' ? m.text : `${m.author} : ${m.text}`}
           </p>
         ))}
       </div>
@@ -65,13 +81,13 @@ export function ChatBox() {
           ref={inputRef}
           className="chat-input"
           maxLength={80}
-          placeholder="Enter 키로 채팅"
+          placeholder="관우에게 명령을 내리십시오"
           onFocus={() => useUiStore.getState().setChatFocused(true)}
           onBlur={() => useUiStore.getState().setChatFocused(false)}
           onKeyDown={(e) => {
             e.stopPropagation() // Phaser 전역 키 캡처로 전파 금지 (입력 중 preventDefault 방지)
             if (e.key === 'Enter') submit()
-            else if (e.key === 'Escape') { e.currentTarget.value = ''; e.currentTarget.blur() }
+            else if (e.key === 'Escape') { e.currentTarget.value = ''; releaseChatFocus() }
           }}
         />
         <button className="chat-send" onClick={submit}>전송</button>

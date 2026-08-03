@@ -6,7 +6,7 @@ import { create } from 'zustand'
  */
 export interface ChatMessage {
   id: number
-  kind: 'system' | 'player'
+  kind: 'system' | 'player' | 'guanYu'
   author?: string
   text: string
 }

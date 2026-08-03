@@ -33,6 +33,7 @@ import { KeySettingsPanel } from './ui/KeySettingsPanel'
 import { Launcher, GAME_WINDOW_NAME, GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT } from './ui/Launcher'
 import { CharacterSelect } from './ui/CharacterSelect'
 import { LoadingScreen } from './ui/LoadingScreen'
+import { CommandHelpPanel } from './ui/CommandHelpPanel'
 
 /** 게임 창인지 판별: 런처가 window.open으로 띄우는 URL에 붙는 ?mode=game */
 const isGameWindow = new URLSearchParams(location.search).get('mode') === 'game'
@@ -63,6 +64,20 @@ function GameApp() {
     enforce()
     window.addEventListener('resize', enforce)
     return () => window.removeEventListener('resize', enforce)
+  }, [])
+
+  // F1: 어디서든 관우 명령 도움말 토글. 브라우저 기본 도움말은 게임 창에서 차단한다.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'F1' || useScreenStore.getState().screen !== 'game') return
+      e.preventDefault()
+      const ui = useUiStore.getState()
+      if (ui.cinematicOpen || ui.keySettingsOpen) return
+      ui.setSettingsOpen(false)
+      ui.setCommandHelpOpen(!ui.commandHelpOpen)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   useEffect(() => {
@@ -113,7 +128,8 @@ function GameApp() {
       const ui = useUiStore.getState()
       // 시네마틱 대화 중 ESC는 대화만 닫는다 (CinematicDialog가 처리 — 설정 메뉴로 넘기지 않음)
       if (ui.cinematicOpen) return
-      if (ui.keySettingsOpen) ui.setKeySettingsOpen(false)
+      if (ui.commandHelpOpen) ui.setCommandHelpOpen(false)
+      else if (ui.keySettingsOpen) ui.setKeySettingsOpen(false)
       else if (ui.settingsOpen) ui.setSettingsOpen(false)
       else if (ui.questOpen) ui.toggleQuest()
       else if (ui.statsOpen) ui.toggleStats()
@@ -178,6 +194,7 @@ function GameApp() {
             {/* ---- 모달 ---- */}
             <SettingsMenu />
             <KeySettingsPanel />
+            <CommandHelpPanel />
             <p className={`server-status server-status--${serverStatus}`}>
               {serverStatus === 'checking' ? '서버 확인 중…' : serverStatus === 'ok' ? '' : '서버 연결 안 됨 (진행 저장 안 됨)'}
             </p>
