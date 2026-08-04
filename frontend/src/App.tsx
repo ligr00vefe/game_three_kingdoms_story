@@ -11,6 +11,8 @@ import { GoldDisplay } from './ui/GoldDisplay'
 import { DeathOverlay } from './ui/DeathOverlay'
 import { fetchHealth } from './api/health'
 import { loadGameState, startAutosave } from './api/game'
+import { me } from './api/auth'
+import { useAuthStore } from './stores/authStore'
 import { useGameStore } from './stores/gameStore'
 import { useUiStore } from './stores/uiStore'
 import { useScreenStore } from './stores/screenStore'
@@ -84,6 +86,8 @@ function GameApp() {
     document.title = GAME_WINDOW_NAME
     fetchHealth()
       .then(async () => {
+        const user = await me()
+        useAuthStore.getState().setUser(user)
         await loadGameState() // 캐릭터/인벤토리 서버 로드 (Phase 3)
         useGameStore.getState().setServerStatus('ok')
       })

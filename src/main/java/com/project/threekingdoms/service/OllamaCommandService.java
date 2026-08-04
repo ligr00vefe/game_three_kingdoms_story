@@ -15,6 +15,8 @@ import tools.jackson.databind.ObjectMapper;
 import com.project.threekingdoms.api.dto.AiCommandDtos.GameContext;
 import com.project.threekingdoms.api.dto.AiCommandDtos.InterpretCommandRequest;
 import com.project.threekingdoms.api.dto.AiCommandDtos.InterpretedCommand;
+import com.project.threekingdoms.api.dto.AiCommandDtos.ChatRequest;
+import com.project.threekingdoms.api.dto.AiCommandDtos.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,20 +25,25 @@ import org.springframework.stereotype.Service;
 public class OllamaCommandService {
 
 	private static final Set<String> ALLOWED_ACTIONS = Set.of(
-		"CONTINUE_AUTO_COMBAT", "MOVE_TO", "RETURN_TO_BASE", "GUARD_POSITION",
+		"CONTINUE_AUTO_COMBAT", "MOVE_TO", "RUSH_TO", "RETURN_TO_BASE", "GUARD_POSITION",
 		"ADVANCE_AND_ATTACK", "ATTACK_TARGET", "FOLLOW_PLAYER", "RETREAT", "HOLD",
 		"USE_SKILL", "JUMP", "PLACE_BARRICADE", "TALK_TO_NPC", "STATUS",
 		"HOLD_AND_ATTACK", "PURSUE_ENEMIES", "PRIORITIZE_CASTLE_DEFENSE",
 		"ELIMINATE_CASTLE_INFILTRATORS",
+		"GUARD_BEHIND_BARRICADE",
+		"PICKUP_ITEM",
 		"ANSWER_GAME_QUESTION", "UNSUPPORTED"
 	);
 	private static final Set<String> ALLOWED_TARGETS = Set.of(
 		"forward", "backward", "current_position", "castle_gate", "main_castle",
 		"castle_outside", "outside_combat", "defense_arena", "npc_castle_lord",
-		"in_front_of_character"
+		"in_front_of_character", "skill_charge_slash", "skill_glaive_flurry",
+		"skill_decisive_strike", "skill_dragon_slash", "skill_lightning_descent"
 	);
 
 	private static final String SYSTEM_PROMPT = """
+		If the user asks to defend behind a barricade, return GUARD_BEHIND_BARRICADE with a null targetId.
+		If the user asks to pick up an item, coin, or money, return PICKUP_ITEM with a null targetId.
 		너는 삼국지 횡스크롤 게임의 관우 명령 해석기다. 사용자의 한국어를 허용된 행동 하나로 변환한다.
 		관우답게 간결한 한국어 한 문장으로 답하고 reply는 반드시 한국어 80자 이내로 쓴다.
 		reason은 UNSUPPORTED일 때만 짧은 영문 코드로 쓰고 나머지는 null로 쓴다. JSON 이외의 글은 출력하지 않는다.
@@ -68,6 +75,16 @@ public class OllamaCommandService {
 		"너무 멀리 갔다. 성문 앞으로 돌아와 지켜" => GUARD_POSITION/castle_gate
 		"하늘을 날아 폭격해" => UNSUPPORTED
 		실제 실행 가능 여부와 대상 존재 여부는 게임 엔진이 다시 검증한다.
+		""";
+
+	private static final String CHAT_SYSTEM_PROMPT = """
+		너는 삼국지 세계관의 관우다. 유비를 섬기는 촉한의 장수이며 의롭고 신중하고 충직하다.
+		사용자에게는 항상 정중한 한국어 존댓말로 답하고, 관우다운 간결하고 단호한 말투를 사용한다.
+		게임 속 현재 상황을 고려하되, 실제로 실행하지 않은 행동을 했다고 거짓말하지 않는다.
+		이 요청은 게임 명령이 아닌 자유 대화다. 인사, 질문, 감상, 조언에는 자연스럽게 답한다.
+		답변은 한국어 20자 안팎, 최대 60자로 짧게 한다. 불확실한 게임 정보는 모른다고 말한다.
+		현대의 정치, 인터넷, 스마트폰, 현대 기술, 현대 인물과 같은 세계관 밖 질문에는 답하지 않는다.
+		"이 시대에는 알 수 없는 일"이라고 짧게 말하고 삼국지 세계관 안의 질문으로 바꾸어 달라고 한다.
 		""";
 
 	private final ObjectMapper objectMapper;
@@ -116,6 +133,39 @@ public class OllamaCommandService {
 			return unavailable("OLLAMA_UNAVAILABLE");
 		} catch (Exception exception) {
 			return unavailable("OLLAMA_UNAVAILABLE");
+		}
+	}
+
+	public ChatResponse chat(ChatRequest request) {
+		try {
+			Map<String, Object> body = Map.of(
+				"model", model,
+				"stream", false,
+				"think", false,
+				"keep_alive", "5m",
+				"options", Map.of("temperature", 0.7, "num_predict", 48),
+				"messages", List.of(
+					Map.of("role", "system", "content", CHAT_SYSTEM_PROMPT),
+					Map.of("role", "user", "content", contextText(request.context()) + "\n사용자: " + request.text())
+				)
+			);
+			HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(baseUrl + "/api/chat"))
+				.timeout(Duration.ofSeconds(120))
+				.header("Content-Type", "application/json; charset=UTF-8")
+				.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+				.build();
+			HttpResponse<String> response = httpClient.send(
+				httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			if (response.statusCode() != 200) return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
+			JsonNode root = objectMapper.readTree(response.body());
+			String reply = root.path("message").path("content").asText("").trim();
+			if (reply.isBlank()) return new ChatResponse("무슨 말씀이신지 조금 더 자세히 말씀해 주십시오.");
+			return new ChatResponse(reply.length() > 60 ? reply.substring(0, 60) : reply);
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
+		} catch (Exception exception) {
+			return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
 		}
 	}
 

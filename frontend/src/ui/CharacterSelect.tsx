@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { CHARACTERS, LOBBY_SLOTS } from '../data/characters'
 import { useScreenStore } from '../stores/screenStore'
+import { useGameStore } from '../stores/gameStore'
 
 /**
  * 두루마리가 말리거나 펴지는 데 걸리는 시간(ms).
@@ -66,6 +67,7 @@ export function CharacterSelect() {
   const [shown, setShown] = useState<string | null>('guanwu')
   const [open, setOpen] = useState(false)
   const char = shown ? CHARACTERS[shown] : null
+  const game = useGameStore()
 
   // 두루마리 축과 종이가 **같은 속도**로 열리도록, 뷰포트 높이를 fr이 아니라 측정된 px로 여닫는다.
   // (grid fr 전환은 픽셀 기준으로 선형이 아니라 축 이동과 내용 노출이 어긋나 보였다.)
@@ -163,15 +165,15 @@ export function CharacterSelect() {
             <span className="scroll-rod scroll-rod--top" />
             <div className="scroll-viewport" style={{ height: open ? contentH : 0 }}>
               <div className="scroll-content" ref={contentRef}>
-                <div className="lobby-card-lv">Lv. <b>1</b></div>
-                <div className="lobby-card-name">{char.name}</div>
+                <div className="lobby-card-lv">Lv. <b>{game.level}</b></div>
+                <div className="lobby-card-name">{game.characterName || char.name}</div>
                 <div className="lobby-card-class">⚔ {char.clazz}</div>
                 <p className="lobby-card-desc">{char.desc}</p>
                 <div className="lobby-card-stats">
-                  <div className="lobby-stat"><span>HP</span><b>{char.stats.hp}</b></div>
-                  <div className="lobby-stat"><span>MP</span><b>{char.stats.mp}</b></div>
-                  <div className="lobby-stat"><span>공격력</span><b>{char.stats.attack}</b></div>
-                  <div className="lobby-stat"><span>이동속도</span><b>{char.stats.speedPct}%</b></div>
+                  <div className="lobby-stat"><span>HP</span><b>{game.maxHp}</b></div>
+                  <div className="lobby-stat"><span>MP</span><b>{game.maxMp}</b></div>
+                  <div className="lobby-stat"><span>공격력</span><b>{game.attackPower}</b></div>
+                  <div className="lobby-stat"><span>이동속도</span><b>{Math.round(game.moveSpeedMult * 100)}%</b></div>
                 </div>
                 <div className="lobby-card-skill">
                   <span className="lobby-skill-tag">스킬</span>

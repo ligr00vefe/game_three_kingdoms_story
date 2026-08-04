@@ -49,6 +49,22 @@ public class GameStateService {
 		return new GameStateResponse(toDto(character), inventory, defs);
 	}
 
+	@Transactional
+	public GameStateResponse loadState(Long accountId, String characterCode) {
+		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
+			.orElseGet(() -> {
+				GameCharacter created = new GameCharacter("관우");
+				created.setAccountId(accountId);
+				created.setCharacterCode(characterCode);
+				return characterRepository.save(created);
+			});
+		List<InventoryItemDto> inventory = inventoryRepository.findByCharacterId(character.getId()).stream()
+			.map(i -> new InventoryItemDto(i.getItemCode(), i.getQuantity(), i.getSlotIndex(), i.isEquipped())).toList();
+		List<ItemDefinitionDto> defs = itemDefinitionRepository.findAll().stream()
+			.map(d -> new ItemDefinitionDto(d.getCode(), d.getName(), d.getItemType(), d.getIconKey(), d.getEffectJson(), d.getDescription())).toList();
+		return new GameStateResponse(toDto(character), inventory, defs);
+	}
+
 	/**
 	 * 스냅샷 저장: 캐릭터 스탯 갱신 + 인벤토리 전체 교체.
 	 * 단일 플레이어 초기 단계의 단순한 방식 — Phase 5에서 증분 저장으로 개선 검토.
@@ -74,10 +90,39 @@ public class GameStateService {
 		inventoryRepository.saveAll(items);
 	}
 
+	@Transactional
+	public void saveState(Long accountId, String characterCode, SaveStateRequest request) {
+		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
+			.orElseGet(() -> {
+				GameCharacter created = new GameCharacter("관우");
+				created.setAccountId(accountId);
+				created.setCharacterCode(characterCode);
+				return characterRepository.save(created);
+			});
+		applyState(character, request);
+		inventoryRepository.deleteByCharacterId(character.getId());
+		List<InventoryItem> items = request.inventory().stream()
+			.map(i -> new InventoryItem(character, i.itemCode(), i.quantity(), i.slotIndex(), i.equipped())).toList();
+		inventoryRepository.saveAll(items);
+	}
+
+	private void applyState(GameCharacter character, SaveStateRequest request) {
+		character.setLevel(request.level());
+		character.setExp(request.exp());
+		character.setMaxHp(request.maxHp());
+		character.setHp(Math.min(request.hp(), request.maxHp()));
+		character.setMaxMp(request.maxMp());
+		character.setMp(Math.min(request.mp(), request.maxMp()));
+		character.setAttackPower(request.attackPower());
+		character.setGold(request.gold());
+		if (request.stageCode() != null && !request.stageCode().isBlank()) character.setStageCode(request.stageCode());
+		character.setDefenseStage(request.defenseStage());
+	}
+
 	private CharacterDto toDto(GameCharacter c) {
 		return new CharacterDto(
-			c.getName(), c.getLevel(), c.getExp(),
+			c.getName(), c.getCharacterCode(), c.getLevel(), c.getExp(),
 			c.getMaxHp(), c.getHp(), c.getMaxMp(), c.getMp(),
-			c.getAttackPower(), c.getGold(), c.getStageCode());
+			c.getAttackPower(), c.getGold(), c.getStageCode(), c.getDefenseStage());
 	}
 }

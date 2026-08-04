@@ -123,13 +123,14 @@ export class DefenseManager {
     // 매 100ms 카운트다운/전환 틱
     this.tickEvent = this.scene.time.addEvent({ delay: 100, loop: true, callback: () => this.tick() })
 
-    this.startStage(1)
+    this.startStage(Math.max(1, useGameStore.getState().defenseStage))
   }
 
   // ---- 스테이지 흐름 ----
 
   private startStage(n: number) {
     this.stage = n
+    useGameStore.getState().setStats({ stageCode: 'map_defense', defenseStage: n })
     this.phase = 'wait'
     this.phaseEndsAt = this.scene.time.now + DEFENSE.WAIT_MS
     this.spawnedCount = 0
@@ -341,6 +342,12 @@ export class DefenseManager {
     const safeX = Phaser.Math.Clamp(worldX, this.placeMinX(), this.placeMaxX())
     this.placing = true
     return this.placeBarricade(safeX) ? 'PLACED' : 'NOT_WAIT_PHASE'
+  }
+
+  getNearestBarricadeX(playerX: number): number | null {
+    const barricades = this.structures.filter((structure) => !structure.isBase && structure.hp > 0)
+    if (barricades.length === 0) return null
+    return barricades.sort((a, b) => Math.abs(a.spr.x - playerX) - Math.abs(b.spr.x - playerX))[0].spr.x
   }
 
   /** 배치 미리보기 갱신 — 마우스(월드 x) 위치에 반투명 바리케이트를 그려 설치 지점을 예고한다.

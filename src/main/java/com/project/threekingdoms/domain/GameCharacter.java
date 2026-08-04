@@ -21,6 +21,12 @@ public class GameCharacter {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	@Column(name = "account_id")
+	private Long accountId;
+
+	@Column(name = "character_code", nullable = false, length = 30)
+	private String characterCode = "guanwu";
+
 	@Column(nullable = false, unique = true, length = 20)
 	private String name;
 
@@ -50,6 +56,9 @@ public class GameCharacter {
 
 	@Column(name = "stage_code", nullable = false, length = 30)
 	private String stageCode = "stage1_grassland";
+
+	@Column(name = "defense_stage", nullable = false)
+	private int defenseStage = 1;
 
 	public GameCharacter(String name) {
 		this.name = name;

@@ -21,6 +21,7 @@ export interface PlayerControl {
   jumpJustDown: boolean
   attackJustDown: boolean
   sitJustDown: boolean
+  preventCombo?: boolean
 }
 
 /** 앉기(휴식) 기능 — 2026-07-12 기획에서 제거. 코드 보존용 플래그 (차후 부활 시 true) */
@@ -325,7 +326,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // 기본 공격 (GAME_DESIGN 4.1) — 지상은 정지, 공중은 관성 유지.
     // 연속기 시간창(COMBO_WINDOW_MS) 안에 다시 누르면 다음 단계로, 넘겼으면 찌르기(0단계)부터.
     if (input.attackJustDown) {
-      if (now <= this.comboExpiresAt && this.comboStep < COMBAT.COMBO_MAX - 1) this.comboStep += 1
+      if (input.preventCombo) {
+        this.comboStep = 0
+        this.comboExpiresAt = 0
+      } else if (now <= this.comboExpiresAt && this.comboStep < COMBAT.COMBO_MAX - 1) this.comboStep += 1
       else this.comboStep = 0
       this.startAction('attack', now)
       return
@@ -531,7 +535,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.body.blocked.down && now >= this.dashLungeUntil) this.setVelocityX(0)
 
     // 선입력 버퍼: 기본 공격 모션 중 공격키를 누르면 다음 콤보 단계를 예약한다(마지막 단계 제외).
-    if (this.state_ === 'attack' && input.attackJustDown && this.comboStep < COMBAT.COMBO_MAX - 1) {
+    if (this.state_ === 'attack' && input.attackJustDown && !input.preventCombo && this.comboStep < COMBAT.COMBO_MAX - 1) {
       this.comboQueued = true
     }
 

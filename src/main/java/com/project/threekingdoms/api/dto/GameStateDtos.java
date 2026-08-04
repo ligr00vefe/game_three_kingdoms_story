@@ -12,9 +12,9 @@ import jakarta.validation.constraints.NotNull;
 public class GameStateDtos {
 
 	public record CharacterDto(
-		String name, int level, long exp,
+		String name, String characterCode, int level, long exp,
 		int maxHp, int hp, int maxMp, int mp,
-		int attackPower, long gold, String stageCode
+		int attackPower, long gold, String stageCode, int defenseStage
 	) {}
 
 	public record InventoryItemDto(
@@ -42,6 +42,12 @@ public class GameStateDtos {
 		@Min(1) int maxMp, @Min(0) int mp,
 		@Min(1) int attackPower,
 		@Min(0) long gold,
-		@NotNull @Valid List<InventoryItemDto> inventory
-	) {}
+		@NotNull @Valid List<InventoryItemDto> inventory,
+		String stageCode, @Min(1) int defenseStage
+	) {
+		public SaveStateRequest(int level, long exp, int maxHp, int hp, int maxMp, int mp,
+			int attackPower, long gold, List<InventoryItemDto> inventory) {
+			this(level, exp, maxHp, hp, maxMp, mp, attackPower, gold, inventory, "stage1_grassland", 1);
+		}
+	}
 }

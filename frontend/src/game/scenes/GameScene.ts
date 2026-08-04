@@ -21,7 +21,7 @@ import { drawSpeechBubble } from '../utils/bubble'
 import { GuanYuController } from '../ai/GuanYuController'
 import { parseLocalCommand } from '../ai/localCommandParser'
 import type { GuanYuCommand } from '../ai/commands'
-import { interpretWithLocalAi } from '../../api/command'
+import { chatWithLocalAi, interpretWithLocalAi } from '../../api/command'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -31,6 +31,9 @@ import { interpretWithLocalAi } from '../../api/command'
 const PLAYER_HEAD_TOP_OFFSET = (128 / 2 - 68) * PLAYER.VISUAL_SCALE
 /** 말풍선 꼬리 끝과 머리 사이 여백(px) */
 const CHAT_BUBBLE_GAP = 6
+/** 관우 머리 중심에 꼬리를 맞추기 위한 말풍선 미세 보정(px) */
+const CHAT_BUBBLE_X_OFFSET = 8
+const CHAT_BUBBLE_Y_OFFSET = 8
 /** 기존 키보드 포탈/NPC 상호작용 반경 (px) */
 const PORTAL_RANGE = 44
 
@@ -266,8 +269,10 @@ export class GameScene extends Phaser.Scene {
   private readonly hybridControl: PlayerControl = {
     left: false, right: false, up: false, down: false,
     jumpJustDown: false, attackJustDown: false, sitJustDown: false,
+    preventCombo: false,
   }
   private commandRequestId = 0
+  private pickupCommandQueued = false
 
   /** AI 생성 아트가 로드됐는지 — 없으면 placeholder 폴백 (Phase 7) */
   private art(key: string) {
@@ -294,10 +299,14 @@ export class GameScene extends Phaser.Scene {
   init(data: { mapKey?: string; spawnX?: number; spawnY?: number; mode?: 'normal' | 'defense' }) {
     // 이전 맵에서 아직 응답 중인 로컬 AI 요청이 새 맵에 명령을 적용하지 못하게 무효화한다.
     this.commandRequestId += 1
-    this.mapKey = data.mapKey ?? 'map_ye_castle'
+    const savedStage = useGameStore.getState().stageCode
+    const savedMap = savedStage === 'map_defense' ? 'map_defense'
+      : savedStage === 'map_stage1' ? 'map_stage1' : 'map_ye_castle'
+    this.mapKey = data.mapKey ?? savedMap
     this.spawnOverride =
       data.spawnX !== undefined ? { x: data.spawnX, y: data.spawnY ?? 440 } : null
-    this.mode = data.mode ?? 'normal'
+    this.mode = data.mode ?? (this.mapKey === 'map_defense' ? 'defense' : 'normal')
+    useGameStore.getState().setStats({ stageCode: this.mapKey })
     this.defense = undefined
     this.menuPortalTarget = null
     this.transitioning = false
@@ -719,6 +728,7 @@ export class GameScene extends Phaser.Scene {
       get alive() { return self.player.isHittable },
       receiveHit: (attack: number, fromX: number) => {
         self.player.receiveHit(attack, fromX)
+        self.guanYu.reactToHit(self.player, self.spawner.monsters, fromX)
         self.effects.damageNumber(self.player.x, self.player.y - 46, attack, 'taken', false, self.player)
       },
     }
@@ -767,6 +777,7 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
     EventBus.on(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
     EventBus.on(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
+    EventBus.on(GameEvents.GUAN_YU_CHAT, this.handleGuanYuHybridChat, this)
     EventBus.on(GameEvents.CAST_SKILL, this.handleCastSkill, this)
     EventBus.on(GameEvents.PROMOTED, this.handlePromoted, this)
     EventBus.on(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
@@ -785,6 +796,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
       EventBus.off(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
       EventBus.off(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
+      EventBus.off(GameEvents.GUAN_YU_CHAT, this.handleGuanYuHybridChat, this)
       EventBus.off(GameEvents.CAST_SKILL, this.handleCastSkill, this)
       EventBus.off(GameEvents.PROMOTED, this.handlePromoted, this)
       EventBus.off(GameEvents.REQUEST_SCREENSHOT, this.takeScreenshot, this)
@@ -1040,11 +1052,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 채팅 원문 → 무료 로컬 파서 → 검증된 상태 전환. 유료 API 호출 경로는 존재하지 않는다. */
-  private handleGuanYuCommand = async (text: string) => {
+  private handleGuanYuHybridChat = (text: string) => this.handleGuanYuCommand(text, true)
+
+  private handleGuanYuCommand = async (text: string, allowChatFallback = false) => {
     // 로컬 명령도 이전의 느린 AI 요청을 취소하는 논리적 경계가 된다.
     const requestId = ++this.commandRequestId
     let command = parseLocalCommand(text)
     if (command.action === 'UNSUPPORTED' && command.reason === 'LOCAL_PARSER_NO_MATCH') {
+      if (allowChatFallback) {
+        const stats = useGameStore.getState()
+        const reply = await chatWithLocalAi(text, {
+          mapKey: this.mapKey,
+          mode: this.mode,
+          characterState: this.guanYu.state,
+          hp: stats.hp,
+          maxHp: stats.maxHp,
+        })
+        if (requestId !== this.commandRequestId) return
+        this.emitGuanYuReply(reply)
+        return
+      }
       this.emitGuanYuReply('잠시 기다려 주십시오. 명을 헤아리고 있습니다.')
       const stats = useGameStore.getState()
       command = await interpretWithLocalAi(text, {
@@ -1055,11 +1082,51 @@ export class GameScene extends Phaser.Scene {
         maxHp: stats.maxHp,
       })
       // 연속 명령은 가장 최근 요청만 실행한다.
-      if (requestId !== this.commandRequestId || !this.scene.isActive()) return
+      if (requestId !== this.commandRequestId) return
+    }
+    // 일반 대화는 명령 해석 AI가 실패해도 채팅 AI로 넘긴다.
+    // 기존에는 특정 reason만 허용해서 LOCAL_AI_UNAVAILABLE 등에서는
+    // "기본 명령" 응답으로 끝나고 일반 대화가 실행되지 않았다.
+    if (allowChatFallback && command.action === 'UNSUPPORTED') {
+      const stats = useGameStore.getState()
+      const reply = await chatWithLocalAi(text, {
+        mapKey: this.mapKey,
+        mode: this.mode,
+        characterState: this.guanYu.state,
+        hp: stats.hp,
+        maxHp: stats.maxHp,
+      })
+      if (requestId !== this.commandRequestId) return
+      this.emitGuanYuReply(reply)
+      return
     }
     if (command.action === 'STATUS') {
       const stats = useGameStore.getState()
       this.emitGuanYuReply(`현재 체력은 ${stats.hp}/${stats.maxHp}, 상태는 ${this.guanYu.state}입니다.`)
+      return
+    }
+    if (command.action === 'USE_SKILL') {
+      this.player.queueSkill()
+      this.emitGuanYuReply(command.reply)
+      return
+    }
+    if (command.action === 'PICKUP_ITEM') {
+      this.pickupCommandQueued = true
+      this.emitGuanYuReply(command.reply)
+      return
+    }
+    if (command.action === 'GUARD_BEHIND_BARRICADE') {
+      if (!this.defense) {
+        this.emitGuanYuReply('이곳에는 방벽을 운용하는 수비전이 없습니다.')
+        return
+      }
+      const barricadeX = this.defense.getNearestBarricadeX(this.player.x)
+      if (barricadeX === null) {
+        this.emitGuanYuReply('근처에 방벽이 없습니다.')
+        return
+      }
+      this.guanYu.guardBehindPosition(barricadeX - 82, this.player.x)
+      this.emitGuanYuReply(command.reply)
       return
     }
     if (command.action === 'ANSWER_GAME_QUESTION' || command.action === 'UNSUPPORTED') {
@@ -1165,6 +1232,7 @@ export class GameScene extends Phaser.Scene {
     this.hybridControl.jumpJustDown = this.input_.jumpJustDown || ai.jumpJustDown
     this.hybridControl.attackJustDown = this.input_.attackJustDown || ai.attackJustDown
     this.hybridControl.sitJustDown = this.input_.sitJustDown || ai.sitJustDown
+    this.hybridControl.preventCombo = ai.preventCombo
   }
 
   private hasManualGameplayInput() {
@@ -1314,7 +1382,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 드랍 아이템: 만료/자동획득/Z 줍기
-    this.drops.update(this.player.x, this.player.y, this.input_.pickupJustDown, this.time.now, delta)
+    const pickupPressed = this.input_.pickupJustDown || this.pickupCommandQueued
+    this.pickupCommandQueued = false
+    this.drops.update(this.player.x, this.player.y, pickupPressed, this.time.now, delta)
 
     // 몬스터 AI — update() 안에서 할당/클로저 생성 최소화 (성능 규칙 3)
     const monsters = this.spawner.monsters
@@ -1334,7 +1404,10 @@ export class GameScene extends Phaser.Scene {
       if (this.time.now >= this.chatBubbleUntil) this.chatBubble.setVisible(false)
       else {
         const tailTipY = this.player.y + PLAYER_HEAD_TOP_OFFSET - CHAT_BUBBLE_GAP
-        this.chatBubble.setPosition(this.player.x, tailTipY - this.chatBubbleH / 2 - 7)
+        this.chatBubble.setPosition(
+          this.player.x + CHAT_BUBBLE_X_OFFSET,
+          tailTipY - this.chatBubbleH / 2 - 7 - CHAT_BUBBLE_Y_OFFSET,
+        )
       }
     }
 

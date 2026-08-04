@@ -20,6 +20,46 @@ function hasAny(text: string, words: readonly string[]) {
  */
 export function parseLocalCommand(input: string): GuanYuCommand {
   const text = normalizeCommandText(input)
+  if (hasAny(text, ['아이템줍', '아이템주워', '동전줍', '동전주워', '돈주워', '돈줍'])) {
+    return validateCommand({
+      action: 'PICKUP_ITEM', priority: 'NORMAL',
+      reply: '주변의 아이템과 동전을 줍겠습니다.',
+    })
+  }
+  if (hasAny(text, ['방벽뒤', '바리케이드뒤', '바리케이트뒤']) &&
+      hasAny(text, ['수비', '방어', '지켜', '대기', '싸', '전투', '공격'])) {
+    return validateCommand({
+      action: 'GUARD_BEHIND_BARRICADE', priority: 'HIGH',
+      reply: '가까운 방벽 뒤에서 수비하겠습니다.',
+    })
+  }
+  const skillNames: Array<[string, string]> = [
+    ['참마돌격', 'skill_charge_slash'],
+    ['언월난무', 'skill_glaive_flurry'],
+    ['일격필살', 'skill_decisive_strike'],
+    ['청룡참', 'skill_dragon_slash'],
+    ['뇌신강림', 'skill_lightning_descent'],
+  ]
+  const requestedSkill = skillNames.find(([name]) => text.includes(name))
+  if (requestedSkill) {
+    return validateCommand({
+      action: 'USE_SKILL', targetId: requestedSkill[1], priority: 'HIGH',
+      reply: `${requestedSkill[0]}을(를) 사용하겠습니다.`,
+    })
+  }
+  const rush = hasAny(text, ['빨리', '빠르게', '대쉬', '대시', '전력'])
+  if (rush && hasAny(text, ['마을', '본진', '성으로', '돌아'])) {
+    return validateCommand({
+      action: 'RUSH_TO', targetId: 'main_castle', priority: 'HIGH',
+      reply: '대시를 섞어 본진으로 빠르게 돌아가겠습니다.',
+    })
+  }
+  if (rush && hasAny(text, ['가', '이동', '전진', '앞'])) {
+    return validateCommand({
+      action: 'RUSH_TO', targetId: 'forward', priority: 'HIGH',
+      reply: '대시를 섞어 빠르게 이동하겠습니다.',
+    })
+  }
   if (!text) return unsupported('EMPTY_INPUT', '명령을 말씀해 주십시오.')
 
   if (hasAny(text, ['전직', '승급', '직책'])) {
@@ -85,6 +125,12 @@ export function parseLocalCommand(input: string): GuanYuCommand {
 
   const mentionsGate = hasAny(text, ['성문', '문앞', '성앞'])
   const guard = hasAny(text, ['지켜', '방어', '사수'])
+  if (guard && hasAny(text, ['성', '성문', '본진', '수성'])) {
+    return validateCommand({
+      action: 'PRIORITIZE_CASTLE_DEFENSE', targetId: 'castle_gate', priority: 'HIGH',
+      reply: '성문으로 이동해 성을 지키겠습니다.',
+    })
+  }
   if (guard) {
     return validateCommand({
       action: 'GUARD_POSITION', targetId: mentionsGate ? 'castle_gate' : 'current_position',

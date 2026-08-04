@@ -6,6 +6,7 @@ import type { GuanYuCommand } from './commands'
 export type GuanYuState =
   | 'STANDBY'
   | 'MOVING_TO_TARGET'
+  | 'RUSHING'
   | 'RETURNING_TO_BASE'
   | 'GUARDING'
   | 'ADVANCING'
@@ -34,10 +35,18 @@ export class GuanYuController {
   private arrivalTargetId: string | null = null
   private arrivedTargetId: string | null = null
   private jumpQueued = false
+  private rushJumpStarted = false
+  private rushDashTriggered = false
+  private counterTarget: Monster | null = null
+  private counterUntil = 0
+  private counterAttackQueued = false
+  private combatTarget: Monster | null = null
+  private combatTargetUntil = 0
 
   readonly control: PlayerControl = {
     left: false, right: false, up: false, down: false,
     jumpJustDown: false, attackJustDown: false, sitJustDown: false,
+    preventCombo: false,
   }
 
   execute(command: GuanYuCommand, playerX: number, targets: Record<string, number>): boolean {
@@ -57,6 +66,22 @@ export class GuanYuController {
         this.arrivalTargetId = command.targetId ?? null
         this.stateAfterArrival = 'HOLDING'
         this.state = 'MOVING_TO_TARGET'
+        return true
+      }
+      case 'RUSH_TO': {
+        const x = command.targetId === 'forward'
+          ? playerX + BASIC_MOVE_DISTANCE
+          : command.targetId === 'backward'
+            ? playerX - BASIC_MOVE_DISTANCE
+            : targets[command.targetId ?? '']
+        if (x === undefined) return false
+        this.targetX = Math.max(targets.world_min ?? x, Math.min(targets.world_max ?? x, x))
+        this.guardX = null
+        this.arrivalTargetId = command.targetId ?? null
+        this.stateAfterArrival = 'HOLDING'
+        this.rushJumpStarted = false
+        this.rushDashTriggered = false
+        this.state = 'RUSHING'
         return true
       }
       case 'RETURN_TO_BASE':
@@ -87,6 +112,8 @@ export class GuanYuController {
         this.guardX = playerX
         this.state = 'HOLDING_COMBAT'
         return true
+      case 'GUARD_BEHIND_BARRICADE':
+        return false
       case 'PURSUE_ENEMIES': this.state = 'PURSUING_ENEMIES'; return true
       case 'ELIMINATE_CASTLE_INFILTRATORS':
         this.state = 'ELIMINATING_CASTLE_INFILTRATORS'
@@ -117,6 +144,19 @@ export class GuanYuController {
     }
     if (player.state_ === 'dead') { this.state = 'DEAD'; return }
 
+    // 피격 직후에는 원래 이동 명령보다 공격자를 우선한다.
+    // 뒤를 보고 싸우는 중 앞에서 맞는 상황에서도 방향을 전환하고 반격한다.
+    if (this.counterUntil > player.scene.time.now) {
+      const target = this.counterTarget?.active && this.counterTarget.alive ? this.counterTarget : null
+      if (target) this.attackOrApproach(player, target)
+      else if (this.counterAttackQueued) {
+        this.counterAttackQueued = false
+        this.control.attackJustDown = true
+      }
+      return
+    }
+    this.counterTarget = null
+
     if (this.state === 'MOVING_TO_TARGET' || this.state === 'RETURNING_TO_BASE' || this.state === 'MOVING_TO_NPC') {
       if (this.targetX === null) { this.state = 'STANDBY'; return }
       if (this.moveToward(player.x, this.targetX)) {
@@ -127,6 +167,24 @@ export class GuanYuController {
         if (this.state === 'MOVING_TO_NPC') this.state = 'HOLDING'
         else this.state = this.stateAfterArrival
       }
+      return
+    }
+
+    if (this.state === 'RUSHING') {
+      if (this.targetX === null || Math.abs(player.x - this.targetX) <= ARRIVAL_DISTANCE) {
+        this.state = this.stateAfterArrival
+        return
+      }
+      const dx = this.targetX - player.x
+      if (player.body?.blocked.down && !this.rushJumpStarted) {
+        this.rushJumpStarted = true
+        this.control.jumpJustDown = true
+      } else if (!player.body?.blocked.down && this.rushJumpStarted && !this.rushDashTriggered) {
+        this.rushDashTriggered = true
+        this.control.jumpJustDown = true
+      }
+      if (dx < 0) this.control.left = true
+      else this.control.right = true
       return
     }
 
@@ -200,8 +258,36 @@ export class GuanYuController {
     this.arrivalTargetId = null
     this.arrivedTargetId = null
     this.jumpQueued = false
+    this.rushJumpStarted = false
+    this.rushDashTriggered = false
+    this.counterTarget = null
+    this.counterUntil = 0
+    this.counterAttackQueued = false
+    this.combatTarget = null
+    this.combatTargetUntil = 0
     this.state = 'HOLDING'
     this.resetControl()
+  }
+
+  /** 몬스터에게 맞은 방향의 적을 짧게 최우선 반격 대상으로 지정한다. */
+  reactToHit(player: Player, monsters: readonly Monster[], fromX: number) {
+    const direction: -1 | 1 = fromX < player.x ? -1 : 1
+    player.facing = direction
+    this.counterTarget = monsters
+      .filter((monster) => monster.active && monster.alive &&
+        (monster.x - player.x) * direction >= -24 &&
+        Math.abs(monster.y - player.y) < 100)
+      .sort((a, b) => Math.abs(a.x - player.x) - Math.abs(b.x - player.x))[0] ?? null
+    this.counterUntil = player.scene.time.now + 900
+    this.counterAttackQueued = true
+  }
+
+  guardBehindPosition(positionX: number, playerX: number) {
+    this.targetX = positionX
+    this.guardX = positionX
+    this.arrivalTargetId = null
+    this.stateAfterArrival = 'GUARDING'
+    this.state = Math.abs(playerX - positionX) <= ARRIVAL_DISTANCE ? 'GUARDING' : 'MOVING_TO_TARGET'
   }
 
   consumeArrival(): string | null {
@@ -211,6 +297,11 @@ export class GuanYuController {
   }
 
   private nearestEnemy(player: Player, monsters: readonly Monster[], maxDistance = Infinity): Monster | null {
+    const now = player.scene.time.now
+    if (this.combatTarget && now < this.combatTargetUntil && this.combatTarget.active && this.combatTarget.alive) {
+      const lockedDistance = Math.abs(this.combatTarget.x - player.x)
+      if (lockedDistance < maxDistance && Math.abs(this.combatTarget.y - player.y) < 90) return this.combatTarget
+    }
     let nearest: Monster | null = null
     let nearestDistance = maxDistance
     for (const monster of monsters) {
@@ -221,14 +312,32 @@ export class GuanYuController {
         nearestDistance = distance
       }
     }
+    this.combatTarget = nearest
+    this.combatTargetUntil = nearest ? now + 350 : 0
     return nearest
   }
 
   private attackOrApproach(player: Player, enemy: Monster) {
     const dx = enemy.x - player.x
-    if (Math.abs(dx) <= COMBAT.ATTACK_REACH * 0.82) this.control.attackJustDown = true
-    else if (dx < 0) this.control.left = true
-    else this.control.right = true
+    const attackDistance = COMBAT.ATTACK_REACH * 0.82
+    const guardMode = this.state === 'GUARDING' || this.state === 'HOLDING_COMBAT' || this.state === 'DEFENDING_CASTLE'
+    this.control.preventCombo = guardMode
+    if (guardMode && this.guardX !== null && Math.abs(player.x - this.guardX) > 8) {
+      this.moveToward(player.x, this.guardX)
+      return
+    }
+    if (Math.abs(dx) <= attackDistance) {
+      // 공격 거리 안에서는 좌우 이동을 끄고 방향만 유지해 경계에서 앞뒤 진동을 막는다.
+      this.control.left = false
+      this.control.right = false
+      player.facing = dx < 0 ? -1 : 1
+      this.control.attackJustDown = true
+    } else if (!guardMode) {
+      if (dx < 0) this.control.left = true
+      else this.control.right = true
+    } else {
+      player.facing = dx < 0 ? -1 : 1
+    }
   }
 
   private moveToward(currentX: number, targetX: number): boolean {
@@ -247,5 +356,6 @@ export class GuanYuController {
     this.control.jumpJustDown = false
     this.control.attackJustDown = false
     this.control.sitJustDown = false
+    this.control.preventCombo = false
   }
 }

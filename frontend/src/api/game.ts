@@ -3,6 +3,7 @@ import { EventBus, GameEvents } from '../game/EventBus'
 import { useGameStore } from '../stores/gameStore'
 import { useInventoryStore, INVENTORY_SIZE } from '../stores/inventoryStore'
 import type { ItemDef, ItemType } from '../stores/inventoryStore'
+import { useScreenStore } from '../stores/screenStore'
 
 interface ServerItemDef {
   code: string
@@ -24,7 +25,7 @@ interface GameStateResponse {
   character: {
     name: string; level: number; exp: number
     maxHp: number; hp: number; maxMp: number; mp: number
-    attackPower: number; gold: number; stageCode: string
+    attackPower: number; gold: number; stageCode: string; defenseStage: number
   }
   inventory: ServerInventoryItem[]
   itemDefinitions: ServerItemDef[]
@@ -32,12 +33,15 @@ interface GameStateResponse {
 
 /** 접속 시 서버 상태 로드 → 스토어 하이드레이트 (첫 Phaser↔React↔서버 3자 연동) */
 export async function loadGameState(): Promise<void> {
-  const { data } = await api.get<GameStateResponse>('/game/state')
+  const characterCode = useScreenStore.getState().selectedCharacter
+  const { data } = await api.get<GameStateResponse>('/game/state', { params: { characterCode } })
   const c = data.character
   useGameStore.getState().setStats({
+    characterName: c.name,
     level: c.level, exp: c.exp,
     maxHp: c.maxHp, hp: c.hp, maxMp: c.maxMp, mp: c.mp,
     attackPower: c.attackPower, gold: c.gold,
+    stageCode: c.stageCode, defenseStage: c.defenseStage,
   })
   const defs: ItemDef[] = data.itemDefinitions.map((d) => ({
     code: d.code, name: d.name, itemType: d.itemType, iconKey: d.iconKey,
@@ -59,12 +63,14 @@ function buildSaveRequest() {
     level: g.level, exp: g.exp,
     maxHp: g.maxHp, hp: g.hp, maxMp: g.maxMp, mp: g.mp,
     attackPower: g.attackPower, gold: g.gold,
+    stageCode: g.stageCode, defenseStage: g.defenseStage,
     inventory,
   }
 }
 
 export async function saveGameState(): Promise<void> {
-  await api.post('/game/state', buildSaveRequest())
+  const characterCode = useScreenStore.getState().selectedCharacter
+  await api.post('/game/state', buildSaveRequest(), { params: { characterCode } })
 }
 
 /**
@@ -92,6 +98,7 @@ export function startAutosave(intervalMs = 10_000): () => void {
   }
   EventBus.on(GameEvents.LEVEL_UP, saveSoon)
   EventBus.on(GameEvents.PLAYER_DIED, saveSoon)
+  EventBus.on(GameEvents.DEFENSE_STATE, saveSoon)
 
   return () => {
     clearInterval(timer)
@@ -99,5 +106,6 @@ export function startAutosave(intervalMs = 10_000): () => void {
     if (eventSaveTimer) clearTimeout(eventSaveTimer)
     EventBus.off(GameEvents.LEVEL_UP, saveSoon)
     EventBus.off(GameEvents.PLAYER_DIED, saveSoon)
+    EventBus.off(GameEvents.DEFENSE_STATE, saveSoon)
   }
 }

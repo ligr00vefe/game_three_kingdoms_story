@@ -20,6 +20,8 @@ interface GameState {
   expToNext: number
   attackPower: number
   gold: number
+  stageCode: string
+  defenseStage: number
   /** 1차 스탯 (스탯창 표시 — 관우는 STR 주스탯) */
   str: number
   dex: number
@@ -50,6 +52,8 @@ export const useGameStore = create<GameState>()(
     expToNext: 100,
     attackPower: 10,
     gold: 0,
+    stageCode: 'stage1_grassland',
+    defenseStage: 1,
     str: 20,
     dex: 10,
     int: 5,

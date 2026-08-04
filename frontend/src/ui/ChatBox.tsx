@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useChatStore } from '../stores/chatStore'
 import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
+import { useAuthStore } from '../stores/authStore'
 import { EventBus, GameEvents } from '../game/EventBus'
 
 /**
@@ -59,11 +60,14 @@ export function ChatBox() {
     if (text) {
       useChatStore.getState().addMessage({
         kind: 'player',
-        author: useGameStore.getState().characterName,
+        author: useAuthStore.getState().user?.displayName ?? useGameStore.getState().characterName,
         text,
       })
-      EventBus.emit(GameEvents.CHAT_BUBBLE, text) // 플레이어 머리 위 말풍선
-      EventBus.emit(GameEvents.GUAN_YU_COMMAND, text)
+      if (text.startsWith('/')) {
+        EventBus.emit(GameEvents.GUAN_YU_COMMAND, text.slice(1).trim())
+      } else {
+        EventBus.emit(GameEvents.GUAN_YU_CHAT, text)
+      }
     }
   }
 
@@ -81,7 +85,7 @@ export function ChatBox() {
           ref={inputRef}
           className="chat-input"
           maxLength={80}
-          placeholder="관우에게 명령을 내리십시오"
+          placeholder="/명령 또는 일반 대화"
           onFocus={() => useUiStore.getState().setChatFocused(true)}
           onBlur={() => useUiStore.getState().setChatFocused(false)}
           onKeyDown={(e) => {

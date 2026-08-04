@@ -13,6 +13,11 @@ public final class AiCommandDtos {
 		@Valid GameContext context
 	) {}
 
+	public record ChatRequest(
+		@NotBlank @Size(max = 500) String text,
+		@Valid GameContext context
+	) {}
+
 	public record GameContext(
 		String mapKey,
 		String mode,
@@ -28,5 +33,7 @@ public final class AiCommandDtos {
 		String reply,
 		String reason
 	) {}
+
+	public record ChatResponse(String reply) {}
 }
 

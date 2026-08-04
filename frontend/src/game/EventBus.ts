@@ -84,6 +84,7 @@ export const GameEvents = {
   CHAT_BUBBLE: 'ui:chat-bubble',
   /** 채팅으로 입력한 관우 명령 원문 (string) */
   GUAN_YU_COMMAND: 'ui:guan-yu-command',
+  GUAN_YU_CHAT: 'ui:guan-yu-chat',
   /** 관우의 명령 응답/대기 대사 ({text:string}) */
   GUAN_YU_REPLY: 'game:guan-yu-reply',
   /** 퀵슬롯 스킬 발동 요청 */

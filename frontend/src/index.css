@@ -354,15 +354,20 @@ html, body, #root { height: 100%; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  background: #101014;
+  gap: 10px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(115, 79, 26, .22), transparent 34%),
+    radial-gradient(circle at 50% 100%, rgba(25, 65, 60, .16), transparent 42%),
+    #101014;
 }
 /* 로고 원본(1536×1024)은 배경이 검정이라 .launcher 배경(#101014)에 그대로 녹아든다.
    창이 작아도 버튼이 화면 밖으로 밀리지 않도록 세로를 vh로 함께 제한한다. */
 .launcher-logo {
-  width: min(560px, 82vw);
-  max-height: 56vh;
+  width: min(460px, 72vw);
+  max-height: 44vh;
   object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .48));
 }
 .launcher-btn {
   margin-top: 8px;
@@ -385,6 +390,49 @@ html, body, #root { height: 100%; }
   font-size: 18px;
   font-weight: 700;
   color: #e8b64c;
+}
+.launcher-auth {
+  width: min(390px, 88vw);
+  margin-top: 18px;
+  padding: 30px 30px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  color: #f4e8c1;
+  background: linear-gradient(145deg, rgba(42, 31, 21, .96), rgba(18, 18, 23, .98));
+  border: 1px solid #80652e;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 221, 134, .04), inset 0 0 24px rgba(255, 204, 82, .06);
+}
+.launcher-auth--register { border-color: #4e7b71; }
+.launcher-kicker { margin: 0; color: #d9a83d; font-size: 11px; letter-spacing: .18em; }
+.launcher-auth h1 { margin: 0; font-family: Gugi, sans-serif; font-size: 22px; }
+.launcher-subtitle { margin: -4px 0 6px; color: #b7aa8e; font-size: 13px; }
+.launcher-auth input {
+  box-sizing: border-box; width: 100%; padding: 13px 14px; color: #f8efd8;
+  background: rgba(10, 10, 14, .78); border: 1px solid #4f4637; border-radius: 9px; outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.launcher-auth input:focus { background: #111116; border-color: #d9a83d; box-shadow: 0 0 0 3px rgba(217, 168, 61, .14); }
+.launcher-auth input::placeholder { color: #766e60; }
+.launcher-auth > .launcher-btn { width: 100%; margin-top: 2px; }
+.launcher-start-btn, .launcher-switch {
+  padding: 10px 14px; color: #ead7a6; background: transparent; border: 1px solid #67583d;
+  border-radius: 8px; cursor: pointer;
+}
+.launcher-start-btn { color: #211803; background: linear-gradient(135deg, #ffe99b, #d99a2b); border-color: #b67f20; font-weight: 800; box-shadow: 0 7px 18px rgba(217, 154, 43, .25); }
+.launcher-switch { font-size: 12px; }
+.launcher-start-btn:hover, .launcher-switch:hover { filter: brightness(1.12); }
+.launcher-auth button:disabled { opacity: .45; cursor: not-allowed; }
+.launcher-message { margin: 2px 0 0; color: #d9b96d; font-size: 12px; text-align: center; }
+.launcher-authenticated { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+.launcher-welcome { margin: 0; padding: 15px 12px; color: #ffe8a3; text-align: center; background: rgba(217, 168, 61, .09); border: 1px solid rgba(217, 168, 61, .28); border-radius: 10px; }
+.launcher-authenticated .launcher-start-btn { width: 100%; padding: 13px 14px; font-size: 16px; }
+
+@media (max-height: 700px) {
+  .launcher { justify-content: flex-start; padding: 24px 0; box-sizing: border-box; }
+  .launcher-logo { max-height: 30vh; }
+  .launcher-auth { margin-top: 10px; padding: 22px 24px; }
 }
 
 /* ==================================================================
@@ -1618,7 +1666,8 @@ html, body, #root { height: 100%; }
 
 .def-top {
   position: absolute;
-  top: 8px;
+  /* 상단 공지 배너(top: 8px) 아래로 내려 겹침을 피한다. */
+  top: 42px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1654,7 +1703,7 @@ html, body, #root { height: 100%; }
    상태창 내용이 늘어나면 이 값도 같이 키워야 한다. */
 .def-wave-warning {
   position: absolute;
-  top: 120px;
+  top: 178px;
   left: 50%;
   transform: translateX(-50%);
   padding: 16px 40px;
