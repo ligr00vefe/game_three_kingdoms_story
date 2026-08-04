@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { useDefenseStore } from '../stores/defenseStore'
-import type { DefensePhase, DefeatReason } from '../stores/defenseStore'
+import type { DefensePhase, DefeatReason, DefenseUpgrade } from '../stores/defenseStore'
 import { useGameStore } from '../stores/gameStore'
 import { useScreenStore } from '../stores/screenStore'
 import { EventBus, GameEvents } from '../game/EventBus'
+import { AutoCombatControls } from './AutoCombatControls'
 
 interface DefenseStatePayload {
   phase: DefensePhase
@@ -13,6 +14,11 @@ interface DefenseStatePayload {
   baseHp: number
   maxBaseHp: number
   defeatReason: DefeatReason
+  archerCooldownMs: number
+  combo: number
+  supportGauge: number
+  eventName: string | null
+  rewardChoices: DefenseUpgrade[]
 }
 
 const DEFEAT_MSG: Record<'base' | 'death' | 'timeout', string> = {
@@ -21,7 +27,22 @@ const DEFEAT_MSG: Record<'base' | 'death' | 'timeout', string> = {
   timeout: '시간 내 방어에 실패했습니다',
 }
 
-const BARRICADE_COST = 30
+const BARRICADES = [
+  { tier: 'low', name: '하급 방벽', cost: 30, hp: 100, icon: '🪵' },
+  { tier: 'mid', name: '중급 방벽', cost: 150, hp: 240, icon: '🧱' },
+  { tier: 'high', name: '상급 방벽', cost: 500, hp: 500, icon: '🏰' },
+] as const
+const HP_POTION = { cost: 20, amount: 40 }
+const MP_POTION = { cost: 15, amount: 30 }
+const ARCHER_COST = 50
+const UPGRADE_INFO: Record<DefenseUpgrade, { icon: string; name: string; desc: string }> = {
+  attack: { icon: '⚔️', name: '청룡의 기세', desc: '공격력 +3' },
+  vitality: { icon: '❤️', name: '강건한 육신', desc: '최대 HP +20' },
+  mana: { icon: '💧', name: '무예의 깨달음', desc: '최대 MP +12' },
+  salvage: { icon: '🪙', name: '전리품 수거', desc: '골드 +70' },
+  fortify: { icon: '🏯', name: '성곽 보강', desc: '기지 최대 HP +35' },
+  repair: { icon: '🔨', name: '긴급 정비', desc: '모든 구조물 완전 수리' },
+}
 
 /** Wave 임박 경고를 띄우기 시작하는 남은 대기시간(ms).
  *  DefenseManager의 DEFENSE.WAIT_MS와 같은 값이면 대기 단계 내내 경고가 울린다. */
@@ -52,11 +73,20 @@ export function DefenseHud() {
   const purchaseOpen = useDefenseStore((s) => s.purchaseOpen)
   const placing = useDefenseStore((s) => s.placing)
   const pauseOpen = useDefenseStore((s) => s.pauseOpen)
+  const archerCooldownMs = useDefenseStore((s) => s.archerCooldownMs)
+  const combo = useDefenseStore((s) => s.combo)
+  const supportGauge = useDefenseStore((s) => s.supportGauge)
+  const eventName = useDefenseStore((s) => s.eventName)
+  const rewardChoices = useDefenseStore((s) => s.rewardChoices)
   const gold = useGameStore((s) => s.gold)
+  const hp = useGameStore((s) => s.hp)
+  const maxHp = useGameStore((s) => s.maxHp)
+  const mp = useGameStore((s) => s.mp)
+  const maxMp = useGameStore((s) => s.maxMp)
 
   useEffect(() => {
     const onState = (p: DefenseStatePayload) => useDefenseStore.getState().setFromEvent(p)
-    const onPlaceMode = (v: boolean) => useDefenseStore.getState().setPlacing(v)
+    const onPlaceMode = (v: boolean | string) => useDefenseStore.getState().setPlacing(v !== false)
     // 디펜스가 아닌 맵(성밖/감숙성)에 진입하면 HUD를 완전히 끈다
     const onEnd = () => useDefenseStore.getState().reset()
     EventBus.on(GameEvents.DEFENSE_STATE, onState)
@@ -71,12 +101,26 @@ export function DefenseHud() {
 
   if (!active) return null
 
-  const buyBarricade = () => {
-    if (gold < BARRICADE_COST) return
+  const buyBarricade = (tier: 'low' | 'mid' | 'high', cost: number) => {
+    if (gold < cost) return
     useDefenseStore.getState().setPurchaseOpen(false)
     useDefenseStore.getState().setPlacing(true)
-    EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, true)
+    EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, tier)
   }
+  const buyRecovery = (kind: 'hp' | 'mp') => {
+    const item = kind === 'hp' ? HP_POTION : MP_POTION
+    const state = useGameStore.getState()
+    const current = kind === 'hp' ? state.hp : state.mp
+    const maximum = kind === 'hp' ? state.maxHp : state.maxMp
+    if (state.gold < item.cost || current >= maximum) return
+    state.setStats({
+      gold: state.gold - item.cost,
+      ...(kind === 'hp' ? { hp: Math.min(maximum, current + item.amount) } : { mp: Math.min(maximum, current + item.amount) }),
+    })
+  }
+  const callArchers = () => EventBus.emit(GameEvents.DEFENSE_ARCHER_VOLLEY)
+  const repair = (target: 'base' | 'barricades') => EventBus.emit(GameEvents.DEFENSE_REPAIR, target)
+  const chooseUpgrade = (upgrade: DefenseUpgrade) => EventBus.emit(GameEvents.DEFENSE_CHOOSE_UPGRADE, upgrade)
   const cancelPlacing = () => {
     useDefenseStore.getState().setPlacing(false)
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
@@ -108,6 +152,7 @@ export function DefenseHud() {
       {/* 상단중앙: 카운트다운 + 스테이지 정보 */}
       <div className="def-top">
         <div className="def-stage">STAGE {stage}</div>
+        {eventName && <div className="def-event">{eventName}</div>}
         {phase === 'wait' && (
           <div className="def-timer def-timer--wait">
             대기 <span className="def-timer-num">{Math.ceil(timeLeftMs / 1000)}</span>
@@ -119,6 +164,8 @@ export function DefenseHud() {
         {(phase === 'combat' || phase === 'wait') && (
           <div className="def-info">
             <span className="def-zombies">🧟 남은 {zombiesLeft}</span>
+            {combo >= 2 && <span className="def-combo">🔥 {combo} COMBO</span>}
+            <span className="def-support">🏹 지원 {Math.round(supportGauge)}%</span>
             <div className="def-basehp">
               <span className="def-basehp-label">🏯 기지</span>
               <div className="def-basehp-track">
@@ -144,8 +191,8 @@ export function DefenseHud() {
         </div>
       )}
 
-      {/* 하단중앙: 구매하기 (대기 단계에만) */}
-      {phase === 'wait' && !placing && (
+      {/* 하단중앙: 대기·전투 중 언제나 사용 가능한 보급소 */}
+      {(phase === 'wait' || phase === 'combat') && !placing && (
         <button className="def-buy-btn" onClick={() => useDefenseStore.getState().setPurchaseOpen(true)}>
           구매하기
         </button>
@@ -155,13 +202,42 @@ export function DefenseHud() {
       {purchaseOpen && (
         <div className="def-shop-backdrop" onClick={() => useDefenseStore.getState().setPurchaseOpen(false)}>
           <div className="def-shop" onClick={(e) => e.stopPropagation()}>
-            <div className="def-shop-title">방어 시설 구매</div>
-            <button className="def-shop-item" onClick={buyBarricade} disabled={gold < BARRICADE_COST}>
-              <div className="def-shop-icon">🧱</div>
-              <div className="def-shop-name">바리케이트</div>
-              <div className="def-shop-price">{BARRICADE_COST} G</div>
-            </button>
-            {gold < BARRICADE_COST && <p className="def-shop-warn">골드가 부족합니다 (보유 {gold} G)</p>}
+            <div className="def-shop-title">전장 보급소 · {gold} G</div>
+            <div className="def-shop-section">방어 시설</div>
+            <div className="def-shop-grid">
+              {BARRICADES.map((item) => (
+                <button key={item.tier} className="def-shop-item" onClick={() => buyBarricade(item.tier, item.cost)} disabled={gold < item.cost}>
+                  <div className="def-shop-icon">{item.icon}</div>
+                  <div className="def-shop-name">{item.name}</div>
+                  <div className="def-shop-desc">HP {item.hp}</div>
+                  <div className="def-shop-price">{item.cost} G</div>
+                </button>
+              ))}
+            </div>
+            <div className="def-shop-section">회복 · 지원</div>
+            <div className="def-shop-grid">
+              <button className="def-shop-item" onClick={() => buyRecovery('hp')} disabled={gold < HP_POTION.cost || hp >= maxHp}>
+                <div className="def-shop-icon">❤️</div><div className="def-shop-name">체력 물약</div>
+                <div className="def-shop-desc">HP +{HP_POTION.amount}</div><div className="def-shop-price">{HP_POTION.cost} G</div>
+              </button>
+              <button className="def-shop-item" onClick={() => buyRecovery('mp')} disabled={gold < MP_POTION.cost || mp >= maxMp}>
+                <div className="def-shop-icon">💧</div><div className="def-shop-name">마력 물약</div>
+                <div className="def-shop-desc">MP +{MP_POTION.amount}</div><div className="def-shop-price">{MP_POTION.cost} G</div>
+              </button>
+              <button className="def-shop-item" onClick={callArchers} disabled={phase !== 'combat' || (supportGauge < 100 && gold < ARCHER_COST) || archerCooldownMs > 0 || zombiesLeft <= 0}>
+                <div className="def-shop-icon">🏹</div><div className="def-shop-name">궁수 일제사격</div>
+                <div className="def-shop-desc">전방 최대 5명{archerCooldownMs > 0 ? ` · ${Math.ceil(archerCooldownMs / 1000)}초` : ''}</div>
+                <div className="def-shop-price">{supportGauge >= 100 ? '지원 게이지 사용' : `${ARCHER_COST} G`}</div>
+              </button>
+              <button className="def-shop-item" onClick={() => repair('base')} disabled={gold < 30 || baseHp >= maxBaseHp}>
+                <div className="def-shop-icon">🏯</div><div className="def-shop-name">기지 수리</div>
+                <div className="def-shop-desc">기지 HP +40</div><div className="def-shop-price">30 G</div>
+              </button>
+              <button className="def-shop-item" onClick={() => repair('barricades')} disabled={gold < 40}>
+                <div className="def-shop-icon">🔨</div><div className="def-shop-name">방벽 정비</div>
+                <div className="def-shop-desc">모든 방벽 35%</div><div className="def-shop-price">40 G</div>
+              </button>
+            </div>
             <button className="def-shop-close" onClick={() => useDefenseStore.getState().setPurchaseOpen(false)}>닫기</button>
           </div>
         </div>
@@ -171,7 +247,17 @@ export function DefenseHud() {
       {phase === 'victory' && (
         <div className="def-banner def-banner--victory">
           <div className="def-banner-title">STAGE {stage} 클리어!</div>
-          <div className="def-banner-sub">잠시 후 다음 스테이지…</div>
+          <div className="def-banner-sub">다음 전투를 위한 강화 하나를 선택하세요</div>
+          <div className="def-upgrade-grid">
+            {rewardChoices.map((upgrade) => {
+              const info = UPGRADE_INFO[upgrade]
+              return (
+                <button className="def-upgrade" key={upgrade} onClick={() => chooseUpgrade(upgrade)}>
+                  <span>{info.icon}</span><b>{info.name}</b><small>{info.desc}</small>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -192,6 +278,10 @@ export function DefenseHud() {
           <div className="settings-menu">
             <div className="settings-title">일시정지</div>
             <button className="settings-item settings-item--dim" onClick={resumeGame}>게임으로 돌아가기 (ESC)</button>
+            <details className="auto-settings-details">
+              <summary>🤖 자동 전투 설정</summary>
+              <AutoCombatControls />
+            </details>
             <div className="settings-sep" />
             <button className="settings-item" onClick={returnToLobby}>🏠 대기실로 돌아가기</button>
             <button className="settings-item settings-item--danger" onClick={giveUp}>🏳 포기하기 (감숙성으로)</button>

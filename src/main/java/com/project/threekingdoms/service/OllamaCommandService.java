@@ -82,9 +82,11 @@ public class OllamaCommandService {
 		사용자에게는 항상 정중한 한국어 존댓말로 답하고, 관우다운 간결하고 단호한 말투를 사용한다.
 		게임 속 현재 상황을 고려하되, 실제로 실행하지 않은 행동을 했다고 거짓말하지 않는다.
 		이 요청은 게임 명령이 아닌 자유 대화다. 인사, 질문, 감상, 조언에는 자연스럽게 답한다.
-		답변은 한국어 20자 안팎, 최대 60자로 짧게 한다. 불확실한 게임 정보는 모른다고 말한다.
-		현대의 정치, 인터넷, 스마트폰, 현대 기술, 현대 인물과 같은 세계관 밖 질문에는 답하지 않는다.
-		"이 시대에는 알 수 없는 일"이라고 짧게 말하고 삼국지 세계관 안의 질문으로 바꾸어 달라고 한다.
+		답변은 반드시 한국어 한 문장으로 작성하며 20자 안팎, 최대 40자로 짧게 한다.
+		사고 과정, 분석, 영어 설명, 머리말, 따옴표를 출력하지 말고 사용자에게 보여 줄 최종 답변만 출력한다.
+		삼국지 시대, 현재 게임, 인사나 간단한 일상 대화와 무관한 전문 질문에는
+		"죄송하지만 제가 알지 못하는 분야입니다."처럼 짧게 거절한다.
+		불확실한 게임 정보는 지어내지 말고 모른다고 답한다.
 		""";
 
 	private final ObjectMapper objectMapper;
@@ -143,7 +145,8 @@ public class OllamaCommandService {
 				"stream", false,
 				"think", false,
 				"keep_alive", "5m",
-				"options", Map.of("temperature", 0.7, "num_predict", 48),
+				"format", chatSchema(),
+				"options", Map.of("temperature", 0.4, "num_predict", 64),
 				"messages", List.of(
 					Map.of("role", "system", "content", CHAT_SYSTEM_PROMPT),
 					Map.of("role", "user", "content", contextText(request.context()) + "\n사용자: " + request.text())
@@ -158,15 +161,29 @@ public class OllamaCommandService {
 				httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 			if (response.statusCode() != 200) return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
 			JsonNode root = objectMapper.readTree(response.body());
-			String reply = root.path("message").path("content").asText("").trim();
-			if (reply.isBlank()) return new ChatResponse("무슨 말씀이신지 조금 더 자세히 말씀해 주십시오.");
-			return new ChatResponse(reply.length() > 60 ? reply.substring(0, 60) : reply);
+			String content = root.path("message").path("content").asText("");
+			String reply;
+			try {
+				reply = cleanChatReply(objectMapper.readTree(content).path("reply").asText(""));
+			} catch (Exception ignored) {
+				reply = cleanChatReply(content);
+			}
+			if (reply.isBlank()) return new ChatResponse("다시 한번 말씀해 주십시오.");
+			return new ChatResponse(reply.length() > 40 ? reply.substring(0, 40) : reply);
 		} catch (InterruptedException exception) {
 			Thread.currentThread().interrupt();
 			return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
 		} catch (Exception exception) {
 			return new ChatResponse("잠시 후 다시 말씀해 주십시오.");
 		}
+	}
+
+	static String cleanChatReply(String rawReply) {
+		if (rawReply == null) return "";
+		String reply = rawReply.replaceAll("(?s)<think>.*?</think>", "").trim();
+		int answerMarker = reply.lastIndexOf("</think>");
+		if (answerMarker >= 0) reply = reply.substring(answerMarker + 8).trim();
+		return reply.replaceAll("^[\\\"']|[\\\"']$", "").trim();
 	}
 
 	private InterpretedCommand validate(InterpretedCommand command) {
@@ -204,6 +221,18 @@ public class OllamaCommandService {
 				"reason", Map.of("type", List.of("string", "null"))
 			),
 			"required", List.of("action", "targetId", "priority", "reply", "reason"),
+			"additionalProperties", false
+		);
+	}
+
+	private Map<String, Object> chatSchema() {
+		return Map.of(
+			"type", "object",
+			"properties", Map.of("reply", Map.of(
+				"type", "string",
+				"maxLength", 40
+			)),
+			"required", List.of("reply"),
 			"additionalProperties", false
 		);
 	}

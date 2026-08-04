@@ -2,6 +2,7 @@ import { COMBAT } from '../config'
 import type { Monster } from '../entities/Monster'
 import type { Player, PlayerControl } from '../entities/Player'
 import type { GuanYuCommand } from './commands'
+import type { CombatPolicy } from '../../stores/autoCombatStore'
 
 export type GuanYuState =
   | 'STANDBY'
@@ -136,7 +137,7 @@ export class GuanYuController {
     }
   }
 
-  update(player: Player, monsters: readonly Monster[]) {
+  update(player: Player, monsters: readonly Monster[], policy: CombatPolicy = 'nearest', hpRatio = 1) {
     this.resetControl()
     if (this.jumpQueued) {
       this.control.jumpJustDown = true
@@ -199,7 +200,11 @@ export class GuanYuController {
       return
     }
     if (this.state === 'AUTO_COMBAT') {
-      const enemy = this.nearestEnemy(player, monsters)
+      if (policy === 'survival' && hpRatio < 0.35) {
+        this.control.left = true
+        return
+      }
+      const enemy = this.policyTarget(player, monsters, policy)
       if (enemy) this.attackOrApproach(player, enemy)
       return
     }
@@ -239,6 +244,36 @@ export class GuanYuController {
       if (urgent) this.attackOrApproach(player, urgent)
       else if (Math.abs(player.x - anchor) > 60) this.moveToward(player.x, anchor)
     }
+  }
+
+  activateAutoCombat() {
+    if (this.state === 'STANDBY' || this.state === 'HOLDING') this.state = 'AUTO_COMBAT'
+  }
+
+  private policyTarget(player: Player, monsters: readonly Monster[], policy: CombatPolicy): Monster | null {
+    if (policy === 'defense') return this.mostUrgentEnemy(monsters)
+    if (policy === 'elite') {
+      let elite: Monster | null = null
+      let eliteScore = -1
+      for (const monster of monsters) {
+        if (!monster.active || !monster.alive) continue
+        const score = monster.def.maxHp + monster.def.defense * 10
+        if (score > eliteScore) { elite = monster; eliteScore = score }
+      }
+      return elite
+    }
+    if (policy === 'danger') {
+      let dangerous: Monster | null = null
+      let distance = Infinity
+      for (const monster of monsters) {
+        if (!monster.active || !monster.alive ||
+            (!monster.def.name.includes('화약') && !monster.def.name.includes('돌진'))) continue
+        const candidateDistance = Math.abs(monster.x - player.x)
+        if (candidateDistance < distance) { dangerous = monster; distance = candidateDistance }
+      }
+      return dangerous ?? this.nearestEnemy(player, monsters)
+    }
+    return this.nearestEnemy(player, monsters)
   }
 
   /** 디펜스에서 x가 작을수록 성에 가까운, 즉 가장 급한 적이다. */

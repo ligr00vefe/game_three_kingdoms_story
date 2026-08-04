@@ -70,5 +70,29 @@
         "chance": 0.08
       }
     ]
+  },
+  "zombie_runner": {
+    "name": "황건 돌진병", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
+    "maxHp": 22, "attack": 4, "defense": 0, "exp": 18, "moveSpeed": 95,
+    "detectRange": 99999, "attackRange": 42, "attackCooldownMs": 800, "attackWindupMs": 220,
+    "drops": [{ "code": "coin", "chance": 1.0, "min": 2, "max": 5 }]
+  },
+  "zombie_shield": {
+    "name": "황건 방패병", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
+    "maxHp": 75, "attack": 7, "defense": 6, "exp": 28, "moveSpeed": 36,
+    "detectRange": 99999, "attackRange": 46, "attackCooldownMs": 1300, "attackWindupMs": 420,
+    "drops": [{ "code": "coin", "chance": 1.0, "min": 4, "max": 8 }]
+  },
+  "zombie_exploder": {
+    "name": "황건 화약병", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
+    "maxHp": 28, "attack": 18, "defense": 1, "exp": 25, "moveSpeed": 68,
+    "detectRange": 99999, "attackRange": 48, "attackCooldownMs": 1800, "attackWindupMs": 500,
+    "drops": [{ "code": "coin", "chance": 1.0, "min": 3, "max": 7 }]
+  },
+  "zombie_boss": {
+    "name": "황건 대장", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
+    "maxHp": 500, "attack": 16, "defense": 8, "exp": 120, "moveSpeed": 42,
+    "detectRange": 99999, "attackRange": 56, "attackCooldownMs": 950, "attackWindupMs": 380,
+    "drops": [{ "code": "coin", "chance": 1.0, "min": 35, "max": 55 }]
   }
 }

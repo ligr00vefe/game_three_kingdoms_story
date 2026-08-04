@@ -17,6 +17,9 @@ import { useGameStore } from './stores/gameStore'
 import { useUiStore } from './stores/uiStore'
 import { useScreenStore } from './stores/screenStore'
 import { useDefenseStore } from './stores/defenseStore'
+import { useInventoryStore } from './stores/inventoryStore'
+import { usePortalMenuStore } from './stores/portalMenuStore'
+import { useDialogStore } from './stores/dialogStore'
 import { EventBus, GameEvents } from './game/EventBus'
 import { FEATURES } from './features'
 import { InventoryPanel } from './ui/InventoryPanel'
@@ -36,6 +39,7 @@ import { Launcher, GAME_WINDOW_NAME, GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT } fro
 import { CharacterSelect } from './ui/CharacterSelect'
 import { LoadingScreen } from './ui/LoadingScreen'
 import { CommandHelpPanel } from './ui/CommandHelpPanel'
+import { AiQuickHelp } from './ui/AiQuickHelp'
 
 /** 게임 창인지 판별: 런처가 window.open으로 띄우는 URL에 붙는 ?mode=game */
 const isGameWindow = new URLSearchParams(location.search).get('mode') === 'game'
@@ -114,11 +118,35 @@ function GameApp() {
     }
   }, [])
 
-  // ESC: 단축키 세팅 → 설정 순으로 닫고, 아무것도 없으면 설정 메뉴 열기 (인게임에서만)
+  // ESC: 열린 창을 먼저 닫고, 아무 창도 없을 때만 설정/디펜스 일시정지를 연다.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (useScreenStore.getState().screen !== 'game') return
+
+      const ui = useUiStore.getState()
+      // 시네마틱 대화의 ESC는 CinematicDialog가 직접 처리한다.
+      if (ui.cinematicOpen) return
+
+      e.preventDefault()
+      // 일반 패널은 디펜스 여부와 관계없이 최우선으로 닫는다.
+      if (ui.commandHelpOpen) { ui.setCommandHelpOpen(false); return }
+      if (ui.keySettingsOpen) { ui.setKeySettingsOpen(false); return }
+      if (ui.settingsOpen) { ui.setSettingsOpen(false); return }
+      if (ui.questOpen) { ui.toggleQuest(); return }
+      if (ui.statsOpen) { ui.toggleStats(); return }
+      if (ui.skillbookOpen) { ui.toggleSkillbook(); return }
+      if (ui.equipOpen) { ui.toggleEquip(); return }
+
+      const inventory = useInventoryStore.getState()
+      if (inventory.open) { inventory.setOpen(false); return }
+
+      const portalMenu = usePortalMenuStore.getState()
+      if (portalMenu.open) { portalMenu.close(); return }
+
+      const dialog = useDialogStore.getState()
+      if (dialog.npcName !== null) { dialog.close(); return }
+
       // 디펜스 모드: 일반 설정 메뉴 대신 전용 일시정지 메뉴(게임으로/대기실로/포기하기)를 토글
       const def = useDefenseStore.getState()
       if (def.active) {
@@ -129,17 +157,7 @@ function GameApp() {
         else def.setPauseOpen(true)
         return
       }
-      const ui = useUiStore.getState()
-      // 시네마틱 대화 중 ESC는 대화만 닫는다 (CinematicDialog가 처리 — 설정 메뉴로 넘기지 않음)
-      if (ui.cinematicOpen) return
-      if (ui.commandHelpOpen) ui.setCommandHelpOpen(false)
-      else if (ui.keySettingsOpen) ui.setKeySettingsOpen(false)
-      else if (ui.settingsOpen) ui.setSettingsOpen(false)
-      else if (ui.questOpen) ui.toggleQuest()
-      else if (ui.statsOpen) ui.toggleStats()
-      else if (ui.skillbookOpen) ui.toggleSkillbook()
-      else if (ui.equipOpen) ui.toggleEquip()
-      else if (!ui.chatFocused) ui.setSettingsOpen(true)
+      if (!ui.chatFocused) ui.setSettingsOpen(true)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -176,6 +194,7 @@ function GameApp() {
             <Minimap />
             <GoldDisplay />
             <NoticeBanner />
+            <AiQuickHelp />
             {FEATURES.equipment && <InventoryPanel />}
             {FEATURES.equipment && <EquipmentPanel />}
             <CharacterInfoPanel />

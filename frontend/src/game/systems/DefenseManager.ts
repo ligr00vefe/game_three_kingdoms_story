@@ -3,6 +3,18 @@ import type { Monster, MonsterTarget } from '../entities/Monster'
 import { SpawnManager } from './SpawnManager'
 import { EventBus, GameEvents } from '../EventBus'
 import { useGameStore } from '../../stores/gameStore'
+import { EffectManager } from './EffectManager'
+
+export type BarricadeTier = 'low' | 'mid' | 'high'
+export type DefenseUpgrade = 'attack' | 'vitality' | 'mana' | 'salvage' | 'fortify' | 'repair'
+
+export const BARRICADE_TIERS: Record<BarricadeTier, {
+  name: string; cost: number; hp: number; width: number; height: number; tint: number
+}> = {
+  low: { name: '하급', cost: 30, hp: 100, width: 44, height: 64, tint: 0xffffff },
+  mid: { name: '중급', cost: 150, hp: 240, width: 54, height: 72, tint: 0xd7e8ff },
+  high: { name: '상급', cost: 500, hp: 500, width: 66, height: 82, tint: 0xffd778 },
+}
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
 const DEFENSE = {
@@ -17,9 +29,12 @@ const DEFENSE = {
   SPAWN_INTERVAL_MS: 1_800,
   /** 좀비 스폰 x (맨 오른쪽에서) — worldWidth 기준 offset */
   SPAWN_X_OFFSET: 80,
-  /** 바리케이트 가격/체력 */
-  BARRICADE_COST: 30,
-  BARRICADE_HP: 100,
+  /** 바리케이트 사이 최소 간격 */
+  BARRICADE_GAP: 12,
+  /** 궁수 지원 */
+  ARCHER_COST: 50,
+  ARCHER_COOLDOWN_MS: 8_000,
+  ARCHER_TARGETS: 5,
   /** 기지 체력 */
   BASE_HP: 100,
   /** 좀비가 플레이어를 우선 추적하는 근접 범위 (넘어서면 기지로 진격) */
@@ -46,6 +61,7 @@ interface Structure {
   maxHp: number
   isBase: boolean
   barW: number
+  tier?: BarricadeTier
 }
 
 type Phase = 'idle' | 'wait' | 'combat' | 'victory' | 'defeat'
@@ -66,6 +82,7 @@ export class DefenseManager {
   private worldWidth: number
   private group: Phaser.Physics.Arcade.StaticGroup
   private playerTarget: MonsterTarget
+  private effects: EffectManager
 
   private stage = 1
   private phase: Phase = 'idle'
@@ -81,6 +98,15 @@ export class DefenseManager {
   private spawnEvent?: Phaser.Time.TimerEvent
   /** 바리케이트 배치 대기 모드 (구매 창에서 바리케이트 선택 시 on) */
   placing = false
+  selectedTier: BarricadeTier = 'low'
+  private archerReadyAt = 0
+  private archerCooldownMs = DEFENSE.ARCHER_COOLDOWN_MS
+  private combo = 0
+  private comboExpiresAt = 0
+  private supportGauge = 0
+  private eventName: string | null = null
+  private spawnIntervalMs: number = DEFENSE.SPAWN_INTERVAL_MS
+  private rewardChoices: DefenseUpgrade[] = []
   /** 배치 미리보기 고스트(마우스를 따라다니는 반투명 바리케이트). 배치 모드에서만 표시. */
   private ghost?: Phaser.GameObjects.Image
 
@@ -94,6 +120,7 @@ export class DefenseManager {
     worldWidth: number,
     group: Phaser.Physics.Arcade.StaticGroup,
     playerTarget: MonsterTarget,
+    effects: EffectManager,
   ) {
     this.scene = scene
     this.spawner = spawner
@@ -101,6 +128,7 @@ export class DefenseManager {
     this.worldWidth = worldWidth
     this.group = group
     this.playerTarget = playerTarget
+    this.effects = effects
 
     const self = this
     this.structureTarget = {
@@ -136,21 +164,41 @@ export class DefenseManager {
     this.spawnedCount = 0
     this.waveTotal = n + DEFENSE.BASE_ZOMBIES
     this.waveRemaining = this.waveTotal
+    this.combo = 0
+    this.rollStageEvent()
     this.emitState()
+  }
+
+  private rollStageEvent() {
+    this.spawnIntervalMs = DEFENSE.SPAWN_INTERVAL_MS
+    if (this.stage % 5 === 0) {
+      this.eventName = '대장 출현: 보스 웨이브'
+      return
+    }
+    const roll = Phaser.Math.Between(0, 3)
+    if (roll === 0) {
+      this.eventName = '야습: 적이 빠르게 몰려옵니다'
+      this.spawnIntervalMs = 1_050
+    } else if (roll === 1) {
+      this.eventName = '보급 마차: 군자금 40G 획득'
+      const store = useGameStore.getState()
+      store.setStats({ gold: store.gold + 40 })
+    } else if (roll === 2) {
+      this.eventName = '정예 부대: 특수병 출현 증가'
+    } else {
+      this.eventName = '평온한 전운'
+    }
   }
 
   private startCombat() {
     this.phase = 'combat'
     this.phaseEndsAt = this.scene.time.now + DEFENSE.COMBAT_MS
-    this.placing = false
-    this.hidePlacementPreview()
-    EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
     // 좀비 순차 스폰. 첫 마리는 아래에서 즉시 스폰하므로 타이머는 나머지(waveTotal-1)만 담당한다.
     // repeat=N은 콜백을 N+1회 실행하므로, 나머지 waveTotal-1회를 원하면 repeat=waveTotal-2.
     // (예전엔 repeat=waveTotal-1이라 타이머가 waveTotal회 + 즉시 1회 = waveTotal+1마리를 스폰,
     //  승리 조건(waveTotal 처치)은 1마리 남았는데 먼저 충족돼 조기 클리어되던 버그가 있었다.)
     this.spawnEvent = this.scene.time.addEvent({
-      delay: DEFENSE.SPAWN_INTERVAL_MS,
+      delay: this.spawnIntervalMs,
       repeat: Math.max(0, this.waveTotal - 2),
       callback: () => this.spawnOne(),
     })
@@ -161,13 +209,34 @@ export class DefenseManager {
 
   private spawnOne() {
     if (this.phase !== 'combat') return
-    const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET
-    this.spawner.spawnAt('zombie_defense', x, x - 30, x + 20, (m) => this.onZombieDied(m))
+    const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET - Phaser.Math.Between(0, 180)
+    const code = this.monsterCodeFor(this.spawnedCount)
+    const monster = this.spawner.spawnAt(code, x, x - 30, x + 20, (m) => this.onZombieDied(m))
+    this.scene.time.delayedCall(700, () => {
+      if (!monster.active) return
+      if (code === 'zombie_runner') monster.setTint(0xffcc80)
+      else if (code === 'zombie_shield') monster.setTint(0x90caf9)
+      else if (code === 'zombie_exploder') monster.setTint(0xff8a80)
+      else if (code === 'zombie_boss') monster.setTint(0xce93d8).setScale(1.45)
+    })
     this.spawnedCount += 1
+  }
+
+  private monsterCodeFor(index: number): string {
+    if (this.stage % 5 === 0 && index === this.waveTotal - 1) return 'zombie_boss'
+    const eliteBoost = this.eventName?.startsWith('정예') ? 2 : 1
+    if (this.stage >= 4 && index % Math.max(3, 7 - eliteBoost) === 2) return 'zombie_exploder'
+    if (this.stage >= 3 && index % Math.max(3, 6 - eliteBoost) === 1) return 'zombie_shield'
+    if (this.stage >= 2 && index % Math.max(2, 5 - eliteBoost) === 0) return 'zombie_runner'
+    return 'zombie_defense'
   }
 
   private onZombieDied(_m: Monster) {
     this.waveRemaining -= 1
+    const now = this.scene.time.now
+    this.combo = now <= this.comboExpiresAt ? this.combo + 1 : 1
+    this.comboExpiresAt = now + 3_000
+    this.supportGauge = Math.min(100, this.supportGauge + Math.min(20, 8 + this.combo))
     this.emitState()
     if (this.phase === 'combat' && this.waveRemaining <= 0) this.victory()
   }
@@ -176,10 +245,10 @@ export class DefenseManager {
     this.phase = 'victory'
     this.spawnEvent?.remove()
     this.spawnEvent = undefined
+    this.rewardChoices = Phaser.Utils.Array.Shuffle<DefenseUpgrade>(
+      ['attack', 'vitality', 'mana', 'salvage', 'fortify', 'repair'],
+    ).slice(0, 3)
     this.emitState()
-    this.scene.time.delayedCall(DEFENSE.VICTORY_DELAY_MS, () => {
-      if (this.phase === 'victory') this.startStage(this.stage + 1)
-    })
   }
 
   /** 패배 처리. reason: 'base'=기지 파괴 / 'death'=캐릭터 사망 / 'timeout'=시간 초과 */
@@ -203,6 +272,7 @@ export class DefenseManager {
   }
 
   private tick() {
+    if (this.combo > 0 && this.scene.time.now > this.comboExpiresAt) this.combo = 0
     if (this.phase === 'wait') {
       if (this.scene.time.now >= this.phaseEndsAt) { this.startCombat(); return }
     } else if (this.phase === 'combat') {
@@ -316,19 +386,28 @@ export class DefenseManager {
   private placeMinX() { return DEFENSE.BASE_X + 70 }
   private placeMaxX() { return this.worldWidth - 120 }
 
-  /** 이 위치에 지금 바리케이트를 설치할 수 있는가 (대기 단계 + 배치 모드 + 배치존 안 + 골드 충분). */
+  /** 이 위치에 지금 바리케이트를 설치할 수 있는가. 전투 중에도 가능하며 기존 방벽과 겹칠 수 없다. */
   private canPlaceAt(worldX: number): boolean {
-    if (this.phase !== 'wait' || !this.placing) return false
+    if ((this.phase !== 'wait' && this.phase !== 'combat') || !this.placing) return false
     if (worldX < this.placeMinX() || worldX > this.placeMaxX()) return false
-    return useGameStore.getState().gold >= DEFENSE.BARRICADE_COST
+    const def = BARRICADE_TIERS[this.selectedTier]
+    if (useGameStore.getState().gold < def.cost) return false
+    return !this.structures.some((structure) => {
+      if (structure.isBase || structure.hp <= 0) return false
+      const otherWidth = structure.barW
+      return Math.abs(structure.spr.x - worldX) < (def.width + otherWidth) / 2 + DEFENSE.BARRICADE_GAP
+    })
   }
 
   /** 바리케이트 설치 (대기 단계 + 배치 모드 + 골드 충분 + 배치존 안). GameScene 포인터에서 호출. */
   placeBarricade(worldX: number): boolean {
     if (!this.canPlaceAt(worldX)) return false
+    const def = BARRICADE_TIERS[this.selectedTier]
     const gold = useGameStore.getState().gold
-    useGameStore.getState().setStats({ gold: gold - DEFENSE.BARRICADE_COST })
-    this.addStructure(worldX, DEFENSE.BARRICADE_HP, false, 'img_barricade', 44, 64, 40)
+    useGameStore.getState().setStats({ gold: gold - def.cost })
+    const structure = this.addStructure(worldX, def.hp, false, 'img_barricade', def.width, def.height, def.width - 4)
+    structure.tier = this.selectedTier
+    structure.spr.setTint(def.tint)
     this.placing = false
     this.hidePlacementPreview()
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
@@ -337,8 +416,9 @@ export class DefenseManager {
 
   /** 자연어 명령용 설치 경로. UI 배치 모드를 열지 않고 현재 캐릭터 앞의 안전 범위에 즉시 설치한다. */
   placeBarricadeByCommand(worldX: number): BarricadeCommandResult {
-    if (this.phase !== 'wait') return 'NOT_WAIT_PHASE'
-    if (useGameStore.getState().gold < DEFENSE.BARRICADE_COST) return 'NOT_ENOUGH_GOLD'
+    if (this.phase !== 'wait' && this.phase !== 'combat') return 'NOT_WAIT_PHASE'
+    this.selectedTier = 'low'
+    if (useGameStore.getState().gold < BARRICADE_TIERS.low.cost) return 'NOT_ENOUGH_GOLD'
     const safeX = Phaser.Math.Clamp(worldX, this.placeMinX(), this.placeMaxX())
     this.placing = true
     return this.placeBarricade(safeX) ? 'PLACED' : 'NOT_WAIT_PHASE'
@@ -353,17 +433,88 @@ export class DefenseManager {
   /** 배치 미리보기 갱신 — 마우스(월드 x) 위치에 반투명 바리케이트를 그려 설치 지점을 예고한다.
    *  배치존 밖/골드 부족이면 붉게, 설치 가능하면 초록빛으로 표시한다. */
   updatePlacementPreview(worldX: number) {
-    if (!this.placing || this.phase !== 'wait') { this.hidePlacementPreview(); return }
+    if (!this.placing || (this.phase !== 'wait' && this.phase !== 'combat')) { this.hidePlacementPreview(); return }
+    const def = BARRICADE_TIERS[this.selectedTier]
     if (!this.ghost) {
       // origin을 밑변(0.5,1)에 둬 y=groundY면 실제 설치될 바리케이트와 바닥 정렬이 같다.
       this.ghost = this.scene.add.image(0, 0, 'img_barricade')
-        .setOrigin(0.5, 1).setDisplaySize(44, 64).setDepth(6)
+        .setOrigin(0.5, 1).setDepth(6)
     }
+    this.ghost.setDisplaySize(def.width, def.height)
     // 배치존을 벗어나도 고스트는 실제 커서 위치에 그려 "여긴 안 됨"을 색으로 알린다(범위 안내).
     const shownX = Phaser.Math.Clamp(worldX, this.placeMinX() - 40, this.placeMaxX() + 40)
     const valid = this.canPlaceAt(worldX)
     this.ghost.setVisible(true).setPosition(shownX, this.groundY)
       .setAlpha(valid ? 0.55 : 0.4).setTint(valid ? 0x8affa0 : 0xff6b6b)
+  }
+
+  /** 플레이어 전방의 적 최대 5명에게 궁수 지원 사격. */
+  callArcherVolley(): boolean {
+    if (this.phase !== 'combat' && this.phase !== 'wait') return false
+    if (this.scene.time.now < this.archerReadyAt) return false
+    const targets = this.spawner.monsters
+      .filter((monster) => monster.alive && monster.x > this.playerTarget.x)
+      .sort((a, b) => a.x - b.x)
+      .slice(0, DEFENSE.ARCHER_TARGETS)
+    const store = useGameStore.getState()
+    const charged = this.supportGauge >= 100
+    if (targets.length === 0 || (!charged && store.gold < DEFENSE.ARCHER_COST)) return false
+    if (charged) this.supportGauge = 0
+    else store.setStats({ gold: store.gold - DEFENSE.ARCHER_COST })
+    this.archerReadyAt = this.scene.time.now + this.archerCooldownMs
+    const damage = 24 + this.stage * 2
+    targets.forEach((target, index) => {
+      const arrow = this.scene.add.rectangle(target.x + 90, target.y - 150 - index * 8, 28, 4, 0xffe082)
+        .setDepth(8).setRotation(2.2)
+      this.scene.tweens.add({
+        targets: arrow,
+        x: target.x,
+        y: target.y - 18,
+        duration: 260 + index * 45,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          arrow.destroy()
+          if (target.alive) target.receiveHit(damage, false, target.x + 80, this.effects, this.scene.time.now)
+        },
+      })
+    })
+    this.emitState()
+    return true
+  }
+
+  repair(target: 'base' | 'barricades'): boolean {
+    const store = useGameStore.getState()
+    const cost = target === 'base' ? 30 : 40
+    if (store.gold < cost) return false
+    const structures = target === 'base'
+      ? [this.base]
+      : this.structures.filter((structure) => !structure.isBase && structure.hp > 0)
+    if (structures.length === 0 || structures.every((structure) => structure.hp >= structure.maxHp)) return false
+    store.setStats({ gold: store.gold - cost })
+    for (const structure of structures) {
+      const amount = target === 'base' ? 40 : Math.ceil(structure.maxHp * 0.35)
+      structure.hp = Math.min(structure.maxHp, structure.hp + amount)
+      this.drawHpBar(structure)
+    }
+    this.emitState()
+    return true
+  }
+
+  chooseUpgrade(upgrade: DefenseUpgrade) {
+    if (this.phase !== 'victory' || !this.rewardChoices.includes(upgrade)) return
+    const store = useGameStore.getState()
+    if (upgrade === 'attack') store.setStats({ attackPower: store.attackPower + 3 })
+    else if (upgrade === 'vitality') store.setStats({ maxHp: store.maxHp + 20, hp: store.hp + 20 })
+    else if (upgrade === 'mana') store.setStats({ maxMp: store.maxMp + 12, mp: store.mp + 12 })
+    else if (upgrade === 'salvage') store.setStats({ gold: store.gold + 70 })
+    else if (upgrade === 'fortify') {
+      this.base.maxHp += 35; this.base.hp = Math.min(this.base.maxHp, this.base.hp + 35); this.drawHpBar(this.base)
+    } else if (upgrade === 'repair') {
+      for (const structure of this.structures) { if (structure.hp > 0) { structure.hp = structure.maxHp; this.drawHpBar(structure) } }
+    }
+    this.rewardChoices = []
+    this.scene.time.delayedCall(DEFENSE.VICTORY_DELAY_MS, () => this.startStage(this.stage + 1))
+    this.emitState()
   }
 
   /** 배치 미리보기 숨김 (배치 모드 종료/전투 시작 시). */
@@ -385,6 +536,11 @@ export class DefenseManager {
       baseHp: this.base.hp,
       maxBaseHp: this.base.maxHp,
       defeatReason: this.defeatReason,
+      archerCooldownMs: Math.max(0, this.archerReadyAt - this.scene.time.now),
+      combo: this.combo,
+      supportGauge: this.supportGauge,
+      eventName: this.eventName,
+      rewardChoices: this.rewardChoices,
     })
   }
 

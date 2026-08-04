@@ -103,6 +103,12 @@ export const GameEvents = {
   DEFENSE_EXIT: 'ui:defense-exit',
   /** 디펜스 ESC 일시정지 메뉴 on/off (boolean) — 씬을 pause/resume 한다 */
   DEFENSE_PAUSE: 'ui:defense-pause',
+  /** 디펜스 궁수 지원 사격 요청 */
+  DEFENSE_ARCHER_VOLLEY: 'ui:defense-archer-volley',
+  /** 디펜스 구조물 수리 요청: base | barricades */
+  DEFENSE_REPAIR: 'ui:defense-repair',
+  /** 웨이브 보상 강화 선택 */
+  DEFENSE_CHOOSE_UPGRADE: 'ui:defense-choose-upgrade',
   // 음향 훅 (지금은 구현하지 않음 — 자리만 확보, DEVELOPMENT_PLAN "이후" 항목)
   SFX: 'sfx:play',
 } as const

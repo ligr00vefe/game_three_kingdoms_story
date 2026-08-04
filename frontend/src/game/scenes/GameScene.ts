@@ -9,12 +9,15 @@ import { InputManager } from '../systems/InputManager'
 import { EffectManager } from '../systems/EffectManager'
 import { SpawnManager } from '../systems/SpawnManager'
 import { DefenseManager } from '../systems/DefenseManager'
+import type { BarricadeTier } from '../systems/DefenseManager'
+import type { DefenseUpgrade } from '../systems/DefenseManager'
 import { ItemDropManager } from '../systems/ItemDropManager'
 import type { DropDef } from '../systems/ItemDropManager'
 import { rollBasicDamage, rollSkillDamage } from '../systems/combat'
 import { gainExp } from '../systems/progression'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
+import { useAutoCombatStore } from '../../stores/autoCombatStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
 import { FEATURES } from '../../features'
 import { drawSpeechBubble } from '../utils/bubble'
@@ -748,7 +751,7 @@ export class GameScene extends Phaser.Scene {
     }
     // 디펜스 오케스트레이션 (웨이브/타이머/바리케이트/기지/승패)
     if (this.mode === 'defense' && structures) {
-      this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget)
+      this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget, this.effects)
       this.setupDefenseInput()
     } else {
       // 디펜스가 아닌 맵(성밖/감숙성)에서는 디펜스 HUD(현황판·구매 버튼)를 확실히 끈다.
@@ -787,6 +790,9 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.DEFENSE_PLACE_MODE, this.handleDefensePlaceMode, this)
     EventBus.on(GameEvents.DEFENSE_EXIT, this.handleDefenseExit, this)
     EventBus.on(GameEvents.DEFENSE_PAUSE, this.handleDefensePause, this)
+    EventBus.on(GameEvents.DEFENSE_ARCHER_VOLLEY, this.handleArcherVolley, this)
+    EventBus.on(GameEvents.DEFENSE_REPAIR, this.handleDefenseRepair, this)
+    EventBus.on(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GameEvents.LEVEL_UP, this.handleLevelUp, this)
       EventBus.off(GameEvents.PLAYER_DIED, this.handleDeath, this)
@@ -805,6 +811,9 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.DEFENSE_PLACE_MODE, this.handleDefensePlaceMode, this)
       EventBus.off(GameEvents.DEFENSE_EXIT, this.handleDefenseExit, this)
       EventBus.off(GameEvents.DEFENSE_PAUSE, this.handleDefensePause, this)
+      EventBus.off(GameEvents.DEFENSE_ARCHER_VOLLEY, this.handleArcherVolley, this)
+      EventBus.off(GameEvents.DEFENSE_REPAIR, this.handleDefenseRepair, this)
+      EventBus.off(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
       this.defense?.destroy()
     })
 
@@ -917,8 +926,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 바리케이트 배치 대기 모드 토글 (구매 창에서 바리케이트 선택 시 on) */
-  private handleDefensePlaceMode = (placing: boolean) => {
+  private handleDefensePlaceMode = (request: boolean | BarricadeTier) => {
     if (!this.defense) return
+    const placing = request !== false
+    if (typeof request === 'string') this.defense.selectedTier = request
     this.defense.placing = placing
     if (placing) {
       // 배치 모드 진입 즉시 현재 커서 위치에 미리보기를 띄운다(마우스를 움직이기 전에도 보이게).
@@ -929,6 +940,19 @@ export class GameScene extends Phaser.Scene {
       this.defense.hidePlacementPreview()
     }
   }
+
+  private handleArcherVolley = () => {
+    if (!this.defense) return
+    if (!this.defense.callArcherVolley()) {
+      this.emitGuanYuReply('적이 없거나 골드·준비 시간이 부족합니다.')
+    }
+  }
+
+  private handleDefenseRepair = (target: 'base' | 'barricades') => {
+    if (this.defense && !this.defense.repair(target)) this.emitGuanYuReply('수리할 대상이나 골드가 부족합니다.')
+  }
+
+  private handleDefenseUpgrade = (upgrade: DefenseUpgrade) => this.defense?.chooseUpgrade(upgrade)
 
   /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치, 마우스 이동 시 설치 미리보기 갱신 */
   private setupDefenseInput() {
@@ -1060,6 +1084,7 @@ export class GameScene extends Phaser.Scene {
     let command = parseLocalCommand(text)
     if (command.action === 'UNSUPPORTED' && command.reason === 'LOCAL_PARSER_NO_MATCH') {
       if (allowChatFallback) {
+        this.emitGuanYuReply('잠시 생각하고 있습니다.')
         const stats = useGameStore.getState()
         const reply = await chatWithLocalAi(text, {
           mapKey: this.mapKey,
@@ -1141,7 +1166,7 @@ export class GameScene extends Phaser.Scene {
       const result = this.defense.placeBarricadeByCommand(this.player.x + this.player.facing * 120)
       if (result === 'PLACED') this.emitGuanYuReply(command.reply)
       else if (result === 'NOT_ENOUGH_GOLD') this.emitGuanYuReply('방벽을 설치할 골드가 부족합니다.')
-      else this.emitGuanYuReply('방벽은 전투 대기 시간에만 설치할 수 있습니다.')
+      else this.emitGuanYuReply('지금은 방벽을 설치할 수 없습니다.')
       return
     }
     if (command.action === 'ELIMINATE_CASTLE_INFILTRATORS' && !this.defense) {
@@ -1331,8 +1356,29 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     this.input_.update(this.time.now)
     if (this.hasManualGameplayInput()) this.guanYu.cancelForManualControl()
+    const auto = useAutoCombatStore.getState()
+    const gameStats = useGameStore.getState()
+    if (auto.enabled) this.guanYu.activateAutoCombat()
     const previousGuanYuState = this.guanYu.state
-    this.guanYu.update(this.player, this.spawner.monsters)
+    this.guanYu.update(
+      this.player,
+      this.spawner.monsters,
+      auto.enabled ? auto.policy : 'nearest',
+      gameStats.maxHp > 0 ? gameStats.hp / gameStats.maxHp : 0,
+    )
+    if (auto.enabled && auto.autoSkill) {
+      let nearbyCount = 0
+      let bossPresent = false
+      for (const monster of this.spawner.monsters) {
+        if (!monster.active || !monster.alive) continue
+        if (Math.abs(monster.x - this.player.x) <= 280) nearbyCount += 1
+        if (monster.def.name.includes('대장')) bossPresent = true
+      }
+      const enoughMp = gameStats.maxMp > 0 && gameStats.mp / gameStats.maxMp >= auto.minMpPercent / 100
+      if (enoughMp && nearbyCount >= auto.minEnemyCount && (!auto.reserveSkillForBoss || bossPresent)) {
+        this.player.queueSkill()
+      }
+    }
     const arrivedCommandTarget = this.guanYu.consumeArrival()
     if (arrivedCommandTarget) this.handleCommandArrival(arrivedCommandTarget)
     this.updateHybridControl()
