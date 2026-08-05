@@ -59,7 +59,7 @@ export function SettingsMenu() {
             useUiStore.getState().setCommandHelpOpen(true)
           }}
         >
-          📜 관우 명령 도움말 (F1)
+          📜 AI 명령어 예시 (A/F1)
         </button>
         <button
           className="settings-item"

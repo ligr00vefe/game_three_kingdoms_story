@@ -18,9 +18,10 @@ import { gainExp } from '../systems/progression'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useAutoCombatStore } from '../../stores/autoCombatStore'
+import { useDefenseTacticsStore } from '../../stores/defenseTacticsStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
 import { FEATURES } from '../../features'
-import { drawSpeechBubble } from '../utils/bubble'
+import { drawSpeechBubble, WORLD_UI_RESOLUTION } from '../utils/bubble'
 import { GuanYuController } from '../ai/GuanYuController'
 import { parseLocalCommand } from '../ai/localCommandParser'
 import type { GuanYuCommand } from '../ai/commands'
@@ -251,7 +252,7 @@ export class GameScene extends Phaser.Scene {
   /** 게임 모드 — 'defense'면 디펜스 시스템(DefenseManager) 활성, 일반 포탈/스폰 대신 웨이브 진행 */
   private mode: 'normal' | 'defense' = 'normal'
   private defense?: DefenseManager
-  private defenseTacticSlot: 1 | 2 | 3 | 4 | 5 | null = null
+  private defenseTacticSlot: 1 | 2 | 3 | 4 | 5 | 6 | null = null
   /** menu 포탈에서 "성밖으로" 선택 시 이동할 타깃 (PORTAL_MENU emit 시 보관) */
   private menuPortalTarget: PortalDef | null = null
   /** 하늘에 떠서 가로로 흘러가는 구름들 — update()에서 x를 밀고 band 밖으로 나가면 반대쪽에서 재진입 */
@@ -711,6 +712,7 @@ export class GameScene extends Phaser.Scene {
       } else this.effects.attack(fxX, fxY, facing, hit)
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
+    // 점프 대시는 대쉬 먼지 하나만, 이단 점프는 상승 기류 하나만 재생해 서로 겹치지 않게 한다.
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
     this.player.onSkill = (hitbox, facing) => {
@@ -754,8 +756,10 @@ export class GameScene extends Phaser.Scene {
     // 디펜스 오케스트레이션 (웨이브/타이머/바리케이트/기지/승패)
     if (this.mode === 'defense' && structures) {
       this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget, this.effects)
-      this.defenseTacticSlot = 2
-      this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
+      this.defenseTacticSlot = 1
+      useDefenseTacticsStore.getState().selectTactic(1)
+      this.guanYu.cancelForManualControl()
+      this.player.facing = 1
       this.setupDefenseInput()
     } else {
       // 디펜스가 아닌 맵(성밖/감숙성)에서는 디펜스 HUD(현황판·구매 버튼)를 확실히 끈다.
@@ -914,7 +918,7 @@ export class GameScene extends Phaser.Scene {
 
   /** 포탈 메뉴 "탐험하기": 디펜스 아레나로 진입 */
   private handlePortalEnterDefense = () => {
-    this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 520, spawnY: 440 })
+    this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 260, spawnY: 440 })
   }
 
   /** 디펜스 종료 후 감숙성 수문장 앞으로 복귀 */
@@ -940,7 +944,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.defense) return
     const placing = request !== false
     if (typeof request === 'string') {
-      if (request === 'watchtower' || request === 'bastion') this.defense.selectedStructure = request
+      if (request === 'watchtower' || request === 'cannonTower' || request === 'bastion') this.defense.selectedStructure = request
       else if (request !== 'barricade') { this.defense.selectedStructure = 'barricade'; this.defense.selectedTier = request }
     }
     this.defense.placing = placing
@@ -967,21 +971,22 @@ export class GameScene extends Phaser.Scene {
 
   private handleDefenseUpgrade = (upgrade: DefenseUpgrade) => this.defense?.chooseUpgrade(upgrade)
 
-  private handleDefenseTactic = (slot: 1 | 2 | 3 | 4 | 5) => {
+  private handleDefenseTactic = (slot: 1 | 2 | 3 | 4 | 5 | 6) => {
     if (!this.defense) return
     this.defenseTacticSlot = slot
     const wallX = this.defense.getWallGuardX()
-    if (slot === 2) this.guanYu.guardDefenseWall(wallX, this.player.x)
-    else if (slot === 5) this.guanYu.returnToDefenseWall(wallX)
+    if (slot === 1) this.guanYu.cancelForManualControl()
+    else if (slot === 3) this.guanYu.guardDefenseWall(wallX, this.player.x)
+    else if (slot === 6) this.guanYu.returnToDefenseWall(wallX)
     else this.guanYu.activateTacticAutoCombat()
   }
 
   private handleDefenseWaveStart = () => {
-    if (this.defenseTacticSlot === 1 && !this.guanYu.isCommandActive()) this.guanYu.activateTacticAutoCombat()
+    if (this.defenseTacticSlot === 2 && !this.guanYu.isCommandActive()) this.guanYu.activateTacticAutoCombat()
   }
 
   private handleDefenseWaveComplete = () => {
-    if (this.defenseTacticSlot !== 1 || this.guanYu.isCommandActive() || !this.defense) return
+    if (this.defenseTacticSlot !== 2 || this.guanYu.isCommandActive() || !this.defense) return
     this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
   }
 
@@ -1068,7 +1073,10 @@ export class GameScene extends Phaser.Scene {
   private handleChatBubble = (text: string) => {
     if (!this.chatBubble) {
       this.chatBubbleText = this.add
-        .text(0, 0, '', { fontSize: '12px', color: '#333333', wordWrap: { width: 170 } })
+        .text(0, 0, '', {
+          fontSize: '11px', color: '#212121', wordWrap: { width: 170 },
+          resolution: WORLD_UI_RESOLUTION,
+        })
         .setOrigin(0.5)
       this.chatBubbleBg = this.add.graphics()
       this.chatBubble = this.add
@@ -1078,8 +1086,8 @@ export class GameScene extends Phaser.Scene {
     }
     const msg = text.length > 60 ? `${text.slice(0, 60)}…` : text
     this.chatBubbleText!.setText(msg)
-    const w = this.chatBubbleText!.width + 16
-    const h = this.chatBubbleText!.height + 10
+    const w = this.chatBubbleText!.width + 20
+    const h = this.chatBubbleText!.height + 14
     this.chatBubbleH = h
     drawSpeechBubble(this.chatBubbleBg!, w, h)
     this.chatBubble.setVisible(true)
@@ -1240,7 +1248,7 @@ export class GameScene extends Phaser.Scene {
       this.guanYu.execute({
         action: 'HOLD', priority: 'NORMAL', reply: '아레나에서 명을 기다리겠습니다.',
       }, this.player.x, this.commandTargets())
-      this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 520, spawnY: 440 })
+      this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 260, spawnY: 440 })
       return
     }
     if (targetId !== 'castle_outside' && targetId !== 'outside_combat') return
@@ -1388,13 +1396,13 @@ export class GameScene extends Phaser.Scene {
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
     const commandActive = this.guanYu.isCommandActive()
-    const guardTacticSelected = this.mode === 'defense' && (this.defenseTacticSlot === 2 || this.defenseTacticSlot === 5)
+    const guardTacticSelected = this.mode === 'defense' && (this.defenseTacticSlot === 3 || this.defenseTacticSlot === 6)
     if (manualInput) this.guanYu.cancelForManualControl()
     const auto = useAutoCombatStore.getState()
     const gameStats = useGameStore.getState()
     if (!manualInput && !commandActive && guardTacticSelected && this.defense) {
-      if (this.defenseTacticSlot === 2 && this.guanYu.state === 'HOLDING') this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
-      if (this.defenseTacticSlot === 5 && this.guanYu.state === 'HOLDING') this.guanYu.returnToDefenseWall(this.defense.getWallGuardX())
+      if (this.defenseTacticSlot === 3 && this.guanYu.state === 'HOLDING') this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
+      if (this.defenseTacticSlot === 6 && this.guanYu.state === 'HOLDING') this.guanYu.returnToDefenseWall(this.defense.getWallGuardX())
     }
     if (auto.enabled && !manualInput && !commandActive && !guardTacticSelected) this.guanYu.activateAutoCombat()
     const previousGuanYuState = this.guanYu.state
@@ -1489,8 +1497,8 @@ export class GameScene extends Phaser.Scene {
       else {
         const tailTipY = this.player.y + PLAYER_HEAD_TOP_OFFSET - CHAT_BUBBLE_GAP
         this.chatBubble.setPosition(
-          this.player.x + CHAT_BUBBLE_X_OFFSET,
-          tailTipY - this.chatBubbleH / 2 - 7 - CHAT_BUBBLE_Y_OFFSET,
+          Math.round(this.player.x + CHAT_BUBBLE_X_OFFSET),
+          Math.round(tailTipY - this.chatBubbleH / 2 - 7 - CHAT_BUBBLE_Y_OFFSET),
         )
       }
     }

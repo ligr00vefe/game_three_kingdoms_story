@@ -73,13 +73,14 @@ function GameApp() {
     return () => window.removeEventListener('resize', enforce)
   }, [])
 
-  // F1: 어디서든 관우 명령 도움말 토글. 브라우저 기본 도움말은 게임 창에서 차단한다.
+  // F1/A: 어디서든 AI 명령어 예시를 토글한다. F1의 브라우저 기본 도움말은 게임 창에서 차단한다.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'F1' || useScreenStore.getState().screen !== 'game') return
-      e.preventDefault()
+      if ((e.key !== 'F1' && e.code !== 'KeyA') || useScreenStore.getState().screen !== 'game') return
       const ui = useUiStore.getState()
+      if (e.code === 'KeyA' && ui.chatFocused) return
       if (ui.cinematicOpen || ui.keySettingsOpen) return
+      e.preventDefault()
       ui.setSettingsOpen(false)
       ui.setCommandHelpOpen(!ui.commandHelpOpen)
     }

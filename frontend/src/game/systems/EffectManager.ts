@@ -24,7 +24,7 @@ export class EffectManager {
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
-    this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_burst', maxSize: 8 })
+    this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_effect', maxSize: 8 })
     this.swingPool = scene.add.group({ defaultKey: 'fx_swing', maxSize: 8 })
     this.dashThrustPool = scene.add.group({ defaultKey: 'fx_dash_thrust', maxSize: 8 })
     this.textPool = scene.add.group({ maxSize: 30 })
@@ -38,11 +38,57 @@ export class EffectManager {
     //   마지막 프레임(1452~1725)만 273px로 도로 좁아져 "찔렀다 돌아오는" 것처럼 보인다 → 그 끝
     //   프레임을 빼고 7프레임(f0~f6) 단조 성장으로만 재생한다. 최대 신장(f6)에서 끝나 마무리가 시원하다.
     this.defineStripFrames('fx_dash_thrust', 328, [0, 132, 268, 426, 629, 858, 1121, 1452]) // 7프레임(끝 프레임 제외)
-    this.defineStripFrames('fx_dash', 232, [0, 208, 472, 810, 1160, 1526, 2109])                   // 6프레임
+    this.defineDashFrames()
     // 깊게 찌르기: 성장 프레임을 빠르게(frameRate 130) 지나가고 마지막 임팩트 프레임을 6슬롯 더 붙잡아
     //   "팍!" 하고 꽂히는 타격감을 준다(균등 성장의 '카펫 펴지는' 느낌 제거). 총 ~100ms.
     this.registerAnimPunch('fx_dash_thrust_anim', 'fx_dash_thrust', 130, 6)
-    this.registerAnim('fx_dash_anim', 'fx_dash', 30)               // 6프레임 돌진 잔상
+    this.registerAnim('fx_dash_anim', 'fx_dash', 36)               // 12프레임 돌진 먼지
+    this.defineJumpFrames()
+    this.registerAnim('fx_jump_effect_anim', 'fx_jump_effect', 18)
+    this.defineLevelUpFrames()
+  }
+
+  private defineDashFrames() {
+    if (!this.scene.textures.exists('fx_dash')) return
+    const texture = this.scene.textures.get('fx_dash')
+    for (let i = 0; i < 12; i++) {
+      if (texture.has(String(i))) texture.remove(String(i))
+      const col = i % 6
+      const topRow = i < 6
+      texture.add(i, 0, col * 256, topRow ? 245 : 535, 256, topRow ? 210 : 165)
+    }
+  }
+
+  private defineLevelUpFrames() {
+    if (!this.scene.textures.exists('fx_level_up')) return
+    const texture = this.scene.textures.get('fx_level_up')
+    const beamFrames: Phaser.Types.Animations.AnimationFrame[] = []
+    const labelFrames: Phaser.Types.Animations.AnimationFrame[] = []
+    for (let i = 0; i < 12; i++) {
+      const beamName = `level_beam_${i}`
+      const labelName = `level_label_${i}`
+      if (texture.has(beamName)) texture.remove(beamName)
+      if (texture.has(labelName)) texture.remove(labelName)
+      texture.add(beamName, 0, i * 128, 80, 128, 460)
+      texture.add(labelName, 0, i * 128, 630, 128, 190)
+      beamFrames.push({ key: 'fx_level_up', frame: beamName })
+      labelFrames.push({ key: 'fx_level_up', frame: labelName })
+    }
+    if (this.scene.anims.exists('fx_level_beam_anim')) this.scene.anims.remove('fx_level_beam_anim')
+    if (this.scene.anims.exists('fx_level_label_anim')) this.scene.anims.remove('fx_level_label_anim')
+    this.scene.anims.create({ key: 'fx_level_beam_anim', frames: beamFrames, frameRate: 14, repeat: 0 })
+    this.scene.anims.create({ key: 'fx_level_label_anim', frames: labelFrames, frameRate: 14, repeat: 0 })
+  }
+
+  private defineJumpFrames() {
+    if (!this.scene.textures.exists('fx_jump_effect')) return
+    const texture = this.scene.textures.get('fx_jump_effect')
+    for (let i = 0; i < 8; i++) {
+      const x = (i % 4) * 384
+      const y = i < 4 ? 230 : 650
+      const height = i < 4 ? 282 : 374
+      if (!texture.has(String(i))) texture.add(i, 0, x, y, 384, height)
+    }
   }
 
   /**
@@ -163,7 +209,7 @@ export class EffectManager {
   //   몸 앞(front px)에서 시작해 앞으로 뻗는다. ox=꼬리(왼끝) 기준이라 앞으로 자라고, stretch로 가로만
   //   더 늘여 얇고 긴 찌르기로 보이게 한다(세로 h는 그대로 → 과하지 않게).
   private static readonly SWING = { h: 128, ox: 0.5, oy: 0.99, from: 0.9, to: 1.15 } as const
-  private static readonly DASH_THRUST = { h: 88, ox: 0.05, oy: 0.5, stretch: 1.8, front: 14 } as const
+  private static readonly DASH_THRUST = { h: 59, ox: 0.05, oy: 0.5, stretch: 1.8, front: 14 } as const
   // 돌진 잔상(dashTrail)은 프레임 애니라 성장 트윈값이 필요 없다. back=몸 중심에서 뒤로 뺀 거리(px).
   private static readonly DASH = { h: 56, ox: 0.5, oy: 0.5, back: 12 } as const
 
@@ -231,7 +277,10 @@ export class EffectManager {
     spr.setPosition(px, y).setAlpha(0.85).setFlipX(facing === -1).setAngle(0)
     if (this.scene.anims.exists('fx_dash_anim')) {
       this.playAnimOnce(spr, 'fx_dash_anim')
-      spr.setScale(s.h / (spr.frame.realHeight || 1))
+      const normalizeDashSize = () => spr.setDisplaySize(92, s.h)
+      spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_UPDATE)
+      spr.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeDashSize)
+      normalizeDashSize()
     } else {
       // 폴백: 단일 placeholder 이미지 — 뒤로 흘리며 사라짐
       const base = s.h / (spr.frame.realHeight || 1)
@@ -246,14 +295,30 @@ export class EffectManager {
 
   /** 이단 점프 하강풍 (↑ + 점프 2연타) — 발밑에서 아래로 뿜어져 나간다 */
   doubleJumpBurst(x: number, y: number) {
-    const img = this.jumpBurstPool.get(x, y) as Phaser.GameObjects.Image | null
-    if (!img) return
-    img.setActive(true).setVisible(true)
-    img.setPosition(x, y).setAlpha(0.9).setScale(0.9).setFlipX(false)
-    this.scene.tweens.add({
-      targets: img, y: y + 34, alpha: 0, scaleX: 1.25, scaleY: 1.15,
-      duration: 300, ease: 'Quad.easeOut',
-      onComplete: () => { img.setActive(false).setVisible(false) },
+    this.jumpBurst(x, y, 1.15)
+  }
+
+  jumpBurst(x: number, y: number, scale = 1) {
+    const spr = this.jumpBurstPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!spr) return
+    spr.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 1).setAlpha(0.9).setFlipX(false)
+    if (this.scene.anims.exists('fx_jump_effect_anim')) {
+      // 원본 각 셀 안의 실제 이펙트 중심. 칸 중앙(192)이 아닌 이 좌표를 원점으로 써야
+      // 프레임이 바뀌어도 효과가 캐릭터 정중앙에서 좌우로 흔들리지 않는다.
+      const centers = [260, 190, 161, 149, 220, 185, 82, 192]
+      const normalizeFrame = () => {
+        const index = Math.max(0, (spr.anims.currentFrame?.index ?? 1) - 1)
+        spr.setOrigin((centers[index] ?? 192) / 384, 1)
+        spr.setDisplaySize(82 * scale, 64 * scale)
+      }
+      spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_UPDATE)
+      spr.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeFrame)
+      this.playAnimOnce(spr, 'fx_jump_effect_anim')
+      normalizeFrame()
+    }
+    else this.scene.tweens.add({
+      targets: spr, alpha: 0, duration: 280,
+      onComplete: () => { spr.setActive(false).setVisible(false) },
     })
   }
 
@@ -306,7 +371,6 @@ export class EffectManager {
    * 레벨업 빛 기둥 정렬 — 원본(683x656)의 바닥 링이 y=526에 있어 그 지점을 발밑에 맞춘다.
    * 중앙 정렬하면 기둥이 공중에 뜬다.
    */
-  private static readonly LEVELUP_FX = { originX: 0.488, originY: 0.802 } as const
   /** 기둥 목표 높이(월드 px) — 캐릭터(~51px)보다 확실히 크게 */
   private static readonly LEVELUP_FX_HEIGHT = 165
   /**
@@ -320,22 +384,19 @@ export class EffectManager {
     // 발밑 = 스프라이트 프레임 하단. 캐릭터가 128 프레임에 하단 정렬돼 있어 둘이 사실상 같다
     // (캐릭터 바닥 y=127 vs 프레임 128) — target.y는 프레임 중심이라 그대로 쓰면 안 된다.
     const footY = target.getBounds().bottom
-    const pillar = this.scene.add.image(target.x, footY, 'fx_level_up')
-    pillar.setOrigin(EffectManager.LEVELUP_FX.originX, EffectManager.LEVELUP_FX.originY)
-    pillar.setScale(EffectManager.LEVELUP_FX_HEIGHT / (pillar.frame.realHeight || 1))
-    pillar.setDepth(EffectManager.LEVELUP_FX_DEPTH)
-    // ADD 블렌드 — 아트에 반투명한 어두운 영역이 있어 일반 합성이면 배경 위에 검은 얼룩으로 남는다.
-    // 빛 이펙트라 더하기 합성이 물리적으로도 맞고, 얼룩이 자연스럽게 사라진다.
-    pillar.setBlendMode(Phaser.BlendModes.ADD)
-    const label = this.scene.add
-      .text(target.x, target.y - 90, 'LEVEL UP!', {
-        fontSize: '22px', fontStyle: 'bold', color: '#ffd600', stroke: '#7b5800', strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-    this.scene.tweens.add({
-      targets: [pillar, label], alpha: 0, y: '-=40', duration: 1200, ease: 'Cubic.easeOut',
-      onComplete: () => { pillar.destroy(); label.destroy() },
-    })
+    if (!this.scene.anims.exists('fx_level_beam_anim')) return
+    const pillar = this.scene.add.sprite(target.x, footY, 'fx_level_up', 'level_beam_0')
+      .setOrigin(0.5, 1).setDepth(EffectManager.LEVELUP_FX_DEPTH).setBlendMode(Phaser.BlendModes.ADD)
+    const label = this.scene.add.sprite(target.x, target.y - 80, 'fx_level_up', 'level_label_0')
+      .setOrigin(0.5).setDepth(1)
+    const normalizePillar = () => pillar.setDisplaySize(130, EffectManager.LEVELUP_FX_HEIGHT)
+    const normalizeLabel = () => label.setDisplaySize(112, 58)
+    pillar.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizePillar)
+    label.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeLabel)
+    pillar.play('fx_level_beam_anim'); normalizePillar()
+    label.play('fx_level_label_anim'); normalizeLabel()
+    pillar.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => pillar.destroy())
+    label.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => label.destroy())
   }
 
   /**

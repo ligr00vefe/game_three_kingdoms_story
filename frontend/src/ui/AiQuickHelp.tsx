@@ -15,7 +15,7 @@ export function AiQuickHelp() {
   return (
     <aside className="ai-quick-help">
       <div className="ai-quick-help__title">
-        <span>관우 AI 명령</span>
+        <span>AI 명령어 예시</span>
         <button onClick={() => useAutoCombatStore.getState().setQuickHelpVisible(false)} aria-label="명령 안내 닫기">×</button>
       </div>
       {COMMANDS.map(([command, description]) => (
