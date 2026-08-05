@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useDefenseStore } from '../stores/defenseStore'
-import type { DefensePhase, DefeatReason, DefenseUpgrade } from '../stores/defenseStore'
+import type { DefensePhase, DefeatReason, DefenseUpgrade, OffensiveBuildState } from '../stores/defenseStore'
 import { useGameStore } from '../stores/gameStore'
 import { useScreenStore } from '../stores/screenStore'
 import { useUiStore } from '../stores/uiStore'
@@ -17,49 +17,43 @@ interface DefenseStatePayload {
   defeatReason: DefeatReason
   archerCooldownMs: number
   combo: number
-  supportGauge: number
   eventName: string | null
   rewardChoices: DefenseUpgrade[]
+  supplyLevel: number
+  builtOffensive: OffensiveBuildState
 }
 
-const DEFEAT_MSG: Record<'base' | 'death' | 'timeout', string> = {
+const DEFEAT_MSG: Record<'base' | 'death', string> = {
   base: '기지가 파괴되었습니다',
   death: '캐릭터가 쓰러졌습니다',
-  timeout: '시간 내 방어에 실패했습니다',
 }
 
 const BARRICADES = [
-  { tier: 'low', name: '하급 방벽', cost: 30, hp: 100, icon: '🪵' },
-  { tier: 'mid', name: '중급 방벽', cost: 150, hp: 240, icon: '🧱' },
+  { tier: 'low', name: '목책', cost: 10, hp: 25, icon: '🛡️' },
+  { tier: 'mid', name: '사대', cost: 150, hp: 240, icon: '🧱' },
   { tier: 'high', name: '상급 방벽', cost: 500, hp: 500, icon: '🏰' },
 ] as const
 const OFFENSIVE_STRUCTURES = [
-  { kind: 'watchtower' as const, name: '망루', cost: 220, hp: 260, desc: '자동 화살 공격' },
-  { kind: 'bastion' as const, name: '성루', cost: 450, hp: 520, desc: '대포·스플래시 공격' },
+  { kind: 'watchtower' as const, name: '망루(활)', cost: 220, hp: 260, desc: '자동 화살 공격', icon: '🏹' },
+  { kind: 'cannonTower' as const, name: '망루(포)', cost: 330, hp: 380, desc: '소형 포탄·범위 공격', icon: '💣' },
+  { kind: 'bastion' as const, name: '성루', cost: 450, hp: 520, desc: '중포·강력한 범위 공격', icon: '🏰' },
 ] as const
-const HP_POTION = { cost: 20, amount: 40 }
-const MP_POTION = { cost: 15, amount: 30 }
+const BASE_HP_POTION = { cost: 20, amount: 40 }
+const BASE_MP_POTION = { cost: 15, amount: 30 }
 const ARCHER_COST = 50
 const UPGRADE_INFO: Record<DefenseUpgrade, { icon: string; name: string; desc: string }> = {
   attack: { icon: '⚔️', name: '청룡의 기세', desc: '공격력 +3' },
   vitality: { icon: '❤️', name: '강건한 육신', desc: '최대 HP +20' },
-  mana: { icon: '💧', name: '무예의 깨달음', desc: '최대 MP +12' },
-  salvage: { icon: '🪙', name: '전리품 수거', desc: '골드 +70' },
+  mana: { icon: '📜', name: '무예의 깨달음', desc: '최대 MP +12' },
+  salvage: { icon: '💰', name: '전리품 수거', desc: '골드 +70' },
   fortify: { icon: '🏯', name: '성곽 보강', desc: '기지 최대 HP +35' },
   repair: { icon: '🔨', name: '긴급 정비', desc: '모든 구조물 완전 수리' },
+  supplies: { icon: '📦', name: '보급품 개선', desc: '물약의 효과 상승' },
 }
 
 /** Wave 임박 경고를 띄우기 시작하는 남은 대기시간(ms).
  *  DefenseManager의 DEFENSE.WAIT_MS와 같은 값이면 대기 단계 내내 경고가 울린다. */
 const WAVE_WARNING_MS = 10_000
-
-/** ms → "M:SS" */
-function fmt(ms: number) {
-  const total = Math.ceil(ms / 1000)
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 /**
  * 디펜스 게임 HUD: 상단중앙 카운트다운/스테이지/기지HP, 하단 구매하기,
@@ -80,14 +74,17 @@ export function DefenseHud() {
   const pauseOpen = useDefenseStore((s) => s.pauseOpen)
   const archerCooldownMs = useDefenseStore((s) => s.archerCooldownMs)
   const combo = useDefenseStore((s) => s.combo)
-  const supportGauge = useDefenseStore((s) => s.supportGauge)
   const eventName = useDefenseStore((s) => s.eventName)
   const rewardChoices = useDefenseStore((s) => s.rewardChoices)
+  const supplyLevel = useDefenseStore((s) => s.supplyLevel)
+  const builtOffensive = useDefenseStore((s) => s.builtOffensive)
   const gold = useGameStore((s) => s.gold)
   const hp = useGameStore((s) => s.hp)
   const maxHp = useGameStore((s) => s.maxHp)
   const mp = useGameStore((s) => s.mp)
   const maxMp = useGameStore((s) => s.maxMp)
+  const hpPotion = { cost: BASE_HP_POTION.cost + supplyLevel * 8, amount: BASE_HP_POTION.amount + supplyLevel * 20 }
+  const mpPotion = { cost: BASE_MP_POTION.cost + supplyLevel * 6, amount: BASE_MP_POTION.amount + supplyLevel * 15 }
 
   useEffect(() => {
     const onState = (p: DefenseStatePayload) => useDefenseStore.getState().setFromEvent(p)
@@ -127,14 +124,14 @@ export function DefenseHud() {
     useDefenseStore.getState().setPlacing(true)
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, tier)
   }
-  const buyOffensiveStructure = (kind: 'watchtower' | 'bastion', cost: number) => {
+  const buyOffensiveStructure = (kind: 'watchtower' | 'cannonTower' | 'bastion', cost: number) => {
     if (gold < cost) return
     useDefenseStore.getState().setPurchaseOpen(false)
     useDefenseStore.getState().setPlacing(true)
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, kind)
   }
   const buyRecovery = (kind: 'hp' | 'mp') => {
-    const item = kind === 'hp' ? HP_POTION : MP_POTION
+    const item = kind === 'hp' ? hpPotion : mpPotion
     const state = useGameStore.getState()
     const current = kind === 'hp' ? state.hp : state.mp
     const maximum = kind === 'hp' ? state.maxHp : state.maxMp
@@ -144,7 +141,10 @@ export function DefenseHud() {
       ...(kind === 'hp' ? { hp: Math.min(maximum, current + item.amount) } : { mp: Math.min(maximum, current + item.amount) }),
     })
   }
-  const callArchers = () => EventBus.emit(GameEvents.DEFENSE_ARCHER_VOLLEY)
+  const callArchers = () => {
+    useDefenseStore.getState().setPurchaseOpen(false)
+    EventBus.emit(GameEvents.DEFENSE_ARCHER_VOLLEY)
+  }
   const repair = (target: 'base' | 'barricades') => EventBus.emit(GameEvents.DEFENSE_REPAIR, target)
   const chooseUpgrade = (upgrade: DefenseUpgrade) => EventBus.emit(GameEvents.DEFENSE_CHOOSE_UPGRADE, upgrade)
   const cancelPlacing = () => {
@@ -184,14 +184,10 @@ export function DefenseHud() {
             대기 <span className="def-timer-num">{Math.ceil(timeLeftMs / 1000)}</span>
           </div>
         )}
-        {phase === 'combat' && (
-          <div className="def-timer def-timer--combat">{fmt(timeLeftMs)}</div>
-        )}
         {(phase === 'combat' || phase === 'wait') && (
           <div className="def-info">
             <span className="def-zombies">🧟 남은 {zombiesLeft}</span>
             {combo >= 2 && <span className="def-combo">🔥 {combo} COMBO</span>}
-            <span className="def-support">🏹 지원 {Math.round(supportGauge)}%</span>
             <div className="def-basehp">
               <span className="def-basehp-label">🏯 기지</span>
               <div className="def-basehp-track">
@@ -221,7 +217,7 @@ export function DefenseHud() {
       {(phase === 'wait' || phase === 'combat') && !placing && (
         <button className="def-buy-btn" onClick={() => useDefenseStore.getState().setPurchaseOpen(true)}>
           <span>구매하기</span>
-          <span className="def-buy-key">B</span>
+          <span className="def-buy-key">단축키: B</span>
         </button>
       )}
 
@@ -244,28 +240,28 @@ export function DefenseHud() {
             <div className="def-shop-section">공격 방어 시설</div>
             <div className="def-shop-grid">
               {OFFENSIVE_STRUCTURES.map((item) => (
-                <button key={item.kind} className="def-shop-item" onClick={() => buyOffensiveStructure(item.kind, item.cost)} disabled={gold < item.cost}>
-                  <div className="def-shop-icon">{item.kind === 'watchtower' ? '🏹' : '💣'}</div>
+                <button key={item.kind} className="def-shop-item" onClick={() => buyOffensiveStructure(item.kind, item.cost)} disabled={gold < item.cost || builtOffensive[item.kind]}>
+                  <div className="def-shop-icon" aria-hidden="true">{item.icon}</div>
                   <div className="def-shop-name">{item.name}</div>
                   <div className="def-shop-desc">HP {item.hp} · {item.desc}</div>
-                  <div className="def-shop-price">{item.cost} G</div>
+                  <div className="def-shop-price">{builtOffensive[item.kind] ? '설치 완료' : `${item.cost} G`}</div>
                 </button>
               ))}
             </div>
             <div className="def-shop-section">회복 · 지원</div>
             <div className="def-shop-grid">
-              <button className="def-shop-item" onClick={() => buyRecovery('hp')} disabled={gold < HP_POTION.cost || hp >= maxHp}>
+              <button className="def-shop-item" onClick={() => buyRecovery('hp')} disabled={gold < hpPotion.cost || hp >= maxHp}>
                 <div className="def-shop-icon">❤️</div><div className="def-shop-name">체력 물약</div>
-                <div className="def-shop-desc">HP +{HP_POTION.amount}</div><div className="def-shop-price">{HP_POTION.cost} G</div>
+                <div className="def-shop-desc">HP +{hpPotion.amount}</div><div className="def-shop-price">{hpPotion.cost} G</div>
               </button>
-              <button className="def-shop-item" onClick={() => buyRecovery('mp')} disabled={gold < MP_POTION.cost || mp >= maxMp}>
+              <button className="def-shop-item" onClick={() => buyRecovery('mp')} disabled={gold < mpPotion.cost || mp >= maxMp}>
                 <div className="def-shop-icon">💧</div><div className="def-shop-name">마력 물약</div>
-                <div className="def-shop-desc">MP +{MP_POTION.amount}</div><div className="def-shop-price">{MP_POTION.cost} G</div>
+                <div className="def-shop-desc">MP +{mpPotion.amount}</div><div className="def-shop-price">{mpPotion.cost} G</div>
               </button>
-              <button className="def-shop-item" onClick={callArchers} disabled={phase !== 'combat' || (supportGauge < 100 && gold < ARCHER_COST) || archerCooldownMs > 0 || zombiesLeft <= 0}>
+              <button className="def-shop-item" onClick={callArchers} disabled={phase !== 'combat' || gold < ARCHER_COST || archerCooldownMs > 0 || zombiesLeft <= 0}>
                 <div className="def-shop-icon">🏹</div><div className="def-shop-name">궁수 일제사격</div>
                 <div className="def-shop-desc">전방 최대 5명{archerCooldownMs > 0 ? ` · ${Math.ceil(archerCooldownMs / 1000)}초` : ''}</div>
-                <div className="def-shop-price">{supportGauge >= 100 ? '지원 게이지 사용' : `${ARCHER_COST} G`}</div>
+                <div className="def-shop-price">{ARCHER_COST} G</div>
               </button>
               <button className="def-shop-item" onClick={() => repair('base')} disabled={gold < 30 || baseHp >= maxBaseHp}>
                 <div className="def-shop-icon">🏯</div><div className="def-shop-name">기지 수리</div>

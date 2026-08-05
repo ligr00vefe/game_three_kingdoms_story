@@ -15,7 +15,7 @@ export interface QSEntry {
   code: string
 }
 
-export const QUICKSLOT_COUNT = 7
+export const QUICKSLOT_COUNT = 4
 
 interface QuickslotState {
   slots: (QSEntry | null)[]
@@ -85,6 +85,10 @@ export const useQuickslotStore = create<QuickslotState>()(
     {
       name: 'tks-quickslots-v1',
       partialize: (s) => ({ slots: s.slots }), // held는 저장하지 않음
+      merge: (persisted, current) => {
+        const saved = (persisted as Partial<QuickslotState> | undefined)?.slots ?? []
+        return { ...current, slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null) }
+      },
     },
   ),
 )

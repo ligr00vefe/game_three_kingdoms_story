@@ -2,8 +2,9 @@ import { create } from 'zustand'
 import { EventBus, GameEvents } from '../game/EventBus'
 
 export type DefensePhase = 'idle' | 'wait' | 'combat' | 'victory' | 'defeat'
-export type DefeatReason = 'base' | 'death' | 'timeout' | null
-export type DefenseUpgrade = 'attack' | 'vitality' | 'mana' | 'salvage' | 'fortify' | 'repair'
+export type DefeatReason = 'base' | 'death' | null
+export type DefenseUpgrade = 'attack' | 'vitality' | 'mana' | 'salvage' | 'fortify' | 'repair' | 'supplies'
+export type OffensiveBuildState = Record<'watchtower' | 'cannonTower' | 'bastion', boolean>
 
 /**
  * 디펜스 게임 HUD 상태. Phaser의 DEFENSE_STATE 브로드캐스트로 갱신되고,
@@ -19,9 +20,10 @@ interface DefenseState {
   maxBaseHp: number
   archerCooldownMs: number
   combo: number
-  supportGauge: number
   eventName: string | null
   rewardChoices: DefenseUpgrade[]
+  supplyLevel: number
+  builtOffensive: OffensiveBuildState
   defeatReason: DefeatReason  // 패배 사유 (기지 파괴/사망/시간 초과)
   purchaseOpen: boolean    // 구매 창 열림
   placing: boolean         // 바리케이트 배치 대기(클릭 설치)
@@ -30,7 +32,7 @@ interface DefenseState {
   setFromEvent: (p: {
     phase: DefensePhase; timeLeftMs: number; stage: number
     zombiesLeft: number; baseHp: number; maxBaseHp: number; defeatReason: DefeatReason; archerCooldownMs: number
-    combo: number; supportGauge: number; eventName: string | null; rewardChoices: DefenseUpgrade[]
+    combo: number; eventName: string | null; rewardChoices: DefenseUpgrade[]; supplyLevel: number; builtOffensive: OffensiveBuildState
   }) => void
   setPurchaseOpen: (open: boolean) => void
   setPlacing: (placing: boolean) => void
@@ -49,9 +51,10 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   maxBaseHp: 100,
   archerCooldownMs: 0,
   combo: 0,
-  supportGauge: 0,
   eventName: null,
   rewardChoices: [],
+  supplyLevel: 0,
+  builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
   defeatReason: null,
   purchaseOpen: false,
   placing: false,
@@ -65,6 +68,7 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   setTacticsOpen: (tacticsOpen) => set({ tacticsOpen }),
   reset: () => set({
     active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false, tacticsOpen: false,
-    archerCooldownMs: 0, combo: 0, supportGauge: 0, eventName: null, rewardChoices: [],
+    archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
+    builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
   }),
 }))

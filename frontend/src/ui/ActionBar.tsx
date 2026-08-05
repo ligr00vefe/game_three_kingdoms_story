@@ -4,7 +4,9 @@ import { useQuickslotStore, QUICKSLOT_COUNT } from '../stores/quickslotStore'
 import type { QSEntry } from '../stores/quickslotStore'
 import { useInventoryStore } from '../stores/inventoryStore'
 import { useUiStore } from '../stores/uiStore'
-import { useDefenseStore } from '../stores/defenseStore'
+
+const QUICKSLOT_KEYS = ['KeyZ', 'KeyX', 'KeyC', 'KeyV'] as const
+const QUICKSLOT_LABELS = ['Z', 'X', 'C', 'V'] as const
 
 const SKILL_INFO: Record<string, { name: string; icon: string }> = {
   skill_charge_slash: { name: '참마돌격', icon: '⚡' },
@@ -32,12 +34,11 @@ export function ActionBar() {
   // 숫자키 1~7 (채팅/설정 중에는 무시)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const m = /^Digit([1-7])$/.exec(e.code)
-      if (!m) return
+      const idx = QUICKSLOT_KEYS.indexOf(e.code as typeof QUICKSLOT_KEYS[number])
+      if (idx < 0) return
       const ui = useUiStore.getState()
       if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen) return
-      if (useDefenseStore.getState().active && Number(m[1]) <= 5) return
-      const idx = Number(m[1]) - 1
+      e.preventDefault()
       useQuickslotStore.getState().trigger(idx)
       setFlash(idx)
       setTimeout(() => setFlash(null), 180)
@@ -119,9 +120,9 @@ export function ActionBar() {
                 if (held) useQuickslotStore.getState().placeHeld(i)
                 else if (entry) useQuickslotStore.getState().trigger(i)
               }}
-              title={v ? `${v.label} (${i + 1}키)` : `빈 슬롯 — 아이템/스킬을 드래그해 등록 (${i + 1}키)`}
+              title={v ? `${v.label} (${QUICKSLOT_LABELS[i]}키)` : `빈 슬롯 — 아이템/스킬을 드래그해 등록 (${QUICKSLOT_LABELS[i]}키)`}
             >
-              <span className="aqs-num">{i + 1}</span>
+              <span className="aqs-num">{QUICKSLOT_LABELS[i]}</span>
               {v && (
                 <span className="aqs-icon" style={{ background: v.color }}>
                   {v.icon}

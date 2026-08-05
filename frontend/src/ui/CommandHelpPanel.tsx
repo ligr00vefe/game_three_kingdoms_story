@@ -59,8 +59,8 @@ export function CommandHelpPanel() {
       <div className="command-help" onClick={(event) => event.stopPropagation()}>
         <div className="command-help__header">
           <div>
-            <span className="command-help__key">F1</span>
-            <strong>관우 명령 도움말</strong>
+            <span className="command-help__key">A / F1</span>
+            <strong>AI 명령어 예시</strong>
           </div>
           <button className="ks-close" onClick={close}>×</button>
         </div>
@@ -88,7 +88,7 @@ export function CommandHelpPanel() {
         <p className="command-help__note">
           ↑키로 기존 NPC·포탈에 상호작용할 수 있습니다. 마을에는 적이 없어 “계속 싸워”는 대기할 수 있으니 이동 명령은 “돌진”으로 확인하십시오.
         </p>
-        <button className="command-help__close" onClick={close}>확인 (F1 또는 ESC)</button>
+        <button className="command-help__close" onClick={close}>확인 (A, F1 또는 ESC)</button>
       </div>
     </div>
   )

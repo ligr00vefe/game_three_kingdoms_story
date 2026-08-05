@@ -21,7 +21,7 @@ export function DefenseTacticsPanel() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!useDefenseStore.getState().active) return
-      const match = /^Digit([1-5])$/.exec(event.code)
+      const match = /^Digit([1-6])$/.exec(event.code)
       if (!match) return
       const ui = useUiStore.getState()
       if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen || ui.cinematicOpen) return
@@ -40,7 +40,6 @@ export function DefenseTacticsPanel() {
       <div className="def-tactics__title ui-window__titlebar" onPointerDown={windowDrag.onPointerDown}>
         <span>전술·명령</span>
         <button className="def-tactics__close" onClick={() => useDefenseStore.getState().setTacticsOpen(false)} title="닫기">−</button>
-        <span>1~5</span>
       </div>
       <div className="def-tactics__list">
         {DEFENSE_TACTICS.map((tactic) => (

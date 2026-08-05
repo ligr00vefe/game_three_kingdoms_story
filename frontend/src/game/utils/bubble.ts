@@ -3,14 +3,20 @@
  * fillRoundedRect + fillTriangle을 따로 그리면 겹치는 선이 어긋나 보이므로,
  * 모서리 호를 포함한 단일 path로 본체와 꼬리를 연결해 그린다.
  */
-export function drawSpeechBubble(g: Phaser.GameObjects.Graphics, w: number, h: number) {
+export const WORLD_UI_RESOLUTION = Math.max(4, Math.ceil(window.devicePixelRatio || 1) * 3)
+
+export function drawSpeechBubble(g: Phaser.GameObjects.Graphics, requestedW: number, requestedH: number) {
+  // Even integer dimensions keep the outline on whole device pixels after the
+  // 1.4x gameplay-camera zoom, avoiding a soft half-pixel edge.
+  const w = Math.ceil(requestedW / 2) * 2
+  const h = Math.ceil(requestedH / 2) * 2
   const r = Math.min(7, h / 2)
   const tailW = 10
   const tailH = 7
 
   g.clear()
-  g.fillStyle(0xffffff, 0.95)
-  g.lineStyle(2, 0x9e9e9e)
+  g.fillStyle(0xffffff, 1)
+  g.lineStyle(2, 0x757575, 1)
   g.beginPath()
   g.moveTo(-w / 2 + r, -h / 2)
   g.lineTo(w / 2 - r, -h / 2)

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { drawSpeechBubble } from '../utils/bubble'
+import { drawSpeechBubble, WORLD_UI_RESOLUTION } from '../utils/bubble'
 
 export interface NpcDef {
   name: string
@@ -23,7 +23,7 @@ const INTERACT_RANGE = 60
 const NPC_DEPTH = -10
 // Phaser Text는 기본 resolution 1로 그려져, FIT 스케일로 화면이 확대되면 텍스트가 뿌옇게 늘어난다.
 // 화면 배율(창/게임)×DPR만큼 고배율로 그려두면 확대돼도 선명하다. 작은 라벨이라 메모리 부담은 무시할 수준.
-const TEXT_RESOLUTION = Math.max(2, Math.ceil(window.devicePixelRatio || 1) * 2)
+const TEXT_RESOLUTION = WORLD_UI_RESOLUTION
 
 /**
  * 말풍선 Y오프셋 미세조정(px, 기본 계산값에 더함). 원본 이미지의 여백/비율 차이로 특정

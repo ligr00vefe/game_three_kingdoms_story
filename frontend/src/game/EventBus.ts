@@ -112,7 +112,7 @@ export const GameEvents = {
   DEFENSE_REPAIR: 'ui:defense-repair',
   /** 웨이브 보상 강화 선택 */
   DEFENSE_CHOOSE_UPGRADE: 'ui:defense-choose-upgrade',
-  /** 디펜스 전술 슬롯 선택 (1~5) */
+  /** 디펜스 전술 슬롯 선택 (1~6) */
   DEFENSE_TACTIC: 'ui:defense-tactic',
   // 음향 훅 (지금은 구현하지 않음 — 자리만 확보, DEVELOPMENT_PLAN "이후" 항목)
   SFX: 'sfx:play',

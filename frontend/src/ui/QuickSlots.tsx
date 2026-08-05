@@ -26,6 +26,11 @@ const HIDDEN_ACTIONS: ReadonlySet<GameAction> = new Set(['pickup', 'sit', 'item'
 
 export function QuickSlots() {
   const bindings = useKeybindingStore((s) => s.bindings)
+  const openAiHelp = () => {
+    const ui = useUiStore.getState()
+    ui.setSettingsOpen(false)
+    ui.setCommandHelpOpen(true)
+  }
 
   return (
     <div className="quickslots" title="단축키 안내 — 누르면 해당 기능이 실행됩니다">
@@ -48,6 +53,10 @@ export function QuickSlots() {
           </button>
         )
       })}
+      <button className="qslot qslot--clickable" onClick={openAiHelp} title="AI 명령어 예시 (A)">
+        <span className="qslot-key">A</span>
+        <span className="qslot-name" style={{ background: '#7e57c2' }}>AI</span>
+      </button>
     </div>
   )
 }
