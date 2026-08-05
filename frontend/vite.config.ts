@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       // 개발 중 프론트(5173) → 백엔드(8080) 프록시. CORS 회피의 기본 경로
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
       },
     },

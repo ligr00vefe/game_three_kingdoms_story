@@ -77,6 +77,9 @@ export const GameEvents = {
   DEFENSE_STATE: 'game:defense-state',
   /** 디펜스가 아닌 맵으로 진입 — 디펜스 HUD를 강제로 끈다 (성밖/감숙성엔 현황판·구매 버튼 없음) */
   DEFENSE_END: 'game:defense-end',
+  /** 디펜스 웨이브 시작/종료 알림 — 전술의 자동 복귀/재출격에 사용 */
+  DEFENSE_WAVE_START: 'game:defense-wave-start',
+  DEFENSE_WAVE_COMPLETE: 'game:defense-wave-complete',
   // React → Phaser
   USE_ITEM: 'ui:use-item',
   REVIVE: 'ui:revive',
@@ -109,6 +112,8 @@ export const GameEvents = {
   DEFENSE_REPAIR: 'ui:defense-repair',
   /** 웨이브 보상 강화 선택 */
   DEFENSE_CHOOSE_UPGRADE: 'ui:defense-choose-upgrade',
+  /** 디펜스 전술 슬롯 선택 (1~5) */
+  DEFENSE_TACTIC: 'ui:defense-tactic',
   // 음향 훅 (지금은 구현하지 않음 — 자리만 확보, DEVELOPMENT_PLAN "이후" 항목)
   SFX: 'sfx:play',
 } as const

@@ -31,6 +31,7 @@ import { DialogBox } from './ui/DialogBox'
 import { CinematicDialog } from './ui/CinematicDialog'
 import { PortalMenu } from './ui/PortalMenu'
 import { DefenseHud } from './ui/DefenseHud'
+import { DefenseTacticsPanel } from './ui/DefenseTacticsPanel'
 import { NoticeBanner } from './ui/NoticeBanner'
 import { QuestPanel } from './ui/QuestPanel'
 import { SettingsMenu } from './ui/SettingsMenu'
@@ -204,6 +205,7 @@ function GameApp() {
             <CinematicDialog />
             <PortalMenu />
             <DefenseHud />
+            <DefenseTacticsPanel />
             <DeathOverlay />
             {/* ---- 하단 인터페이스 (메이플 스타일) ---- */}
             <ChatBox />

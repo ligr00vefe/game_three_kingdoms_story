@@ -2,6 +2,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
 import { CHARACTERS } from '../data/characters'
 import { useScreenStore } from '../stores/screenStore'
+import { useDraggableWindow } from './useDraggableWindow'
 
 /** 전투력: 공격력·크리티컬·주스탯·레벨을 합산한 간이 지표 (표시용) */
 function computeCombatPower(s: {
@@ -19,6 +20,7 @@ export function CharacterInfoPanel() {
   const open = useUiStore((s) => s.statsOpen)
   const g = useGameStore()
   const char = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
+  const windowDrag = useDraggableWindow('stats')
 
   if (!open) return null
 
@@ -37,10 +39,10 @@ export function CharacterInfoPanel() {
   ]
 
   return (
-    <div className="ci-panel">
-      <div className="ci-titlebar">
+    <div className="ci-panel ui-window" style={windowDrag.style}>
+      <div className="ci-titlebar ui-window__titlebar" onPointerDown={windowDrag.onPointerDown}>
         CHARACTER INFO
-        <button className="inv-close ci-close" onClick={() => useUiStore.getState().toggleStats()}>×</button>
+        <button className="inv-close ci-close" onClick={() => useUiStore.getState().toggleStats()} title="접기">−</button>
       </div>
 
       {/* 상단: 프리뷰 + 레벨/이름 */}

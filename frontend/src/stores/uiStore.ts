@@ -7,6 +7,9 @@ import { EventBus, GameEvents } from '../game/EventBus'
  * - 설정(ESC)/단축키 세팅/채팅 입력/메인 NPC 시네마틱 대화 중에는 게임 키 입력을 차단한다 (INPUT_BLOCK)
  * - 퀘스트/미니맵은 게임을 막지 않는 비모달 (메이플 방식)
  */
+export type UiWindowId = 'tactics' | 'stats' | 'skillbook' | 'minimap'
+export interface UiWindowPosition { left: number; top: number }
+
 interface UiState {
   settingsOpen: boolean
   keySettingsOpen: boolean
@@ -19,6 +22,7 @@ interface UiState {
   chatFocused: boolean
   /** 메인 NPC 시네마틱 대화 중 (CinematicDialog가 갱신) — 대화 중엔 게임 키 입력을 막는다 */
   cinematicOpen: boolean
+  windowPositions: Record<UiWindowId, UiWindowPosition>
   setSettingsOpen: (open: boolean) => void
   setKeySettingsOpen: (open: boolean) => void
   setCommandHelpOpen: (open: boolean) => void
@@ -29,6 +33,7 @@ interface UiState {
   toggleSkillbook: () => void
   setChatFocused: (focused: boolean) => void
   setCinematicOpen: (open: boolean) => void
+  setWindowPosition: (id: UiWindowId, position: UiWindowPosition) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -43,6 +48,12 @@ export const useUiStore = create<UiState>()(
     skillbookOpen: false,
     chatFocused: false,
     cinematicOpen: false,
+    windowPositions: {
+      tactics: { left: 16, top: 108 },
+      stats: { left: 20, top: 110 },
+      skillbook: { left: 476, top: 110 },
+      minimap: { left: 10, top: 10 },
+    },
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setKeySettingsOpen: (keySettingsOpen) => set({ keySettingsOpen }),
     setCommandHelpOpen: (commandHelpOpen) => set({ commandHelpOpen }),
@@ -53,6 +64,9 @@ export const useUiStore = create<UiState>()(
     toggleSkillbook: () => set((s) => ({ skillbookOpen: !s.skillbookOpen })),
     setChatFocused: (chatFocused) => set({ chatFocused }),
     setCinematicOpen: (cinematicOpen) => set({ cinematicOpen }),
+    setWindowPosition: (id, position) => set((state) => ({
+      windowPositions: { ...state.windowPositions, [id]: position },
+    })),
   })),
 )
 

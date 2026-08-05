@@ -6,6 +6,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { EffectManager } from './EffectManager'
 
 export type BarricadeTier = 'low' | 'mid' | 'high'
+export type DefenseBuildType = 'barricade' | 'watchtower' | 'bastion'
 export type DefenseUpgrade = 'attack' | 'vitality' | 'mana' | 'salvage' | 'fortify' | 'repair'
 
 export const BARRICADE_TIERS: Record<BarricadeTier, {
@@ -14,6 +15,14 @@ export const BARRICADE_TIERS: Record<BarricadeTier, {
   low: { name: '하급', cost: 30, hp: 100, width: 44, height: 64, tint: 0xffffff },
   mid: { name: '중급', cost: 150, hp: 240, width: 54, height: 72, tint: 0xd7e8ff },
   high: { name: '상급', cost: 500, hp: 500, width: 66, height: 82, tint: 0xffd778 },
+}
+
+export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>, {
+  name: string; cost: number; hp: number; width: number; height: number; tint: number
+  damage: number; range: number; cooldownMs: number; splashRadius?: number
+}> = {
+  watchtower: { name: '망루', cost: 220, hp: 260, width: 70, height: 126, tint: 0x9ad7ff, damage: 18, range: 820, cooldownMs: 2_200 },
+  bastion: { name: '성루', cost: 450, hp: 520, width: 92, height: 118, tint: 0xffb74d, damage: 44, range: 900, cooldownMs: 4_800, splashRadius: 92 },
 }
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
@@ -35,6 +44,8 @@ const DEFENSE = {
   ARCHER_COST: 50,
   ARCHER_COOLDOWN_MS: 8_000,
   ARCHER_TARGETS: 5,
+  WATCHTOWER_PROJECTILE_COLOR: 0xfff3a6,
+  BASTION_PROJECTILE_COLOR: 0xff8a65,
   /** 기지 체력 */
   BASE_HP: 100,
   /** 좀비가 플레이어를 우선 추적하는 근접 범위 (넘어서면 기지로 진격) */
@@ -61,6 +72,8 @@ interface Structure {
   maxHp: number
   isBase: boolean
   barW: number
+  kind: 'base' | DefenseBuildType
+  attackReadyAt: number
   tier?: BarricadeTier
 }
 
@@ -98,6 +111,7 @@ export class DefenseManager {
   private spawnEvent?: Phaser.Time.TimerEvent
   /** 바리케이트 배치 대기 모드 (구매 창에서 바리케이트 선택 시 on) */
   placing = false
+  selectedStructure: DefenseBuildType = 'barricade'
   selectedTier: BarricadeTier = 'low'
   private archerReadyAt = 0
   private archerCooldownMs = DEFENSE.ARCHER_COOLDOWN_MS
@@ -193,6 +207,7 @@ export class DefenseManager {
   private startCombat() {
     this.phase = 'combat'
     this.phaseEndsAt = this.scene.time.now + DEFENSE.COMBAT_MS
+    EventBus.emit(GameEvents.DEFENSE_WAVE_START)
     // 좀비 순차 스폰. 첫 마리는 아래에서 즉시 스폰하므로 타이머는 나머지(waveTotal-1)만 담당한다.
     // repeat=N은 콜백을 N+1회 실행하므로, 나머지 waveTotal-1회를 원하면 repeat=waveTotal-2.
     // (예전엔 repeat=waveTotal-1이라 타이머가 waveTotal회 + 즉시 1회 = waveTotal+1마리를 스폰,
@@ -245,6 +260,7 @@ export class DefenseManager {
     this.phase = 'victory'
     this.spawnEvent?.remove()
     this.spawnEvent = undefined
+    EventBus.emit(GameEvents.DEFENSE_WAVE_COMPLETE)
     this.rewardChoices = Phaser.Utils.Array.Shuffle<DefenseUpgrade>(
       ['attack', 'vitality', 'mana', 'salvage', 'fortify', 'repair'],
     ).slice(0, 3)
@@ -297,6 +313,7 @@ export class DefenseManager {
       }
       return
     }
+    this.updateOffensiveStructures(monsters, now)
     const struct = this.rightmostStanding()
     const structX = struct ? struct.spr.x : null
     for (let i = 0; i < monsters.length; i++) {
@@ -315,10 +332,59 @@ export class DefenseManager {
     }
   }
 
+  private updateOffensiveStructures(monsters: Monster[], now: number) {
+    if (this.phase !== 'combat') return
+    for (const structure of this.structures) {
+      if (structure.isBase || structure.hp <= 0 || structure.kind === 'base' || structure.kind === 'barricade' || now < structure.attackReadyAt) continue
+      const spec = OFFENSIVE_STRUCTURES[structure.kind]
+      const target = monsters
+        .filter((monster) => monster.active && monster.alive && monster.x > structure.spr.x && monster.x - structure.spr.x <= spec.range)
+        .sort((a, b) => a.x - b.x)[0]
+      if (!target) continue
+      structure.attackReadyAt = now + spec.cooldownMs
+      if (structure.kind === 'watchtower') this.fireWatchtower(structure, target, spec.damage, now)
+      else this.fireBastion(structure, target, spec.damage, spec.splashRadius ?? 0)
+    }
+  }
+
+  private fireWatchtower(structure: Structure, target: Monster, damage: number, now: number) {
+    const arrow = this.scene.add.rectangle(structure.spr.x + 22, structure.spr.y - structure.spr.displayHeight * 0.65, 28, 4, DEFENSE.WATCHTOWER_PROJECTILE_COLOR)
+      .setDepth(8).setRotation(0.08)
+    this.scene.tweens.add({
+      targets: arrow, x: target.x, y: target.y - 18, duration: 300, ease: 'Quad.easeIn',
+      onComplete: () => {
+        arrow.destroy()
+        if (target.alive) target.receiveHit(damage, false, structure.spr.x, this.effects, now)
+      },
+    })
+  }
+
+  private fireBastion(structure: Structure, target: Monster, damage: number, splashRadius: number) {
+    const shell = this.scene.add.circle(structure.spr.x + 26, structure.spr.y - structure.spr.displayHeight * 0.72, 7, DEFENSE.BASTION_PROJECTILE_COLOR)
+      .setDepth(8)
+    this.scene.tweens.add({
+      targets: shell, x: target.x, y: target.y - 20, duration: 620, ease: 'Quad.easeIn',
+      onComplete: () => {
+        shell.destroy()
+        const impact = this.scene.add.circle(target.x, target.y - 18, splashRadius, 0xff7043, 0.28).setDepth(7)
+        this.scene.tweens.add({ targets: impact, scale: 1.25, alpha: 0, duration: 260, onComplete: () => impact.destroy() })
+        for (const monster of this.spawner.monsters) {
+          if (!monster.active || !monster.alive) continue
+          const distance = Phaser.Math.Distance.Between(target.x, target.y, monster.x, monster.y)
+          if (distance <= splashRadius) {
+            const falloff = distance <= splashRadius * 0.45 ? 1 : 0.65
+            monster.receiveHit(Math.ceil(damage * falloff), false, structure.spr.x, this.effects, this.scene.time.now)
+          }
+        }
+      },
+    })
+  }
+
   // ---- 구조물(기지/바리케이트) ----
 
   private addStructure(
     x: number, hp: number, isBase: boolean, texKey: string, dispW: number, dispH: number, bodyW: number,
+    kind: 'base' | DefenseBuildType = isBase ? 'base' : 'barricade',
   ): Structure {
     const spr = this.group.create(x, this.groundY - dispH / 2, texKey) as Phaser.Physics.Arcade.Sprite
     spr.setDisplaySize(dispW, dispH)
@@ -329,7 +395,7 @@ export class DefenseManager {
     body.setSize(bodyW, dispH, true)
     const barW = dispW
     const hpBar = this.scene.add.graphics().setDepth(5)
-    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW }
+    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, kind, attackReadyAt: 0 }
     this.structures.push(s)
     this.drawHpBar(s)
     return s
@@ -386,11 +452,22 @@ export class DefenseManager {
   private placeMinX() { return DEFENSE.BASE_X + 70 }
   private placeMaxX() { return this.worldWidth - 120 }
 
+  private selectedBuildSpec() {
+    return this.selectedStructure === 'barricade'
+      ? BARRICADE_TIERS[this.selectedTier]
+      : OFFENSIVE_STRUCTURES[this.selectedStructure]
+  }
+
+  private structureTexture(kind: DefenseBuildType) {
+    if (kind === 'bastion' && this.scene.textures.exists('img_castle_base')) return 'img_castle_base'
+    return 'img_barricade'
+  }
+
   /** 이 위치에 지금 바리케이트를 설치할 수 있는가. 전투 중에도 가능하며 기존 방벽과 겹칠 수 없다. */
   private canPlaceAt(worldX: number): boolean {
     if ((this.phase !== 'wait' && this.phase !== 'combat') || !this.placing) return false
     if (worldX < this.placeMinX() || worldX > this.placeMaxX()) return false
-    const def = BARRICADE_TIERS[this.selectedTier]
+    const def = this.selectedBuildSpec()
     if (useGameStore.getState().gold < def.cost) return false
     return !this.structures.some((structure) => {
       if (structure.isBase || structure.hp <= 0) return false
@@ -401,6 +478,7 @@ export class DefenseManager {
 
   /** 바리케이트 설치 (대기 단계 + 배치 모드 + 골드 충분 + 배치존 안). GameScene 포인터에서 호출. */
   placeBarricade(worldX: number): boolean {
+    this.selectedStructure = 'barricade'
     if (!this.canPlaceAt(worldX)) return false
     const def = BARRICADE_TIERS[this.selectedTier]
     const gold = useGameStore.getState().gold
@@ -414,10 +492,27 @@ export class DefenseManager {
     return true
   }
 
+  placeSelectedStructure(worldX: number): boolean {
+    if (this.selectedStructure === 'barricade') return this.placeBarricade(worldX)
+    if (!this.canPlaceAt(worldX)) return false
+    const def = OFFENSIVE_STRUCTURES[this.selectedStructure]
+    const gold = useGameStore.getState().gold
+    useGameStore.getState().setStats({ gold: gold - def.cost })
+    const structure = this.addStructure(
+      worldX, def.hp, false, this.structureTexture(this.selectedStructure), def.width, def.height, def.width - 6, this.selectedStructure,
+    )
+    structure.spr.setTint(def.tint)
+    this.placing = false
+    this.hidePlacementPreview()
+    EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, false)
+    return true
+  }
+
   /** 자연어 명령용 설치 경로. UI 배치 모드를 열지 않고 현재 캐릭터 앞의 안전 범위에 즉시 설치한다. */
   placeBarricadeByCommand(worldX: number): BarricadeCommandResult {
     if (this.phase !== 'wait' && this.phase !== 'combat') return 'NOT_WAIT_PHASE'
     this.selectedTier = 'low'
+    this.selectedStructure = 'barricade'
     if (useGameStore.getState().gold < BARRICADE_TIERS.low.cost) return 'NOT_ENOUGH_GOLD'
     const safeX = Phaser.Math.Clamp(worldX, this.placeMinX(), this.placeMaxX())
     this.placing = true
@@ -430,16 +525,23 @@ export class DefenseManager {
     return barricades.sort((a, b) => Math.abs(a.spr.x - playerX) - Math.abs(b.spr.x - playerX))[0].spr.x
   }
 
+  /** 관우가 성벽 앞에서 수비할 기준 위치. 성 바로 앞을 비워 두고 첫 방어선 안쪽에 잡는다. */
+  getWallGuardX(): number {
+    return this.base.spr.x + 180
+  }
+
   /** 배치 미리보기 갱신 — 마우스(월드 x) 위치에 반투명 바리케이트를 그려 설치 지점을 예고한다.
    *  배치존 밖/골드 부족이면 붉게, 설치 가능하면 초록빛으로 표시한다. */
   updatePlacementPreview(worldX: number) {
     if (!this.placing || (this.phase !== 'wait' && this.phase !== 'combat')) { this.hidePlacementPreview(); return }
-    const def = BARRICADE_TIERS[this.selectedTier]
+    const def = this.selectedBuildSpec()
     if (!this.ghost) {
       // origin을 밑변(0.5,1)에 둬 y=groundY면 실제 설치될 바리케이트와 바닥 정렬이 같다.
-      this.ghost = this.scene.add.image(0, 0, 'img_barricade')
+      this.ghost = this.scene.add.image(0, 0, this.structureTexture(this.selectedStructure))
         .setOrigin(0.5, 1).setDepth(6)
     }
+    const texture = this.structureTexture(this.selectedStructure)
+    if (this.ghost.texture.key !== texture) this.ghost.setTexture(texture)
     this.ghost.setDisplaySize(def.width, def.height)
     // 배치존을 벗어나도 고스트는 실제 커서 위치에 그려 "여긴 안 됨"을 색으로 알린다(범위 안내).
     const shownX = Phaser.Math.Clamp(worldX, this.placeMinX() - 40, this.placeMaxX() + 40)

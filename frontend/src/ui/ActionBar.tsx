@@ -4,6 +4,7 @@ import { useQuickslotStore, QUICKSLOT_COUNT } from '../stores/quickslotStore'
 import type { QSEntry } from '../stores/quickslotStore'
 import { useInventoryStore } from '../stores/inventoryStore'
 import { useUiStore } from '../stores/uiStore'
+import { useDefenseStore } from '../stores/defenseStore'
 
 const SKILL_INFO: Record<string, { name: string; icon: string }> = {
   skill_charge_slash: { name: '참마돌격', icon: '⚡' },
@@ -35,6 +36,7 @@ export function ActionBar() {
       if (!m) return
       const ui = useUiStore.getState()
       if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen) return
+      if (useDefenseStore.getState().active && Number(m[1]) <= 5) return
       const idx = Number(m[1]) - 1
       useQuickslotStore.getState().trigger(idx)
       setFlash(idx)

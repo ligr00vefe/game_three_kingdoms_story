@@ -3,6 +3,7 @@ import { useDefenseStore } from '../stores/defenseStore'
 import type { DefensePhase, DefeatReason, DefenseUpgrade } from '../stores/defenseStore'
 import { useGameStore } from '../stores/gameStore'
 import { useScreenStore } from '../stores/screenStore'
+import { useUiStore } from '../stores/uiStore'
 import { EventBus, GameEvents } from '../game/EventBus'
 import { AutoCombatControls } from './AutoCombatControls'
 
@@ -31,6 +32,10 @@ const BARRICADES = [
   { tier: 'low', name: '하급 방벽', cost: 30, hp: 100, icon: '🪵' },
   { tier: 'mid', name: '중급 방벽', cost: 150, hp: 240, icon: '🧱' },
   { tier: 'high', name: '상급 방벽', cost: 500, hp: 500, icon: '🏰' },
+] as const
+const OFFENSIVE_STRUCTURES = [
+  { kind: 'watchtower' as const, name: '망루', cost: 220, hp: 260, desc: '자동 화살 공격' },
+  { kind: 'bastion' as const, name: '성루', cost: 450, hp: 520, desc: '대포·스플래시 공격' },
 ] as const
 const HP_POTION = { cost: 20, amount: 40 }
 const MP_POTION = { cost: 15, amount: 30 }
@@ -99,6 +104,21 @@ export function DefenseHud() {
     }
   }, [])
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const state = useDefenseStore.getState()
+      const isBuyShortcut = event.code === 'KeyB' || event.key.toLowerCase() === 'b'
+      if (!isBuyShortcut || !state.active || state.purchaseOpen || state.placing) return
+      if (state.phase !== 'wait' && state.phase !== 'combat') return
+      const ui = useUiStore.getState()
+      if (ui.chatFocused || ui.settingsOpen || ui.keySettingsOpen || ui.cinematicOpen) return
+      event.preventDefault()
+      state.setPurchaseOpen(true)
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [])
+
   if (!active) return null
 
   const buyBarricade = (tier: 'low' | 'mid' | 'high', cost: number) => {
@@ -106,6 +126,12 @@ export function DefenseHud() {
     useDefenseStore.getState().setPurchaseOpen(false)
     useDefenseStore.getState().setPlacing(true)
     EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, tier)
+  }
+  const buyOffensiveStructure = (kind: 'watchtower' | 'bastion', cost: number) => {
+    if (gold < cost) return
+    useDefenseStore.getState().setPurchaseOpen(false)
+    useDefenseStore.getState().setPlacing(true)
+    EventBus.emit(GameEvents.DEFENSE_PLACE_MODE, kind)
   }
   const buyRecovery = (kind: 'hp' | 'mp') => {
     const item = kind === 'hp' ? HP_POTION : MP_POTION
@@ -194,7 +220,8 @@ export function DefenseHud() {
       {/* 하단중앙: 대기·전투 중 언제나 사용 가능한 보급소 */}
       {(phase === 'wait' || phase === 'combat') && !placing && (
         <button className="def-buy-btn" onClick={() => useDefenseStore.getState().setPurchaseOpen(true)}>
-          구매하기
+          <span>구매하기</span>
+          <span className="def-buy-key">B</span>
         </button>
       )}
 
@@ -210,6 +237,17 @@ export function DefenseHud() {
                   <div className="def-shop-icon">{item.icon}</div>
                   <div className="def-shop-name">{item.name}</div>
                   <div className="def-shop-desc">HP {item.hp}</div>
+                  <div className="def-shop-price">{item.cost} G</div>
+                </button>
+              ))}
+            </div>
+            <div className="def-shop-section">공격 방어 시설</div>
+            <div className="def-shop-grid">
+              {OFFENSIVE_STRUCTURES.map((item) => (
+                <button key={item.kind} className="def-shop-item" onClick={() => buyOffensiveStructure(item.kind, item.cost)} disabled={gold < item.cost}>
+                  <div className="def-shop-icon">{item.kind === 'watchtower' ? '🏹' : '💣'}</div>
+                  <div className="def-shop-name">{item.name}</div>
+                  <div className="def-shop-desc">HP {item.hp} · {item.desc}</div>
                   <div className="def-shop-price">{item.cost} G</div>
                 </button>
               ))}

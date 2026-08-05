@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { EventBus, GameEvents } from '../game/EventBus'
 import { useUiStore } from '../stores/uiStore'
+import { useDraggableWindow } from './useDraggableWindow'
 
 interface MapInfo {
   name: string
@@ -28,6 +29,7 @@ const H = 64
  */
 export function Minimap() {
   const open = useUiStore((s) => s.minimapOpen)
+  const windowDrag = useDraggableWindow('minimap')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const nameRef = useRef<HTMLSpanElement>(null)
   const baseRef = useRef<HTMLCanvasElement | null>(null) // 지형만 그려둔 오프스크린
@@ -120,8 +122,8 @@ export function Minimap() {
   if (!open) return null
 
   return (
-    <div className="minimap">
-      <div className="minimap-titlebar">
+    <div className="minimap ui-window" style={windowDrag.style}>
+      <div className="minimap-titlebar ui-window__titlebar" onPointerDown={windowDrag.onPointerDown}>
         <span className="minimap-title">MINI MAP</span>
         <span ref={nameRef} className="minimap-name" />
         <button

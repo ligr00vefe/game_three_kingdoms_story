@@ -2,6 +2,7 @@ import { useSkillStore, SKILLS } from '../stores/skillStore'
 import { useUiStore } from '../stores/uiStore'
 import { useGameStore } from '../stores/gameStore'
 import { titleForLevel } from '../game/systems/playerAnimations'
+import { useDraggableWindow } from './useDraggableWindow'
 
 /**
  * 스킬창 (SKILL) — 직책 스케줄에 따라 자동 해금되는 5개 액티브 스킬.
@@ -12,14 +13,15 @@ export function SkillPanel() {
   const levels = useSkillStore((s) => s.levels)
   const points = useSkillStore((s) => s.points)
   const charLevel = useGameStore((s) => s.level)
+  const windowDrag = useDraggableWindow('skillbook')
 
   if (!open) return null
 
   return (
-    <div className="sk-panel">
-      <div className="sk-titlebar">
+    <div className="sk-panel ui-window" style={windowDrag.style}>
+      <div className="sk-titlebar ui-window__titlebar" onPointerDown={windowDrag.onPointerDown}>
         SKILL
-        <button className="inv-close sk-close" onClick={() => useUiStore.getState().toggleSkillbook()}>×</button>
+        <button className="inv-close sk-close" onClick={() => useUiStore.getState().toggleSkillbook()} title="접기">−</button>
       </div>
 
       <div className="sk-header">

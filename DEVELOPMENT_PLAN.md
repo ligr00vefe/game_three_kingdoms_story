@@ -190,7 +190,7 @@ AI 적합성 기준: **정지 이미지 + 낱장 독립성이 높을수록 AI에
 ### Phase 0 — 환경 세팅 (0.5~1일)
 - Spring Initializr 생성(3.1 의존성), Vite 프로젝트 생성, 모노레포 구성
 - 로컬 MySQL 8.x 설치/기동 + Flyway V1 스키마
-- Vite dev 프록시(`/api` → :8080), CORS 설정
+- Vite dev 프록시(`/api` → :8081), CORS 설정
 - **에셋 규격 문서 고정**(6.1: 해상도/프레임 규칙) + placeholder 팩 1종 선정(Kenney 또는 itch.io 무료팩)
 - **목적**: 프론트-백 왕복이 되는 "Hello World" 확보. **리스크**: 프록시/CORS 설정 누락, 에셋 규격 미확정 시 추후 전면 재작업 → 초반에 확정
 

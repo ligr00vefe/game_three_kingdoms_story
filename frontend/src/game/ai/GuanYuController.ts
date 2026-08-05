@@ -43,6 +43,7 @@ export class GuanYuController {
   private counterAttackQueued = false
   private combatTarget: Monster | null = null
   private combatTargetUntil = 0
+  private commandActive = false
 
   readonly control: PlayerControl = {
     left: false, right: false, up: false, down: false,
@@ -52,6 +53,7 @@ export class GuanYuController {
 
   execute(command: GuanYuCommand, playerX: number, targets: Record<string, number>): boolean {
     this.resetControl()
+    this.commandActive = true
     switch (command.action) {
       case 'CONTINUE_AUTO_COMBAT': this.state = 'AUTO_COMBAT'; return true
       case 'ADVANCE_AND_ATTACK': this.state = 'ADVANCING'; return true
@@ -250,6 +252,15 @@ export class GuanYuController {
     if (this.state === 'STANDBY' || this.state === 'HOLDING') this.state = 'AUTO_COMBAT'
   }
 
+  activateTacticAutoCombat() {
+    this.commandActive = false
+    this.state = 'AUTO_COMBAT'
+  }
+
+  isCommandActive() {
+    return this.commandActive
+  }
+
   private policyTarget(player: Player, monsters: readonly Monster[], policy: CombatPolicy): Monster | null {
     if (policy === 'defense') return this.mostUrgentEnemy(monsters)
     if (policy === 'elite') {
@@ -288,6 +299,7 @@ export class GuanYuController {
 
   /** 직접 조작이 들어오면 자동 명령을 취소하고 제자리에 남는다. */
   cancelForManualControl() {
+    this.commandActive = false
     this.targetX = null
     this.guardX = null
     this.arrivalTargetId = null
@@ -323,6 +335,27 @@ export class GuanYuController {
     this.arrivalTargetId = null
     this.stateAfterArrival = 'GUARDING'
     this.state = Math.abs(playerX - positionX) <= ARRIVAL_DISTANCE ? 'GUARDING' : 'MOVING_TO_TARGET'
+  }
+
+  guardDefenseWall(positionX: number, playerX: number) {
+    this.commandActive = false
+    this.targetX = positionX
+    this.guardX = positionX
+    this.arrivalTargetId = null
+    this.stateAfterArrival = 'DEFENDING_CASTLE'
+    this.state = Math.abs(playerX - positionX) <= ARRIVAL_DISTANCE ? 'DEFENDING_CASTLE' : 'MOVING_TO_TARGET'
+  }
+
+  returnToDefenseWall(positionX: number) {
+    this.commandActive = false
+    this.targetX = positionX
+    this.guardX = positionX
+    this.arrivalTargetId = null
+    this.stateAfterArrival = 'DEFENDING_CASTLE'
+    // 긴급 복귀는 일반 이동이 아니라 점프-대시를 포함한 돌진으로 처리한다.
+    this.rushJumpStarted = false
+    this.rushDashTriggered = false
+    this.state = 'RUSHING'
   }
 
   consumeArrival(): string | null {
