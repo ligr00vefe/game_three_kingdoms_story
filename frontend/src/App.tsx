@@ -31,7 +31,6 @@ import { DialogBox } from './ui/DialogBox'
 import { CinematicDialog } from './ui/CinematicDialog'
 import { PortalMenu } from './ui/PortalMenu'
 import { DefenseHud } from './ui/DefenseHud'
-import { DefenseTacticsPanel } from './ui/DefenseTacticsPanel'
 import { NoticeBanner } from './ui/NoticeBanner'
 import { QuestPanel } from './ui/QuestPanel'
 import { SettingsMenu } from './ui/SettingsMenu'
@@ -41,6 +40,7 @@ import { CharacterSelect } from './ui/CharacterSelect'
 import { LoadingScreen } from './ui/LoadingScreen'
 import { CommandHelpPanel } from './ui/CommandHelpPanel'
 import { AiQuickHelp } from './ui/AiQuickHelp'
+import { useAutoCombatStore } from './stores/autoCombatStore'
 
 /** 게임 창인지 판별: 런처가 window.open으로 띄우는 URL에 붙는 ?mode=game */
 const isGameWindow = new URLSearchParams(location.search).get('mode') === 'game'
@@ -68,9 +68,18 @@ function GameApp() {
         try { window.resizeBy(dw, dh) } catch { /* 스크립트가 연 창이 아니면 무시 */ }
       }
     }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'F11') return
+      event.preventDefault()
+      enforce()
+    }
     enforce()
     window.addEventListener('resize', enforce)
-    return () => window.removeEventListener('resize', enforce)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      window.removeEventListener('resize', enforce)
+      window.removeEventListener('keydown', onKeyDown, true)
+    }
   }, [])
 
   // F1/A: 어디서든 AI 명령어 예시를 토글한다. F1의 브라우저 기본 도움말은 게임 창에서 차단한다.
@@ -82,7 +91,12 @@ function GameApp() {
       if (ui.cinematicOpen || ui.keySettingsOpen) return
       e.preventDefault()
       ui.setSettingsOpen(false)
-      ui.setCommandHelpOpen(!ui.commandHelpOpen)
+      if (e.code === 'KeyA') {
+        ui.setCommandHelpOpen(false)
+        useAutoCombatStore.getState().setQuickHelpVisible(true)
+      } else {
+        ui.setCommandHelpOpen(!ui.commandHelpOpen)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -102,24 +116,7 @@ function GameApp() {
     return stopAutosave
   }, [])
 
-  // 전체화면 중 ESC가 전체화면을 끄지 않고 설정 메뉴를 열도록 Keyboard Lock (Chromium 계열).
-  // 잠금 상태에서는 ESC keydown이 게임으로 전달되고, ESC를 길게 누르면 브라우저가 전체화면을 해제한다.
-  useEffect(() => {
-    const nav = navigator as Navigator & {
-      keyboard?: { lock?: (keys?: string[]) => Promise<void>; unlock?: () => void }
-    }
-    const onFsChange = () => {
-      if (document.fullscreenElement) nav.keyboard?.lock?.(['Escape'])?.catch(() => {})
-      else nav.keyboard?.unlock?.()
-    }
-    document.addEventListener('fullscreenchange', onFsChange)
-    onFsChange()
-    return () => {
-      document.removeEventListener('fullscreenchange', onFsChange)
-      nav.keyboard?.unlock?.()
-    }
-  }, [])
-
+  // 게임 창은 일반 팝업으로만 사용하고 전체화면 전환을 허용하지 않는다.
   // ESC: 열린 창을 먼저 닫고, 아무 창도 없을 때만 설정/디펜스 일시정지를 연다.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -206,7 +203,6 @@ function GameApp() {
             <CinematicDialog />
             <PortalMenu />
             <DefenseHud />
-            <DefenseTacticsPanel />
             <DeathOverlay />
             {/* ---- 하단 인터페이스 (메이플 스타일) ---- */}
             <ChatBox />

@@ -71,7 +71,9 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body
 
   def!: MonsterDef
+  monsterCode = ''
   hp = 0
+  private hpBar: Phaser.GameObjects.Graphics
   private state_: MonsterState = 'inactive'
   private homeXMin = 0
   private homeXMax = 0
@@ -91,6 +93,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.def = def
     scene.add.existing(this)
     scene.physics.add.existing(this)
+    this.hpBar = scene.add.graphics().setDepth(4)
     const spriteScale = def.spriteScale ?? 1
     const bodyWidth = 36 / spriteScale
     const bodyHeight = 52 / spriteScale
@@ -169,6 +172,25 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   update(target: MonsterTarget, now: number) {
     this.updateBehaviour(target, now)
     this.updateAnimation()
+    this.updateHpBar()
+  }
+
+  private updateHpBar() {
+    const bar = this.hpBar
+    if (!this.active || !this.visible || this.state_ === 'dead' || this.state_ === 'inactive') {
+      bar.clear()
+      return
+    }
+    const width = 26
+    const height = 3
+    const ratio = Phaser.Math.Clamp(this.hp / Math.max(1, this.def.maxHp), 0, 1)
+    const x = this.x - width / 2
+    const y = this.getBounds().top - 5
+    bar.clear()
+    bar.fillStyle(0x111318, 0.82).fillRect(x - 1, y - 1, width + 2, height + 2)
+    bar.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffc107 : 0xef5350, 1)
+    bar.fillRect(x, y, width * ratio, height)
+    bar.setAlpha(this.alpha)
   }
 
   /** 이동 중이면 달리기, 멈춰 있으면 대기 (GAME_DESIGN 6.2의 배회/추적/공격 상태를 속도로 읽는다) */
@@ -329,6 +351,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.state_ = 'inactive'
     this.setActive(false).setVisible(false)
     this.body.enable = false
+    this.hpBar.clear()
     this.clearTint()
     this.setAlpha(1)
   }

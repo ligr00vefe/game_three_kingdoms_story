@@ -110,6 +110,11 @@ export function CharacterSelect() {
       {/* 군막사 배경 + 의자 좌석 — 스테이지는 배경과 같은 3:2라 좌석 %가 의자에 그대로 맞는다.
           UI(상단/제목/카드)보다 앞에 둬야 뒤로 깔린다 — 모두 absolute라 DOM 순서가 곧 z축이다. */}
       <div className="lobby-stage">
+        <div className="lobby-defense-badge" aria-label={`디펜스 아레나 스테이지 ${game.defenseStage}`}>
+          <span>DEFENSE ARENA</span>
+          <b>STAGE {game.defenseStage}</b>
+          <small>성문 방어 전장</small>
+        </div>
         {/* 화로대 횃불 — 좌석보다 먼저 그려 캐릭터 뒤로 깔리게 한다.
             두 불꽃이 같은 박자로 흔들리면 복사한 티가 나서 오른쪽만 재생 위상을 어긋나게 준다. */}
         {TORCHES.map((t, i) => (

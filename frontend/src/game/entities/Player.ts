@@ -69,6 +69,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private airDashUsed = false
   /** 퀵슬롯(숫자키) 스킬 발동 요청 — 다음 프레임 updateNormal에서 소비 */
   private skillQueued = false
+  private skillQueuedCode = 'skill_charge_slash'
   /** 대쉬 무적 (GAME_DESIGN 3.2 — Phase 2 전투에서 피격 판정에 사용) */
   invincible = false
   /** 원웨이 발판 통과 중이면 true (GameScene의 collider process에서 참조) */
@@ -90,7 +91,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** GameScene이 주입: 히트박스 안 몬스터 판정. comboStep(0:찌르기/1:휘두르기/2:깊게 찌르기)로
    *  단계별 이펙트를 고른다 */
   onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, comboStep: number) => void
-  onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1) => void
+  onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, skillCode: string) => void
+  onSkillStart?: (facing: -1 | 1, skillCode: string) => void
   /** GameScene이 주입: 공중 액션 이펙트 훅 */
   onAirDash?: (x: number, y: number, facing: -1 | 1) => void
   onDoubleJump?: (x: number, y: number) => void
@@ -105,7 +107,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private comboExpiresAt = 0
   /** 대쉬찌르기(2단계) 전진을 이 시각까지 유지 — 이후 정지 */
   private dashLungeUntil = 0
-  private skillReadyAt = 0
+  /** 스킬 코드별 재사용 가능 시각. 한 스킬 사용이 다른 스킬을 막지 않는다. */
+  private skillReadyAt = new Map<string, number>()
   private invincibleUntil = 0
   /** 자연 회복 판정용 — 마지막 전투 행동 시각 (GAME_DESIGN 5.2) */
   lastCombatAt = -Infinity
@@ -337,11 +340,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // 스킬 (GAME_DESIGN 4.2) — MP 체크. 퀵슬롯(숫자키 1~7) 요청만 여기서 소비 (전용 스킬 키 없음)
     const wantSkill = this.skillQueued
     this.skillQueued = false
-    if (wantSkill && now >= this.skillReadyAt) {
+    const skillCode = this.skillQueuedCode
+    const skillReadyAt = this.skillReadyAt.get(skillCode) ?? 0
+    if (wantSkill && now >= skillReadyAt) {
       const s = useGameStore.getState()
       if (s.mp >= COMBAT.SKILL_MP_COST) {
         s.setStats({ mp: s.mp - COMBAT.SKILL_MP_COST })
-        this.skillReadyAt = now + COMBAT.SKILL_COOLDOWN_MS
+        this.skillReadyAt.set(skillCode, now + this.skillCooldownMs(skillCode))
         this.startAction('skill', now)
         return
       }
@@ -513,10 +518,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.lastCombatAt = now
     this.comboQueued = false // 새 모션 시작 — 이전 예약은 소비됐거나 무효
     const duration = kind === 'attack' ? COMBAT.ATTACK_DURATION_MS : COMBAT.SKILL_DURATION_MS
-    const hitAt = kind === 'attack' ? COMBAT.ATTACK_HIT_AT_MS : COMBAT.SKILL_HIT_AT_MS
+    const hitAt = kind === 'attack'
+      ? COMBAT.ATTACK_HIT_AT_MS
+      : this.skillQueuedCode === 'skill_glaive_flurry' ? COMBAT.GLAIVE_HIT_AT_MS : COMBAT.SKILL_HIT_AT_MS
     this.actionUntil = now + duration
     this.actionHitAt = now + hitAt
     this.actionHitDone = false
+    if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
     // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
     const isDashLunge = kind === 'attack' && this.comboStep === 2
     if (this.body.blocked.down) {
@@ -542,7 +550,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.actionHitDone && now >= this.actionHitAt) {
       this.actionHitDone = true
       const hitbox = this.buildHitbox(this.state_ === 'skill')
-      if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing)
+      if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing, this.skillQueuedCode)
       else this.onBasicAttack?.(hitbox, this.facing, this.comboStep)
     }
     if (now >= this.actionUntil) {
@@ -572,12 +580,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   /** 스킬 쿨타임 잔여 (HUD 표시용, Phase 3+) */
   skillCooldownLeft(now: number) {
-    return Math.max(0, this.skillReadyAt - now)
+    return this.skillCooldownLeftFor(this.skillQueuedCode, now)
+  }
+
+  skillCooldownLeftFor(code: string, now: number) {
+    return Math.max(0, (this.skillReadyAt.get(code) ?? 0) - now)
+  }
+
+  skillCooldownMs(code: string) {
+    return COMBAT.SKILL_COOLDOWN_MS_BY_CODE[code] ?? COMBAT.SKILL_COOLDOWN_MS
   }
 
   /** 퀵슬롯(숫자키) 스킬 발동 요청 — 다음 updateNormal에서 키 입력과 동일하게 처리 */
-  queueSkill() {
+  queueSkill(code = 'skill_charge_slash') {
     this.skillQueued = true
+    this.skillQueuedCode = code
+  }
+
+  startGlaiveMotion() {
+    if (this.body.blocked.down) this.setVelocityY(-420)
   }
 
   // ---------- 피격/사망 (GAME_DESIGN 4.3, 5.2) ----------

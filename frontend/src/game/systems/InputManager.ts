@@ -39,8 +39,8 @@ export class InputManager {
   }
 
   private handleKeyDown = (event: KeyboardEvent) => {
-    // Z/X/C/V는 4칸 스킬 퀵슬롯 전용 키다.
-    if (event.code === 'KeyZ' || event.code === 'KeyX' || event.code === 'KeyC' || event.code === 'KeyV') return
+    // 1~7은 React 퀵슬롯에서 처리한다.
+    if (/^Digit[1-7]$/.test(event.code)) return
     // 바인딩된 키는 브라우저 기본 동작(스크롤/메뉴 포커스 등)을 막는다
     if (useKeybindingStore.getState().bindings[event.code]) event.preventDefault()
     if (event.repeat || this.pressed.has(event.code)) return

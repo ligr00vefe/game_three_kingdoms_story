@@ -54,6 +54,8 @@ const DEFENSE = {
   STRUCT_AGGRO_X: 62,
   /** 기지 x (맨 왼쪽) */
   BASE_X: 130,
+  /** 성 이미지 오른쪽의 실제 성문 위치(몬스터가 성 중앙까지 파고들지 않도록 하는 목표점). */
+  BASE_GATE_OFFSET_X: 130,
   /** 큰 성 이미지의 좌측 여백을 피해 체력바를 성문 쪽으로 옮기는 표시 오프셋. */
   BASE_HP_BAR_OFFSET_X: 104,
   /** 기지(성 모형) 렌더 깊이. 액터(플레이어·좀비, 기본 depth 0)보다 **뒤**, 배경/보행로
@@ -97,6 +99,7 @@ export class DefenseManager {
   private group: Phaser.Physics.Arcade.StaticGroup
   private playerTarget: MonsterTarget
   private effects: EffectManager
+  private onMonsterDefeated?: (monster: Monster) => void
 
   private stage = 1
   private phase: Phase = 'idle'
@@ -135,6 +138,7 @@ export class DefenseManager {
     group: Phaser.Physics.Arcade.StaticGroup,
     playerTarget: MonsterTarget,
     effects: EffectManager,
+    onMonsterDefeated?: (monster: Monster) => void,
   ) {
     this.scene = scene
     this.spawner = spawner
@@ -143,6 +147,7 @@ export class DefenseManager {
     this.group = group
     this.playerTarget = playerTarget
     this.effects = effects
+    this.onMonsterDefeated = onMonsterDefeated
     this.ensureCannonAnimations()
 
     // 기지(맨 왼쪽 성 아티팩트) 생성 — 실제 아트(castle_model_01, 404×286)가 있으면 원본 비율
@@ -150,7 +155,7 @@ export class DefenseManager {
     // bodyW는 표시 폭보다 좁게 유지 — 좀비가 STRUCT_AGGRO_X(62px) 안에서 멈춰야 기지를 때린다.
     const baseArt = this.scene.textures.exists('img_castle_base')
     this.base = this.addStructure(
-      DEFENSE.BASE_X, DEFENSE.BASE_HP, true, baseArt ? 'img_castle_base' : 'ph_base', baseArt ? 540 : 70, baseArt ? 360 : 100, 70, 'base', baseArt ? 0.225 : 0,
+      DEFENSE.BASE_X, DEFENSE.BASE_HP, true, baseArt ? 'img_castle_base' : 'ph_base', baseArt ? 540 : 70, baseArt ? 360 : 100, baseArt ? 260 : 70, 'base', baseArt ? 0.225 : 0,
     )
     // HP바(depth 5)는 그대로 액터 위에 남겨 성 모형 뒤로 숨지 않게 한다.
     this.base.spr.setDepth(DEFENSE.BASE_DEPTH)
@@ -221,7 +226,6 @@ export class DefenseManager {
     this.phase = 'combat'
     // 전투는 남은 좀비를 모두 처치할 때까지 계속된다.
     this.phaseEndsAt = 0
-    EventBus.emit(GameEvents.DEFENSE_WAVE_START)
     // 좀비 순차 스폰. 첫 마리는 아래에서 즉시 스폰하므로 타이머는 나머지(waveTotal-1)만 담당한다.
     // repeat=N은 콜백을 N+1회 실행하므로, 나머지 waveTotal-1회를 원하면 repeat=waveTotal-2.
     // (예전엔 repeat=waveTotal-1이라 타이머가 waveTotal회 + 즉시 1회 = waveTotal+1마리를 스폰,
@@ -277,7 +281,6 @@ export class DefenseManager {
     this.phase = 'victory'
     this.spawnEvent?.remove()
     this.spawnEvent = undefined
-    EventBus.emit(GameEvents.DEFENSE_WAVE_COMPLETE)
     this.rewardChoices = Phaser.Utils.Array.Shuffle<DefenseUpgrade>(
       ['attack', 'vitality', 'mana', 'salvage', 'fortify', 'repair', 'supplies'],
     ).slice(0, 3)
@@ -369,7 +372,7 @@ export class DefenseManager {
       targets: arrow, x: target.x, y: hitY, duration: 420, ease: 'Quad.easeIn',
       onComplete: () => {
         arrow.destroy()
-        if (target.alive) target.receiveHit(damage, false, structure.spr.x, this.effects, now)
+        if (target.alive) this.damageMonster(target, damage, structure.spr.x, now)
       },
     })
   }
@@ -436,7 +439,7 @@ export class DefenseManager {
           const distance = Math.abs(impactX - monster.x)
           if (distance <= splashRadius) {
             const falloff = distance <= splashRadius * 0.45 ? 1 : 0.65
-            monster.receiveHit(Math.ceil(damage * falloff), false, structure.spr.x, this.effects, this.scene.time.now)
+            this.damageMonster(monster, Math.ceil(damage * falloff), structure.spr.x, this.scene.time.now)
           }
         }
       },
@@ -459,7 +462,7 @@ export class DefenseManager {
     body.setSize(bodyW, dispH, true)
     // 대형 원본 이미지의 투명 캔버스 폭과 무관하게 시설 체력바는 간결하게 유지한다.
     const offensive = kind === 'watchtower' || kind === 'cannonTower' || kind === 'bastion'
-    const barW = offensive ? Math.min(bodyW, 96) : bodyW
+    const barW = isBase ? 120 : offensive ? Math.min(bodyW, 96) : bodyW
     const hpBar = this.scene.add.graphics().setDepth(5)
     const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, footprint: bodyW, kind, attackReadyAt: 0 }
     this.structures.push(s)
@@ -474,7 +477,7 @@ export class DefenseManager {
     const w = s.barW
     const h = 6
     const x = s.spr.x - w / 2 + (s.isBase ? DEFENSE.BASE_HP_BAR_OFFSET_X : 0)
-    const y = s.spr.y - s.spr.displayHeight / 2 - 12
+    const y = s.spr.y - s.spr.displayHeight / 2 - 5
     g.fillStyle(0x000000, 0.6); g.fillRect(x - 1, y - 1, w + 2, h + 2)
     g.fillStyle(0x424242, 1); g.fillRect(x, y, w, h)
     const ratio = Phaser.Math.Clamp(s.hp / s.maxHp, 0, 1)
@@ -489,7 +492,9 @@ export class DefenseManager {
       if (!nearest) return candidate
       return Math.abs(candidate.spr.x - monsterX) < Math.abs(nearest.spr.x - monsterX) ? candidate : nearest
     }, null as Structure | null) ?? this.base
-    const targetX = structure.spr.x + (monsterX < structure.spr.x ? -structure.footprint / 2 : structure.footprint / 2)
+    const targetX = structure.isBase && monsterX >= structure.spr.x
+      ? structure.spr.x + DEFENSE.BASE_GATE_OFFSET_X
+      : structure.spr.x + (monsterX < structure.spr.x ? -structure.footprint / 2 : structure.footprint / 2)
     return {
       x: targetX,
       y: this.groundY,
@@ -535,6 +540,18 @@ export class DefenseManager {
           s.spr.setPosition(originalX + ruined.offsetX, this.groundY - ruined.height / 2)
           // 잔해는 액터와 몬스터보다 뒤에서 불투명한 어두운 상태로 유지한다.
           s.spr.setDepth(-6)
+          if (!s.isBase) {
+            this.scene.time.delayedCall(2200, () => {
+              if (!s.spr.active) return
+              this.scene.tweens.add({
+                targets: s.spr,
+                alpha: 0,
+                duration: 650,
+                ease: 'Quad.easeIn',
+                onComplete: () => s.spr.setVisible(false).setActive(false),
+              })
+            })
+          }
         },
       })
       return
@@ -746,7 +763,7 @@ export class DefenseManager {
       const hitX = target.x
       const hitY = target.y - 18
       this.launchVolleyArrow(hitX, hitY, index, () => {
-        if (target.alive) target.receiveHit(damage, false, this.base.spr.x, this.effects, this.scene.time.now)
+        if (target.alive) this.damageMonster(target, damage, this.base.spr.x, this.scene.time.now)
       })
     }
     this.emitState()
@@ -771,6 +788,12 @@ export class DefenseManager {
     return true
   }
 
+  private damageMonster(monster: Monster, damage: number, fromX: number, now: number) {
+    const died = monster.receiveHit(damage, false, fromX, this.effects, now)
+    if (died) this.onMonsterDefeated?.(monster)
+  }
+
+  /** 파괴되어 남아 있는 방어 시설 잔해를 보급소에서 일괄 철거한다. */
   chooseUpgrade(upgrade: DefenseUpgrade) {
     if (this.phase !== 'victory' || !this.rewardChoices.includes(upgrade)) return
     const store = useGameStore.getState()

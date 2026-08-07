@@ -12,6 +12,7 @@ export const CAMERA = {
    * 1.0 = 기존(작게 보임). 크게/작게 보이면 이 값만 조정.
    */
   ZOOM: 1.4,
+  FULLSCREEN_ZOOM_MULTIPLIER: 1.5,
 } as const
 
 export const PLAYER = {
@@ -79,7 +80,15 @@ export const COMBAT = {
   /** 스킬: 청룡참 (GAME_DESIGN 4.2) */
   SKILL_MP_COST: 15,
   SKILL_MULTIPLIER: 2.5,
+  /** 스킬별 재사용 대기시간. 등록되지 않은 스킬은 기본값을 사용한다. */
   SKILL_COOLDOWN_MS: 5000,
+  SKILL_COOLDOWN_MS_BY_CODE: {
+    skill_charge_slash: 4000,
+    skill_glaive_flurry: 6500,
+    skill_decisive_strike: 8000,
+    skill_dragon_slash: 5500,
+    skill_lightning_descent: 7000,
+  } as Record<string, number>,
   SKILL_REACH: 200,
   SKILL_HEIGHT: 110,
   SKILL_MAX_TARGETS: 8,
@@ -88,6 +97,7 @@ export const COMBAT = {
   // 그때 f3(최대 신장)이 205~311ms 구간이라 그 시작에 맞췄다 — 250 × (450/550) ≈ 205.
   // 스킬 전용 아트(8프레임)가 들어오면 그 시트 기준으로 다시 잡아야 한다.
   SKILL_HIT_AT_MS: 205,
+  GLAIVE_HIT_AT_MS: 360,
   SKILL_HITSTOP_MS: 70,
 
   /** 피격 (GAME_DESIGN 4.3) */

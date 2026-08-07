@@ -26,16 +26,12 @@ export function CharacterInfoPanel() {
 
   const cp = computeCombatPower(g)
   const rows: [string, string, boolean?][] = [
-    ['스탯 공격력', `${(g.attackPower + g.str * 2).toLocaleString()}`, true],
-    ['데미지', '7.00%'],
-    ['최종 데미지', '0.00%'],
-    ['보스 몬스터 데미지', '20.00%'],
-    ['방어율 무시', '20.00%'],
-    ['공격력', `${g.attackPower}`],
-    ['크리티컬 확률', `${Math.round(g.critChance * 100)}%`, true],
-    ['크리티컬 데미지', `${Math.round((g.critDamage - 1) * 100 + 30)}%`],
+    ['공격력', g.attackPower.toLocaleString(), true],
+    ['치명타 확률', `${(g.critChance * 100).toFixed(1)}%`],
+    ['치명타 데미지', `+${Math.round((g.critDamage - 1) * 100)}%`],
     ['이동속도', `${Math.round(g.moveSpeedMult * 100)}%`],
-    ['재사용 대기시간 감소', '0초 / 0%'],
+    ['경험치', `${g.exp.toLocaleString()} / ${g.expToNext.toLocaleString()}`],
+    ['보유 금화', g.gold.toLocaleString()],
   ]
 
   return (
@@ -62,8 +58,8 @@ export function CharacterInfoPanel() {
 
       {/* 1차 스탯 */}
       <div className="ci-primary">
-        <div className="ci-stat"><span>HP</span><b>{g.maxHp.toLocaleString()}</b></div>
-        <div className="ci-stat"><span>MP</span><b>{g.maxMp.toLocaleString()}</b></div>
+        <div className="ci-stat"><span>HP</span><b>{g.hp.toLocaleString()} / {g.maxHp.toLocaleString()}</b></div>
+        <div className="ci-stat"><span>MP</span><b>{g.mp.toLocaleString()} / {g.maxMp.toLocaleString()}</b></div>
         <div className="ci-stat"><span>STR</span><b>{g.str}</b></div>
         <div className="ci-stat"><span>DEX</span><b>{g.dex}</b></div>
         <div className="ci-stat"><span>INT</span><b>{g.int}</b></div>

@@ -31,7 +31,9 @@ export function startGame(parent: HTMLElement): Phaser.Game {
       // width/height는 초기값일 뿐 Phaser가 부모 크기에 맞춰 리사이즈한다.
       // FIT(16:9 고정+레터박스)이나 FILL(늘려 채움=찌그러짐)이 아니라 이 방식을 쓴다.
       // 카메라는 CAMERA.ZOOM(1.4) 고정이라 스프라이트 픽셀 크기는 일정 — 큰 창일수록 월드가 더 넓게 보인다.
-      mode: Phaser.Scale.RESIZE,
+      // 논리 해상도(1024x576)의 비율을 유지하면서 부모 영역을 빈틈없이 덮는다.
+      // RESIZE는 전체화면에서 카메라가 맵 바깥 세로 영역까지 보여 배경 여백이 생길 수 있다.
+      mode: Phaser.Scale.ENVELOP,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [BootScene, PreloadScene, GameScene],

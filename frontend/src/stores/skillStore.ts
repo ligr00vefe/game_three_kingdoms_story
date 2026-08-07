@@ -15,6 +15,7 @@ export interface SkillDef {
   name: string
   /** 아이콘 placeholder 이모지 (아트 도입 전) */
   icon: string
+  iconImage?: string
   type: 'active' | 'passive'
   maxLevel: number
   /** 이 레벨이 되면 자동으로 1레벨 해금 (character-progression-pivot 직책 스케줄) */
@@ -25,11 +26,11 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   {
-    code: 'skill_charge_slash', name: '참마돌격', icon: '⚡', type: 'active', maxLevel: 10, unlockLevel: 2,
+    code: 'skill_charge_slash', name: '참마돌격', icon: '⚡', iconImage: '/assets/img/fx/skill_wild_horse_charge.png', type: 'active', maxLevel: 10, unlockLevel: 2,
     desc: (lv) => `전방으로 돌진하며 베기. 데미지 ${180 + lv * 20}%, MP 12, 쿨타임 8초.`,
   },
   {
-    code: 'skill_glaive_flurry', name: '언월난무', icon: '🌀', type: 'active', maxLevel: 10, unlockLevel: 7,
+    code: 'skill_glaive_flurry', name: '언월난무', icon: '🌀', iconImage: '/assets/img/fx/skill_crescent_moon_dance.png', type: 'active', maxLevel: 10, unlockLevel: 7,
     desc: (lv) => `전방을 ${3 + Math.floor(lv / 4)}회 연속 타격. 타격당 데미지 ${90 + lv * 10}%, MP 20, 쿨타임 10초.`,
   },
   {

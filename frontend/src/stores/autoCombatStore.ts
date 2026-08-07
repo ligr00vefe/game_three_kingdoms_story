@@ -25,7 +25,7 @@ export const useAutoCombatStore = create<AutoCombatState>()(
     (set) => ({
       enabled: false,
       policy: 'nearest',
-      autoSkill: false,
+      autoSkill: true,
       minMpPercent: 70,
       minEnemyCount: 3,
       reserveSkillForBoss: false,

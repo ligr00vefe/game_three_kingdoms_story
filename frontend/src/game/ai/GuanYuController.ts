@@ -252,11 +252,6 @@ export class GuanYuController {
     if (this.state === 'STANDBY' || this.state === 'HOLDING') this.state = 'AUTO_COMBAT'
   }
 
-  activateTacticAutoCombat() {
-    this.commandActive = false
-    this.state = 'AUTO_COMBAT'
-  }
-
   isCommandActive() {
     return this.commandActive
   }
@@ -335,27 +330,6 @@ export class GuanYuController {
     this.arrivalTargetId = null
     this.stateAfterArrival = 'GUARDING'
     this.state = Math.abs(playerX - positionX) <= ARRIVAL_DISTANCE ? 'GUARDING' : 'MOVING_TO_TARGET'
-  }
-
-  guardDefenseWall(positionX: number, playerX: number) {
-    this.commandActive = false
-    this.targetX = positionX
-    this.guardX = positionX
-    this.arrivalTargetId = null
-    this.stateAfterArrival = 'DEFENDING_CASTLE'
-    this.state = Math.abs(playerX - positionX) <= ARRIVAL_DISTANCE ? 'DEFENDING_CASTLE' : 'MOVING_TO_TARGET'
-  }
-
-  returnToDefenseWall(positionX: number) {
-    this.commandActive = false
-    this.targetX = positionX
-    this.guardX = positionX
-    this.arrivalTargetId = null
-    this.stateAfterArrival = 'DEFENDING_CASTLE'
-    // 긴급 복귀는 일반 이동이 아니라 점프-대시를 포함한 돌진으로 처리한다.
-    this.rushJumpStarted = false
-    this.rushDashTriggered = false
-    this.state = 'RUSHING'
   }
 
   consumeArrival(): string | null {

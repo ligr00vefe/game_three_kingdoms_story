@@ -16,3 +16,7 @@ export async function me(): Promise<AuthUser> {
   const { data } = await api.get<AuthUser>('/auth/me')
   return data
 }
+
+export async function logout(): Promise<void> {
+  await api.delete('/auth/logout')
+}

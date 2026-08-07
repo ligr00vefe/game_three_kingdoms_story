@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
 import { useScreenStore } from '../stores/screenStore'
 import { useAutoCombatStore } from '../stores/autoCombatStore'
+import { logout } from '../api/auth'
+import { useAuthStore } from '../stores/authStore'
 import type { CombatPolicy } from '../stores/autoCombatStore'
 
 /**
@@ -10,24 +12,10 @@ import type { CombatPolicy } from '../stores/autoCombatStore'
  */
 export function SettingsMenu() {
   const open = useUiStore((s) => s.settingsOpen)
-  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement)
   const [autoOpen, setAutoOpen] = useState(false)
   const auto = useAutoCombatStore()
 
-  // 버튼 라벨이 실제 전체화면 상태를 반영하도록 — F11 등 다른 경로로 바뀌어도 동기화
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
-
   if (!open) return null
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) void document.exitFullscreen()
-    else void document.documentElement.requestFullscreen().catch(() => {})
-    useUiStore.getState().setSettingsOpen(false)
-  }
 
   // 대기실 복귀: 설정 닫고 화면을 lobby로 → PhaserGame 언마운트되며 게임 인스턴스 정리
   const returnToLobby = () => {
@@ -44,6 +32,16 @@ export function SettingsMenu() {
     window.close()
   }
 
+  const logoutGame = async () => {
+    if (!window.confirm('로그아웃하고 로그인 화면으로 돌아가시겠습니까?')) return
+    try {
+      await logout()
+    } finally {
+      useAuthStore.getState().setUser(null)
+      window.location.assign(location.pathname)
+    }
+  }
+
   return (
     <div className="ks-backdrop">
       <div className={`settings-menu${autoOpen ? ' settings-menu--wide' : ''}`}>
@@ -52,6 +50,7 @@ export function SettingsMenu() {
           게임으로 돌아가기 (ESC)
         </button>
         <div className="settings-sep" />
+        <button className="settings-item" onClick={() => void logoutGame()}>로그아웃</button>
         <button
           className="settings-item"
           onClick={() => {
@@ -111,9 +110,6 @@ export function SettingsMenu() {
             </label>
           </div>
         )}
-        <button className="settings-item" onClick={toggleFullscreen}>
-          {isFullscreen ? '⛶ 일반화면 전환' : '⛶ 전체화면 전환'}
-        </button>
         <div className="settings-sep" />
         <button className="settings-item" onClick={returnToLobby}>🏠 대기실로 돌아가기</button>
         <button className="settings-item settings-item--danger" onClick={exitGame}>✖ 게임 종료</button>

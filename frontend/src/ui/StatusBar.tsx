@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
+import { useAutoCombatStore } from '../stores/autoCombatStore'
 
 /**
  * 하단 중앙 상태바 (메이플 스타일): Lv 배지 + 이름 + HP/MP 바(수치 표기) + 메뉴 버튼.
@@ -8,6 +9,7 @@ import { useUiStore } from '../stores/uiStore'
  */
 export function StatusBar() {
   const name = useGameStore((s) => s.characterName)
+  const autoEnabled = useAutoCombatStore((s) => s.enabled)
   const hpFillRef = useRef<HTMLDivElement>(null)
   const hpTextRef = useRef<HTMLSpanElement>(null)
   const mpFillRef = useRef<HTMLDivElement>(null)
@@ -47,6 +49,18 @@ export function StatusBar() {
         </div>
       </div>
       <div className="statusbar-menu">
+        <button
+          className={`menu-btn menu-btn--auto${autoEnabled ? ' menu-btn--active' : ''}`}
+          title="자동전투: 가까운 적 우선 공격 + 스킬 자동 사용"
+          onClick={() => {
+            const auto = useAutoCombatStore.getState()
+            const enabled = !auto.enabled
+            auto.setPolicy('nearest')
+            auto.setAutoSkill(true)
+            auto.setMinEnemyCount(1)
+            auto.setEnabled(enabled)
+          }}
+        >Auto</button>
         <button className="menu-btn" title="스탯 (S)" onClick={() => useUiStore.getState().toggleStats()}>👤</button>
         <button className="menu-btn" title="스킬 (K)" onClick={() => useUiStore.getState().toggleSkillbook()}>📖</button>
         <button className="menu-btn" title="퀘스트 (Q)" onClick={() => useUiStore.getState().toggleQuest()}>📜</button>

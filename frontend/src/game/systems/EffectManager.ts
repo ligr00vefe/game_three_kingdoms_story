@@ -10,6 +10,8 @@ export class EffectManager {
   private attackPool: Phaser.GameObjects.Group
   private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
+  private glaivePool: Phaser.GameObjects.Group
+  private decisivePool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
@@ -22,6 +24,8 @@ export class EffectManager {
     this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
     this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
+    this.glaivePool = scene.add.group({ defaultKey: 'fx_skill_glaive', maxSize: 4 })
+    this.decisivePool = scene.add.group({ defaultKey: 'fx_decisive_strike', maxSize: 3 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_effect', maxSize: 8 })
@@ -46,6 +50,67 @@ export class EffectManager {
     this.defineJumpFrames()
     this.registerAnim('fx_jump_effect_anim', 'fx_jump_effect', 18)
     this.defineLevelUpFrames()
+    this.defineGlaiveFrames()
+    this.defineDecisiveFrames()
+  }
+
+  private defineGlaiveFrames() {
+    if (!this.scene.textures.exists('fx_skill_glaive')) return
+    const texture = this.scene.textures.get('fx_skill_glaive')
+    const frameXs = [0, 307, 614, 922, 1229]
+    const frameWs = [307, 307, 308, 307, 307]
+    const frameYs = [0, 341, 682]
+    const frameHs = [341, 341, 342]
+    let index = 0
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 5 && index < 13; col++, index++) {
+        const frameName = String(index)
+        if (texture.has(frameName)) texture.remove(frameName)
+        texture.add(index, 0, frameXs[col], frameYs[row], frameWs[col], frameHs[row])
+      }
+    }
+    for (const [key, start, length, frameRate] of [
+      ['fx_skill_glaive_slash_left', 0, 5, 28],
+      ['fx_skill_glaive_slash_right', 5, 5, 28],
+      ['fx_skill_glaive_slam', 10, 3, 18],
+    ] as const) {
+      if (this.scene.anims.exists(key)) this.scene.anims.remove(key)
+      this.scene.anims.create({
+        key,
+        frames: Array.from({ length }, (_, i) => ({ key: 'fx_skill_glaive', frame: start + i })),
+        frameRate,
+        repeat: 0,
+      })
+    }
+  }
+
+  private defineDecisiveFrames() {
+    if (!this.scene.textures.exists('fx_decisive_strike')) return
+    const texture = this.scene.textures.get('fx_decisive_strike')
+    let index = 0
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 6; col++, index++) {
+        const frameName = String(index)
+        if (texture.has(frameName)) texture.remove(frameName)
+        const frameY = row === 0 ? 0 : row === 1 ? 341 : 682
+        const frameH = row === 2 ? 342 : 341
+        texture.add(index, 0, col * 256, frameY, 256, frameH)
+      }
+    }
+    if (this.scene.anims.exists('fx_decisive_scope_anim')) this.scene.anims.remove('fx_decisive_scope_anim')
+    if (this.scene.anims.exists('fx_decisive_thrust_anim')) this.scene.anims.remove('fx_decisive_thrust_anim')
+    this.scene.anims.create({
+      key: 'fx_decisive_scope_anim',
+      frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i })),
+      frameRate: 45,
+      repeat: 0,
+    })
+    this.scene.anims.create({
+      key: 'fx_decisive_thrust_anim',
+      frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i + 9 })),
+      frameRate: 30,
+      repeat: 0,
+    })
   }
 
   private defineDashFrames() {
@@ -359,6 +424,58 @@ export class EffectManager {
       duration: EffectManager.SKILL_FX_DURATION_MS, ease: 'Sine.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })
+  }
+
+  skillGlaive(x: number, y: number, facing: -1 | 1, groundY?: number) {
+    const spr = this.glaivePool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!spr) return
+    this.scene.tweens.killTweensOf(spr)
+    spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    spr.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 0.62)
+      .setFlipX(facing === -1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 245)
+    const sequence = ['fx_skill_glaive_slash_left', 'fx_skill_glaive_slash_right', 'fx_skill_glaive_slam']
+    let sequenceIndex = 0
+    const playNext = (animation: string) => {
+      spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+        sequenceIndex += 1
+        if (sequenceIndex < sequence.length) {
+          if (sequenceIndex === 2 && groundY !== undefined) spr.setPosition(x, groundY).setOrigin(0.5, 1)
+          playNext(sequence[sequenceIndex])
+        }
+        else spr.setActive(false).setVisible(false)
+      })
+      spr.play(animation)
+    }
+    playNext(sequence[sequenceIndex])
+  }
+
+  /** 조준 스코프가 먼저 나타난 뒤, 타격 시점에 창 찌르기로 이어지는 일격필살 이펙트. */
+  decisiveStrike(x: number, y: number, facing: -1 | 1) {
+    const scope = this.decisivePool.get(x, y) as Phaser.GameObjects.Sprite | null
+    const thrust = this.decisivePool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!scope || !thrust) return
+    const scopeX = x + facing * 52
+    const thrustX = x + facing * 82
+    const hide = (sprite: Phaser.GameObjects.Sprite) => {
+      sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      this.scene.tweens.killTweensOf(sprite)
+      sprite.setActive(false).setVisible(false)
+    }
+    hide(scope)
+    hide(thrust)
+    scope.setActive(true).setVisible(true).setPosition(scopeX, y).setOrigin(0.5, 0.55)
+      // 원본 시트의 창은 왼쪽을 향하므로 오른쪽 공격일 때 반전한다.
+      .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
+    scope.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      hide(scope)
+      thrust.setActive(true).setVisible(true).setPosition(thrustX, y).setOrigin(0.5, 0.55)
+        .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
+      thrust.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => hide(thrust))
+      thrust.play('fx_decisive_thrust_anim')
+      this.scene.tweens.add({ targets: thrust, x: x + facing * (COMBAT.SKILL_REACH + 30), duration: 300, ease: 'Quad.easeOut' })
+    })
+    scope.play('fx_decisive_scope_anim')
   }
 
   hitSpark(x: number, y: number) {

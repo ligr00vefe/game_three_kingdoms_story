@@ -53,7 +53,9 @@ export function SkillPanel() {
               }}
               title={locked ? `Lv ${def.unlockLevel}에 해금` : `${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
             >
-              <span className="sk-icon" data-type={def.type}>{locked ? '🔒' : def.icon}</span>
+              <span className="sk-icon" data-type={def.type}>
+                {locked ? '🔒' : def.iconImage ? <img src={def.iconImage} alt="" /> : def.icon}
+              </span>
               <div className="sk-info">
                 <span className="sk-name">{def.name}</span>
                 <span className="sk-lv">{locked ? `Lv ${def.unlockLevel} 해금` : `${lv} / ${def.maxLevel}`}</span>

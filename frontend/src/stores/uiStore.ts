@@ -7,7 +7,7 @@ import { EventBus, GameEvents } from '../game/EventBus'
  * - 설정(ESC)/단축키 세팅/채팅 입력/메인 NPC 시네마틱 대화 중에는 게임 키 입력을 차단한다 (INPUT_BLOCK)
  * - 퀘스트/미니맵은 게임을 막지 않는 비모달 (메이플 방식)
  */
-export type UiWindowId = 'tactics' | 'stats' | 'skillbook' | 'minimap'
+export type UiWindowId = 'stats' | 'skillbook' | 'minimap' | 'aiHelp'
 export interface UiWindowPosition { left: number; top: number }
 
 interface UiState {
@@ -49,10 +49,10 @@ export const useUiStore = create<UiState>()(
     chatFocused: false,
     cinematicOpen: false,
     windowPositions: {
-      tactics: { left: 16, top: 108 },
-      stats: { left: 20, top: 110 },
-      skillbook: { left: 476, top: 110 },
-      minimap: { left: 10, top: 10 },
+    stats: { left: 20, top: 110 },
+    skillbook: { left: 476, top: 110 },
+    minimap: { left: 10, top: 10 },
+    aiHelp: { left: 1063, top: 185 },
     },
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setKeySettingsOpen: (keySettingsOpen) => set({ keySettingsOpen }),

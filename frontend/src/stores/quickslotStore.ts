@@ -15,7 +15,7 @@ export interface QSEntry {
   code: string
 }
 
-export const QUICKSLOT_COUNT = 4
+export const QUICKSLOT_COUNT = 7
 
 interface QuickslotState {
   slots: (QSEntry | null)[]

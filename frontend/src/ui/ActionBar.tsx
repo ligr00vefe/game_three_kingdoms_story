@@ -4,17 +4,20 @@ import { useQuickslotStore, QUICKSLOT_COUNT } from '../stores/quickslotStore'
 import type { QSEntry } from '../stores/quickslotStore'
 import { useInventoryStore } from '../stores/inventoryStore'
 import { useUiStore } from '../stores/uiStore'
+import { EventBus, GameEvents } from '../game/EventBus'
 
-const QUICKSLOT_KEYS = ['KeyZ', 'KeyX', 'KeyC', 'KeyV'] as const
-const QUICKSLOT_LABELS = ['Z', 'X', 'C', 'V'] as const
+const QUICKSLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'] as const
+const QUICKSLOT_LABELS = ['1', '2', '3', '4', '5', '6', '7'] as const
 
 const SKILL_INFO: Record<string, { name: string; icon: string }> = {
-  skill_charge_slash: { name: '참마돌격', icon: '⚡' },
-  skill_glaive_flurry: { name: '언월난무', icon: '🌀' },
+  skill_charge_slash: { name: '참마돌격', icon: '/assets/img/fx/skill_wild_horse_charge.png' },
+  skill_glaive_flurry: { name: '언월난무', icon: '/assets/img/fx/skill_crescent_moon_dance.png' },
   skill_decisive_strike: { name: '일격필살', icon: '💀' },
   skill_dragon_slash: { name: '청룡참', icon: '🐉' },
   skill_lightning_descent: { name: '뇌신강림', icon: '🌩️' },
 }
+
+type SkillStatus = { cooldownLeftMs: number; cooldownMs: number; mp: number; mpCost: number; available: boolean }
 
 /**
  * 퀵슬롯 액션바 (우하단, 단축키 안내바 위, 1~7 숫자키).
@@ -30,6 +33,15 @@ export function ActionBar() {
   const defs = useInventoryStore((s) => s.defs)
   const [flash, setFlash] = useState<number | null>(null)
   const heldRef = useRef<HTMLDivElement>(null)
+  const [skillStatuses, setSkillStatuses] = useState<Record<string, SkillStatus>>({})
+
+  useEffect(() => {
+    const onSkillStatus = (status: { skills?: Record<string, SkillStatus> }) => setSkillStatuses(status.skills ?? {})
+    EventBus.on(GameEvents.SKILL_STATUS, onSkillStatus)
+    return () => {
+      EventBus.off(GameEvents.SKILL_STATUS, onSkillStatus)
+    }
+  }, [])
 
   // 숫자키 1~7 (채팅/설정 중에는 무시)
   useEffect(() => {
@@ -100,10 +112,15 @@ export function ActionBar() {
         {Array.from({ length: QUICKSLOT_COUNT }, (_, i) => {
           const entry = slots[i]
           const v = entry ? entryView(entry) : null
+          const skillStatus = entry?.kind === 'skill' ? skillStatuses[entry.code] : undefined
+          const skillBlocked = entry?.kind === 'skill' && !!skillStatus && !skillStatus.available
+          const cooldownProgress = skillStatus && skillStatus.cooldownMs > 0
+            ? Math.max(0, Math.min(1, skillStatus.cooldownLeftMs / skillStatus.cooldownMs))
+            : 0
           return (
             <div
               key={i}
-              className={`aqs-slot ${flash === i ? 'aqs-slot--flash' : ''}`}
+              className={`aqs-slot ${flash === i ? 'aqs-slot--flash' : ''} ${skillBlocked ? 'aqs-slot--skill-disabled' : ''}`}
               draggable={!!entry && !held}
               onDragStart={(e) => {
                 if (!entry) return
@@ -118,15 +135,23 @@ export function ActionBar() {
               onDrop={(e) => onDrop(e, i)}
               onClick={() => {
                 if (held) useQuickslotStore.getState().placeHeld(i)
-                else if (entry) useQuickslotStore.getState().trigger(i)
+                else if (entry && !skillBlocked) useQuickslotStore.getState().trigger(i)
               }}
               title={v ? `${v.label} (${QUICKSLOT_LABELS[i]}키)` : `빈 슬롯 — 아이템/스킬을 드래그해 등록 (${QUICKSLOT_LABELS[i]}키)`}
             >
               <span className="aqs-num">{QUICKSLOT_LABELS[i]}</span>
               {v && (
                 <span className="aqs-icon" style={{ background: v.color }}>
-                  {v.icon}
+                  {v.icon.startsWith('/') ? <img src={v.icon} alt="" /> : v.icon}
                   {v.count !== null && <em className="aqs-count">{v.count}</em>}
+                  {entry?.kind === 'skill' && skillBlocked && (
+                    <span
+                      className="aqs-cooldown"
+                      style={{ background: `conic-gradient(rgba(8, 10, 15, 0.78) ${cooldownProgress * 360}deg, transparent 0)` }}
+                    >
+                      <em>{skillStatus && skillStatus.cooldownLeftMs > 0 ? Math.ceil(skillStatus.cooldownLeftMs / 1000) : 'MP'}</em>
+                    </span>
+                  )}
                 </span>
               )}
             </div>

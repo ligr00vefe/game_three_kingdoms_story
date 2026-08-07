@@ -18,7 +18,6 @@ import { gainExp } from '../systems/progression'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useAutoCombatStore } from '../../stores/autoCombatStore'
-import { useDefenseTacticsStore } from '../../stores/defenseTacticsStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
 import { FEATURES } from '../../features'
 import { drawSpeechBubble, WORLD_UI_RESOLUTION } from '../utils/bubble'
@@ -252,7 +251,6 @@ export class GameScene extends Phaser.Scene {
   /** 게임 모드 — 'defense'면 디펜스 시스템(DefenseManager) 활성, 일반 포탈/스폰 대신 웨이브 진행 */
   private mode: 'normal' | 'defense' = 'normal'
   private defense?: DefenseManager
-  private defenseTacticSlot: 1 | 2 | 3 | 4 | 5 | 6 | null = null
   /** menu 포탈에서 "성밖으로" 선택 시 이동할 타깃 (PORTAL_MENU emit 시 보관) */
   private menuPortalTarget: PortalDef | null = null
   /** 하늘에 떠서 가로로 흘러가는 구름들 — update()에서 x를 밀고 band 밖으로 나가면 반대쪽에서 재진입 */
@@ -278,6 +276,7 @@ export class GameScene extends Phaser.Scene {
   }
   private commandRequestId = 0
   private pickupCommandQueued = false
+  private lastSkillStatusAt = -Infinity
 
   /** AI 생성 아트가 로드됐는지 — 없으면 placeholder 폴백 (Phase 7) */
   private art(key: string) {
@@ -313,7 +312,6 @@ export class GameScene extends Phaser.Scene {
     this.mode = data.mode ?? (this.mapKey === 'map_defense' ? 'defense' : 'normal')
     useGameStore.getState().setStats({ stageCode: this.mapKey })
     this.defense = undefined
-    this.defenseTacticSlot = null
     this.menuPortalTarget = null
     this.transitioning = false
     this.npcs = []
@@ -339,8 +337,11 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, map.worldWidth, map.worldHeight)
     this.cameras.main.setBackgroundColor(0x87ceeb)
     // 메이플 비율: 줌으로 캐릭터/지형을 크게 (config.CAMERA.ZOOM)
-    this.cameras.main.setZoom(CAMERA.ZOOM)
+    this.cameras.main.setZoom(this.getCameraZoom())
     this.cameras.main.setRoundPixels(true)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.updateCameraZoom, this)
+    window.addEventListener('fullscreenchange', this.updateCameraZoom)
+    window.addEventListener('resize', this.updateCameraZoom)
 
     // 줌 적용 후 실제 보이는 월드 크기 — 배경 커버 폭 계산용
     const viewW = width / CAMERA.ZOOM
@@ -499,6 +500,15 @@ export class GameScene extends Phaser.Scene {
       const t = solids.create(x + 16, map.groundY + 16, 'tile_ground') as Phaser.Physics.Arcade.Sprite
       t.setDepth(DEPTH.GROUND)
       if (walkwayArt) t.setVisible(false) // 충돌만 담당, 시각은 이미지로
+    }
+    // 디펜스 아레나 양 끝은 낭떠러지가 아니라 충돌벽으로 막는다.
+    if (this.mode === 'defense') {
+      for (const edgeX of [16, map.worldWidth - 16]) {
+        for (let y = Math.max(0, map.groundY - 256); y < map.worldHeight; y += 32) {
+          const wall = solids.create(edgeX, y + 16, 'tile_ground') as Phaser.Physics.Arcade.Sprite
+          wall.setVisible(false)
+        }
+      }
     }
     // 바닥 아래 장식 밴드 — 캐릭터가 화면 bottom에 직접 닿지 않는다 (성 내부는 석재 안뜰)
     const underH = map.underFloorHeight ?? 96
@@ -715,12 +725,23 @@ export class GameScene extends Phaser.Scene {
     // 점프 대시는 대쉬 먼지 하나만, 이단 점프는 상승 기류 하나만 재생해 서로 겹치지 않게 한다.
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
-    this.player.onSkill = (hitbox, facing) => {
-      // 시전 가능한 스킬이 참마돌격 하나뿐이라 분기 없이 바로 호출한다 (skillStore의 5종은
-      // 스킬트리 UI 데이터일 뿐 아직 시전 경로가 없음). 스킬별 분기가 생기면 여기서 갈라야 한다.
+    this.player.onSkillStart = (facing, skillCode) => {
+      if (skillCode === 'skill_glaive_flurry') this.player.startGlaiveMotion()
+      if (skillCode !== 'skill_decisive_strike') return
+      this.effects.decisiveStrike(this.player.x, this.player.y + 10, facing)
+    }
+    this.player.onSkill = (hitbox, facing, skillCode) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
-      this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
-      this.resolveAttack(hitbox, COMBAT.SKILL_MAX_TARGETS, true)
+      const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
+      const isDecisiveStrike = skillCode === 'skill_decisive_strike'
+      const attackArea = isGlaiveFlurry
+        // 언월난무는 점프 중 바닥을 내려찍는 기술이므로, 공중에 뜬 캐릭터의
+        // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
+        ? new Phaser.Geom.Circle(this.player.x, this.map.groundY - 42, 150)
+        : hitbox
+      if (isGlaiveFlurry) this.effects.skillGlaive(this.player.x, this.player.y + 18, facing, this.map.groundY)
+      else if (!isDecisiveStrike) this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
+      this.resolveAttack(attackArea, isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS, true, isGlaiveFlurry ? 1.25 : 1)
       // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
       this.physics.pause()
       this.cameras.main.shake(90, 0.004)
@@ -755,9 +776,7 @@ export class GameScene extends Phaser.Scene {
     }
     // 디펜스 오케스트레이션 (웨이브/타이머/바리케이트/기지/승패)
     if (this.mode === 'defense' && structures) {
-      this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget, this.effects)
-      this.defenseTacticSlot = 1
-      useDefenseTacticsStore.getState().selectTactic(1)
+      this.defense = new DefenseManager(this, this.spawner, map.groundY, map.worldWidth, structures, this.playerTarget, this.effects, (monster) => this.rewardMonsterDefeat(monster))
       this.guanYu.cancelForManualControl()
       this.player.facing = 1
       this.setupDefenseInput()
@@ -801,9 +820,6 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.DEFENSE_ARCHER_VOLLEY, this.handleArcherVolley, this)
     EventBus.on(GameEvents.DEFENSE_REPAIR, this.handleDefenseRepair, this)
     EventBus.on(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
-    EventBus.on(GameEvents.DEFENSE_TACTIC, this.handleDefenseTactic, this)
-    EventBus.on(GameEvents.DEFENSE_WAVE_START, this.handleDefenseWaveStart, this)
-    EventBus.on(GameEvents.DEFENSE_WAVE_COMPLETE, this.handleDefenseWaveComplete, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GameEvents.LEVEL_UP, this.handleLevelUp, this)
       EventBus.off(GameEvents.PLAYER_DIED, this.handleDeath, this)
@@ -825,9 +841,6 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.DEFENSE_ARCHER_VOLLEY, this.handleArcherVolley, this)
       EventBus.off(GameEvents.DEFENSE_REPAIR, this.handleDefenseRepair, this)
     EventBus.off(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
-      EventBus.off(GameEvents.DEFENSE_TACTIC, this.handleDefenseTactic, this)
-      EventBus.off(GameEvents.DEFENSE_WAVE_START, this.handleDefenseWaveStart, this)
-      EventBus.off(GameEvents.DEFENSE_WAVE_COMPLETE, this.handleDefenseWaveComplete, this)
       this.defense?.destroy()
     })
 
@@ -846,7 +859,13 @@ export class GameScene extends Phaser.Scene {
     // 플레이어 위치는 100ms 간격 스로틀 전송 — React 리렌더 부담 최소화
     this.time.addEvent({
       delay: 100, loop: true, callback: () => {
-        EventBus.emit(GameEvents.PLAYER_MOVED, { x: this.player.x, y: this.player.y })
+        EventBus.emit(GameEvents.PLAYER_MOVED, {
+          x: this.player.x,
+          y: this.player.y,
+          monsters: this.spawner?.monsters
+            .filter((monster) => monster.active && monster.alive)
+            .map((monster) => ({ x: monster.x, y: monster.y, code: monster.monsterCode, hp: monster.hp, maxHp: monster.def.maxHp })) ?? [],
+        })
       },
     })
 
@@ -971,26 +990,23 @@ export class GameScene extends Phaser.Scene {
 
   private handleDefenseUpgrade = (upgrade: DefenseUpgrade) => this.defense?.chooseUpgrade(upgrade)
 
-  private handleDefenseTactic = (slot: 1 | 2 | 3 | 4 | 5 | 6) => {
-    if (!this.defense) return
-    this.defenseTacticSlot = slot
-    const wallX = this.defense.getWallGuardX()
-    if (slot === 1) this.guanYu.cancelForManualControl()
-    else if (slot === 3) this.guanYu.guardDefenseWall(wallX, this.player.x)
-    else if (slot === 6) this.guanYu.returnToDefenseWall(wallX)
-    else this.guanYu.activateTacticAutoCombat()
-  }
-
-  private handleDefenseWaveStart = () => {
-    if (this.defenseTacticSlot === 2 && !this.guanYu.isCommandActive()) this.guanYu.activateTacticAutoCombat()
-  }
-
-  private handleDefenseWaveComplete = () => {
-    if (this.defenseTacticSlot !== 2 || this.guanYu.isCommandActive() || !this.defense) return
-    this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
-  }
-
   /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치, 마우스 이동 시 설치 미리보기 갱신 */
+  private isFullscreenViewport() {
+    return Boolean(document.fullscreenElement) ||
+      (window.innerWidth >= screen.width - 4 && window.innerHeight >= screen.height - 4)
+  }
+
+  private getCameraZoom() {
+    return this.isFullscreenViewport()
+      ? CAMERA.ZOOM * CAMERA.FULLSCREEN_ZOOM_MULTIPLIER
+      : CAMERA.ZOOM
+  }
+
+  private updateCameraZoom = () => {
+    if (!this.cameras?.main) return
+    this.cameras.main.setZoom(this.getCameraZoom())
+  }
+
   private setupDefenseInput() {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (!this.defense || !this.defense.placing) return
@@ -1006,7 +1022,14 @@ export class GameScene extends Phaser.Scene {
 
   /** 히트박스 안의 몬스터에게 데미지 — 가까운 순 maxTargets마리 (GAME_DESIGN 4.1) */
   /** 히트박스에 걸린 몬스터에 데미지를 적용하고, **실제로 맞은 대상**을 거리순으로 반환한다 */
-  private resolveAttack(hitbox: Phaser.Geom.Rectangle, maxTargets: number, isSkill: boolean): Monster[] {
+  private rewardMonsterDefeat(m: Monster) {
+    gainExp(m.def.exp)
+    const allDrops = (m.def as MonsterDef & { drops?: DropDef[] }).drops
+    const drops = FEATURES.equipment ? allDrops : allDrops?.filter((d) => d.code === 'coin')
+    if (drops) this.drops.rollDrops(m.x, m.y - 10, drops)
+  }
+
+  private resolveAttack(hitbox: Phaser.Geom.Rectangle | Phaser.Geom.Circle, maxTargets: number, isSkill: boolean, damageMultiplier = 1): Monster[] {
     const attackPower = useGameStore.getState().attackPower
     const candidates = this.spawner.monsters
       .filter((m) => m.alive && hitbox.contains(m.x, m.y))
@@ -1017,7 +1040,7 @@ export class GameScene extends Phaser.Scene {
       const dmg = isSkill
         ? rollSkillDamage(attackPower, m.def.defense)
         : rollBasicDamage(attackPower, m.def.defense)
-      const died = m.receiveHit(dmg.amount, dmg.crit, this.player.x, this.effects, this.time.now)
+      const died = m.receiveHit(Math.round(dmg.amount * damageMultiplier), dmg.crit, this.player.x, this.effects, this.time.now)
       if (died) {
         gainExp(m.def.exp)
         // 드랍 판정 (GAME_DESIGN 8.1) — 장비 숨김 중엔 골드 외 아이템은 인벤토리로 못 가니 제외
@@ -1305,8 +1328,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 퀵슬롯 스킬 발동 요청 (숫자키) — 실제 시전 가능 여부는 Player가 판정 */
-  private handleCastSkill = () => {
-    this.player.queueSkill()
+  private handleCastSkill = (skillCode?: string) => {
+    this.player.queueSkill(skillCode)
   }
 
   /** 채팅 입력·설정 패널이 열린 동안 게임 키 입력을 차단한다 */
@@ -1396,15 +1419,10 @@ export class GameScene extends Phaser.Scene {
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
     const commandActive = this.guanYu.isCommandActive()
-    const guardTacticSelected = this.mode === 'defense' && (this.defenseTacticSlot === 3 || this.defenseTacticSlot === 6)
     if (manualInput) this.guanYu.cancelForManualControl()
     const auto = useAutoCombatStore.getState()
     const gameStats = useGameStore.getState()
-    if (!manualInput && !commandActive && guardTacticSelected && this.defense) {
-      if (this.defenseTacticSlot === 3 && this.guanYu.state === 'HOLDING') this.guanYu.guardDefenseWall(this.defense.getWallGuardX(), this.player.x)
-      if (this.defenseTacticSlot === 6 && this.guanYu.state === 'HOLDING') this.guanYu.returnToDefenseWall(this.defense.getWallGuardX())
-    }
-    if (auto.enabled && !manualInput && !commandActive && !guardTacticSelected) this.guanYu.activateAutoCombat()
+    if (auto.enabled && !manualInput && !commandActive) this.guanYu.activateAutoCombat()
     const previousGuanYuState = this.guanYu.state
     this.guanYu.update(
       this.player,
@@ -1429,6 +1447,24 @@ export class GameScene extends Phaser.Scene {
     if (arrivedCommandTarget) this.handleCommandArrival(arrivedCommandTarget)
     this.updateHybridControl()
     this.player.update(this.hybridControl, this.time.now)
+    if (this.time.now - this.lastSkillStatusAt >= 80) {
+      this.lastSkillStatusAt = this.time.now
+      const skillCodes = Object.keys(COMBAT.SKILL_COOLDOWN_MS_BY_CODE)
+      const skills = Object.fromEntries(skillCodes.map((code) => {
+        const cooldownMs = this.player.skillCooldownMs(code)
+        const cooldownLeftMs = this.player.skillCooldownLeftFor(code, this.time.now)
+        return [code, {
+          cooldownLeftMs,
+          cooldownMs,
+          mp: gameStats.mp,
+          mpCost: COMBAT.SKILL_MP_COST,
+          available: cooldownLeftMs <= 0 && gameStats.mp >= COMBAT.SKILL_MP_COST,
+        }]
+      }))
+      EventBus.emit(GameEvents.SKILL_STATUS, {
+        skills,
+      })
+    }
 
     // NPC에게 이동 명령으로 도착하면 기존 대화 시스템을 그대로 연다.
     if (previousGuanYuState === 'MOVING_TO_NPC' && this.guanYu.state === 'HOLDING') {

@@ -14,6 +14,7 @@ interface Dropped extends Phaser.Physics.Arcade.Sprite {
   itemCode?: string
   quantity?: number
   expiresAt?: number
+  coinRollUntil?: number
 }
 
 const ICON_BY_CODE: Record<string, string> = {
@@ -69,6 +70,7 @@ export class ItemDropManager {
     item.itemCode = code
     item.quantity = quantity
     item.expiresAt = this.scene.time.now + EXPIRE_MS
+    item.coinRollUntil = code === 'coin' ? this.scene.time.now + 1_100 : undefined
     // 풀에서 재사용된 스프라이트는 이전 동전이 굴러가며 남긴 각도를 그대로 갖고 있다.
     // 초기화하지 않으면 물약·장비 아이콘이 비스듬히 기울어진 채 떨어진다.
     item.setRotation(0)
@@ -93,7 +95,7 @@ export class ItemDropManager {
       const overlapping = dx < 34 && dy < 44
 
       if (item.itemCode === 'coin') {
-        this.rollCoin(item, dtSec)
+        this.rollCoin(item, dtSec, now)
         if (overlapping) this.collectCoin(item) // 동전은 자동 획득
       } else if (pickupPressed && overlapping) {
         this.collectItem(item)
@@ -110,9 +112,14 @@ export class ItemDropManager {
    * 오른쪽(vx>0)으로 굴러가면 시계방향으로 돈다.
    * 공중에 떠 있는 동안에도 같은 식으로 돌아 튀어오를 때의 회전이 끊기지 않는다.
    */
-  private rollCoin(item: Dropped, dtSec: number) {
+  private rollCoin(item: Dropped, dtSec: number, now: number) {
     const body = item.body as Phaser.Physics.Arcade.Body | null
     if (!body) return
+    if (now >= (item.coinRollUntil ?? 0)) {
+      body.setVelocityX(0)
+      return
+    }
+    body.setVelocityX(body.velocity.x * Math.pow(0.02, dtSec))
     item.rotation += (body.velocity.x / COIN_RADIUS) * dtSec
   }
 

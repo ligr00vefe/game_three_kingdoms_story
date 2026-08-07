@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { login, register } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
 
@@ -29,8 +29,15 @@ export function Launcher() {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const user = useAuthStore((state) => state.user)
+  const loginIdInputRef = useRef<HTMLInputElement>(null)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!loggedIn) loginIdInputRef.current?.focus()
+  }, [loggedIn, mode])
 
   const submit = async () => {
+    if (busy || !loginId || !password || (mode === 'register' && !displayName)) return
     setBusy(true)
     setMessage('')
     try {
@@ -69,17 +76,36 @@ export function Launcher() {
               <button className="launcher-start-btn" onClick={() => { if (openGameWindow()) setLaunched(true) }}>게임 시작</button>
             </div>
           ) : (
-            <>
+            <form onSubmit={(event) => { event.preventDefault(); void submit() }}>
               {mode === 'register' && <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="게임에서 보일 이름" maxLength={30} />}
-              <input value={loginId} onChange={(e) => setLoginId(e.target.value)} placeholder="로그인 ID" maxLength={30} />
-              <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호 (4자 이상)" type="password" maxLength={72} />
-              <button className="launcher-btn" disabled={busy || !loginId || !password || (mode === 'register' && !displayName)} onClick={submit}>
+              <input
+                ref={loginIdInputRef}
+                value={loginId}
+                onChange={(e) => setLoginId(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && mode === 'login') {
+                    event.preventDefault()
+                    passwordInputRef.current?.focus()
+                  }
+                }}
+                placeholder="로그인 ID"
+                maxLength={30}
+              />
+              <input
+                ref={passwordInputRef}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호 (4자 이상)"
+                type="password"
+                maxLength={72}
+              />
+              <button type="submit" className="launcher-btn" disabled={busy || !loginId || !password || (mode === 'register' && !displayName)}>
                 {mode === 'login' ? '로그인' : '회원가입'}
               </button>
-              <button className="launcher-switch" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage('') }}>
+              <button type="button" className="launcher-switch" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage('') }}>
                 {mode === 'login' ? '처음이신가요? 회원가입' : '이미 계정이 있나요? 로그인'}
               </button>
-            </>
+            </form>
           )}
           {message && <p className="launcher-message">{message}</p>}
         </section>

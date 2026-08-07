@@ -61,8 +61,12 @@ export class SpawnManager {
 
   private acquire(code: string): Monster {
     const idle = this.pool.pop()
-    if (idle) return idle
+    if (idle) {
+      idle.monsterCode = code
+      return idle
+    }
     const m = new Monster(this.scene, this.defs[code])
+    m.monsterCode = code
     for (const group of this.collideWith) {
       this.scene.physics.add.collider(m, group)
     }

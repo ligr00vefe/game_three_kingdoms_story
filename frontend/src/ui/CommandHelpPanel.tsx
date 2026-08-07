@@ -1,4 +1,11 @@
+import { useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
+
+const GAME_CONTROLS = [
+  { title: 'Movement', commands: [['Arrow keys / WASD', 'Move the character'], ['Space', 'Jump'], ['S', 'Sit or interact'], ['K', 'Open the skill window']] },
+  { title: 'Combat', commands: [['J', 'Basic attack'], ['1 - 7', 'Use the quick slot skill'], ['Auto', 'Nearest enemy attack and automatic skill use']] },
+  { title: 'Interface', commands: [['F1', 'Open the full game help'], ['A', 'Open AI command examples'], ['M', 'Toggle the minimap'], ['ESC', 'Close the current window or open settings']] },
+] as const
 
 const COMMAND_GROUPS = [
   {
@@ -50,6 +57,7 @@ const COMMAND_GROUPS = [
 
 export function CommandHelpPanel() {
   const open = useUiStore((s) => s.commandHelpOpen)
+  const [activeTab, setActiveTab] = useState<'controls' | 'ai'>('controls')
   if (!open) return null
 
   const close = () => useUiStore.getState().setCommandHelpOpen(false)
@@ -59,12 +67,29 @@ export function CommandHelpPanel() {
       <div className="command-help" onClick={(event) => event.stopPropagation()}>
         <div className="command-help__header">
           <div>
-            <span className="command-help__key">A / F1</span>
+            <span className="command-help__key">F1</span>
             <strong>AI 명령어 예시</strong>
           </div>
           <button className="ks-close" onClick={close}>×</button>
         </div>
 
+        <div className="command-help__tabs">
+          <button className={activeTab === 'controls' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('controls')}>GAME CONTROLS</button>
+          <button className={activeTab === 'ai' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('ai')}>AI COMMANDS</button>
+        </div>
+        {activeTab === 'controls' && (
+          <div className="command-help__groups command-help__controls">
+            {GAME_CONTROLS.map((group) => (
+              <section key={group.title} className="command-help__group">
+                <h3>{group.title}</h3>
+                {group.commands.map(([command, description]) => (
+                  <div key={command} className="command-help__row"><code>{command}</code><span>{description}</span></div>
+                ))}
+              </section>
+            ))}
+          </div>
+        )}
+        <div className={activeTab === 'ai' ? '' : 'command-help__panel-hidden'}>
         <p className="command-help__intro">
           <b>방향키·공격키로 직접 조작</b>하거나, <b>Enter</b>를 누르고 채팅창에 명령할 수 있습니다.
           키보드를 조작하면 진행 중이던 자동 명령은 취소되고 직접 조작으로 전환됩니다.
@@ -88,6 +113,7 @@ export function CommandHelpPanel() {
         <p className="command-help__note">
           ↑키로 기존 NPC·포탈에 상호작용할 수 있습니다. 마을에는 적이 없어 “계속 싸워”는 대기할 수 있으니 이동 명령은 “돌진”으로 확인하십시오.
         </p>
+        </div>
         <button className="command-help__close" onClick={close}>확인 (A, F1 또는 ESC)</button>
       </div>
     </div>

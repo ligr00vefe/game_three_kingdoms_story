@@ -2,7 +2,7 @@
   "name": "defense_arena",
   "displayName": "황건적 방어전",
   "underFloorStyle": "water",
-  "worldWidth": 3200,
+  "worldWidth": 2133,
   "worldHeight": 664,
   "groundY": 536,
   "playerSpawn": {

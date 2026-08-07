@@ -66,7 +66,7 @@ npm run dev
 3. 화면 아래 "server: 연결됨" 표시 (Vite 프록시 → Spring → 응답 왕복 정상)
 4. MySQL `game_three_kingdoms`에 `game_character`, `item_definition`, `inventory_item`, `flyway_schema_history` 테이블 생성 확인
 
-API 문서: http://localhost:8080/swagger-ui.html
+API 문서: http://localhost:8081/swagger-ui.html
 
 ## 테스트
 

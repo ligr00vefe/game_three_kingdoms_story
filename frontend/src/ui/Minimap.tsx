@@ -15,6 +15,14 @@ interface MapInfo {
   portals: { x: number; y: number }[]
 }
 
+interface MinimapMonster {
+  x: number
+  y: number
+  code: string
+  hp: number
+  maxHp: number
+}
+
 // GameScene.create()가 React 마운트 타이밍과 무관하게 emit해도 잃지 않도록 모듈 수준에서 캐시
 let lastMapInfo: MapInfo | null = null
 EventBus.on(GameEvents.MAP_INFO, (info: MapInfo) => { lastMapInfo = info })
@@ -34,6 +42,7 @@ export function Minimap() {
   const nameRef = useRef<HTMLSpanElement>(null)
   const baseRef = useRef<HTMLCanvasElement | null>(null) // 지형만 그려둔 오프스크린
   const playerPos = useRef({ x: 0, y: 0 })
+  const monsters = useRef<MinimapMonster[]>([])
 
   useEffect(() => {
     if (!open) return
@@ -96,6 +105,16 @@ export function Minimap() {
       // 플레이어 (노란 점 + 흰 테두리)
       const px = (playerPos.current.x / info.worldWidth) * W
       const py = (playerPos.current.y / info.worldHeight) * H
+      for (const monster of monsters.current) {
+        const mx = (monster.x / info.worldWidth) * W
+        const my = (monster.y / info.worldHeight) * H
+        const isBoss = monster.code.includes('boss')
+        const isElite = monster.code.includes('shield') || monster.code.includes('exploder')
+        ctx.beginPath()
+        ctx.arc(mx, my, isBoss ? 3 : isElite ? 2.5 : 1.8, 0, Math.PI * 2)
+        ctx.fillStyle = isBoss ? '#ff5252' : monster.code.includes('runner') ? '#ffb74d' : isElite ? '#64b5f6' : '#e57373'
+        ctx.fill()
+      }
       ctx.beginPath()
       ctx.arc(px, py, 2.5, 0, Math.PI * 2)
       ctx.fillStyle = '#ffd835'
@@ -110,7 +129,11 @@ export function Minimap() {
       render()
     }
     const onMapInfo = (info: MapInfo) => { drawBase(info); render() }
-    const onMoved = (p: { x: number; y: number }) => { playerPos.current = p; render() }
+    const onMoved = (p: { x: number; y: number; monsters?: MinimapMonster[] }) => {
+      playerPos.current = { x: p.x, y: p.y }
+      monsters.current = p.monsters ?? []
+      render()
+    }
     EventBus.on(GameEvents.MAP_INFO, onMapInfo)
     EventBus.on(GameEvents.PLAYER_MOVED, onMoved)
     return () => {

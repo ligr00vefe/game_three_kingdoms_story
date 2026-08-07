@@ -28,7 +28,6 @@ interface DefenseState {
   purchaseOpen: boolean    // 구매 창 열림
   placing: boolean         // 바리케이트 배치 대기(클릭 설치)
   pauseOpen: boolean       // ESC 일시정지 메뉴 열림
-  tacticsOpen: boolean     // 디펜스 전술·명령 창 열림
   setFromEvent: (p: {
     phase: DefensePhase; timeLeftMs: number; stage: number
     zombiesLeft: number; baseHp: number; maxBaseHp: number; defeatReason: DefeatReason; archerCooldownMs: number
@@ -37,7 +36,6 @@ interface DefenseState {
   setPurchaseOpen: (open: boolean) => void
   setPlacing: (placing: boolean) => void
   setPauseOpen: (open: boolean) => void
-  setTacticsOpen: (open: boolean) => void
   reset: () => void
 }
 
@@ -59,15 +57,13 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   purchaseOpen: false,
   placing: false,
   pauseOpen: false,
-  tacticsOpen: false,
-  setFromEvent: (p) => set((state) => ({ active: true, tacticsOpen: state.active ? state.tacticsOpen : true, ...p })),
+  setFromEvent: (p) => set({ active: true, ...p }),
   setPurchaseOpen: (purchaseOpen) => set({ purchaseOpen }),
   setPlacing: (placing) => set({ placing }),
   // 일시정지 메뉴 열림/닫힘에 맞춰 Phaser 씬을 pause/resume 한다 (좀비·타이머 정지)
   setPauseOpen: (pauseOpen) => { set({ pauseOpen }); EventBus.emit(GameEvents.DEFENSE_PAUSE, pauseOpen) },
-  setTacticsOpen: (tacticsOpen) => set({ tacticsOpen }),
   reset: () => set({
-    active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false, tacticsOpen: false,
+    active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false,
     archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
     builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
   }),

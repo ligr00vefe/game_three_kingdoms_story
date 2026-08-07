@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '0.0.0.0',
+    port: 5173,
     proxy: {
       // 개발 중 프론트(5173) → 백엔드(8080) 프록시. CORS 회피의 기본 경로
       '/api': {

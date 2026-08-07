@@ -46,13 +46,15 @@
     "npc_village_chief": "assets/img/npc/npc_gatekeeper_02.png",
     "fx_attack": "assets/img/fx/effect_basic_attack.png",
     "fx_attack_hit": "assets/img/fx/effect_basic_attack_shot.png",
-    "fx_skill_charge": "assets/img/fx/effect_attack_skill_01.png",
+    "fx_skill_charge": "assets/img/fx/skill_wild_horse_charge.png",
+    "fx_skill_glaive": "assets/img/fx/skill_crescent_moon_dance.png",
     "fx_level_up": "assets/img/fx/effect_level_up.png",
     "icon_coin": "assets/img/items/coin.png",
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",
     "fx_dash": "assets/img/fx/effect_dash.png"
   },
   "spritesheets": {
+    "fx_decisive_strike": { "url": "assets/img/fx/effect_a_single_decisive_blow.png", "frameWidth": 256, "frameHeight": 341 },
     "fx_swing":       { "url": "assets/img/fx/effect_smash.png",       "frameWidth": 370, "frameHeight": 537 },
     "bg_river_anim":      { "url": "assets/img/bg/bg_river_animation.png",   "frameWidth": 1350, "frameHeight": 291.25 },
     "zombie_yellow_idle": { "url": "assets/img/monster/normal_zombie_idle_strip.png",   "frameWidth": 128, "frameHeight": 128 },
