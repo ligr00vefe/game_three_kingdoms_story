@@ -34,8 +34,8 @@ const BARRICADES = [
   { tier: 'high', name: '상급 방벽', cost: 500, hp: 500, icon: '🏰' },
 ] as const
 const OFFENSIVE_STRUCTURES = [
-  { kind: 'watchtower' as const, name: '망루(활)', cost: 220, hp: 260, desc: '자동 화살 공격', icon: '🏹' },
-  { kind: 'cannonTower' as const, name: '망루(포)', cost: 330, hp: 380, desc: '소형 포탄·범위 공격', icon: '💣' },
+  { kind: 'watchtower' as const, name: '망루', cost: 220, hp: 260, desc: '자동 화살 공격', icon: '🏹' },
+  { kind: 'cannonTower' as const, name: '포탑', cost: 330, hp: 380, desc: '소형 포탄·범위 공격', icon: '💣' },
   { kind: 'bastion' as const, name: '성루', cost: 450, hp: 520, desc: '중포·강력한 범위 공격', icon: '🏰' },
 ] as const
 const BASE_HP_POTION = { cost: 20, amount: 40 }

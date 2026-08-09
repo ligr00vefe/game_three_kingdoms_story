@@ -36,7 +36,7 @@ public class OllamaCommandService {
 	);
 	private static final Set<String> ALLOWED_TARGETS = Set.of(
 		"forward", "backward", "current_position", "castle_gate", "main_castle",
-		"castle_outside", "outside_combat", "defense_arena", "npc_castle_lord",
+		"castle_model_02", "outside_combat", "defense_arena", "npc_castle_lord",
 		"in_front_of_character", "skill_charge_slash", "skill_glaive_flurry",
 		"skill_decisive_strike", "skill_dragon_slash", "skill_lightning_descent"
 	);
@@ -66,7 +66,7 @@ public class OllamaCommandService {
 		- UNSUPPORTED: 현대 지식, 게임에 없는 능력, 모호하거나 지원하지 않는 요구
 
 		장소:
-		- 성 밖으로 가= MOVE_TO/castle_outside
+		- 성 밖으로 가= MOVE_TO/castle_model_02
 		- 성 밖으로 나가서 싸워= MOVE_TO/outside_combat
 		- 디펜스 아레나·좀비 방어전으로 가= MOVE_TO/defense_arena
 

@@ -71,7 +71,7 @@ interface MapData {
   monsterSpawns: { code: string; xMin: number; xMax: number; max: number }[]
   /** 장식 건물 (충돌 없음): 관청/거리 상가/우측 성벽 마감 등 — groundY에 바닥을 맞춰 배치.
    * yOffset: 밑변 기준선을 groundY에서 위/아래로 옮긴다 (양수=아래로, 음수=위로, px). */
-  decor?: { kind: 'gwan' | 'buildings' | 'rightWall' | 'castleOutside'; x: number; width: number; height: number; yOffset?: number }[]
+  decor?: { kind: 'gwan' | 'buildings' | 'rightWall' | 'castleModel02'; x: number; width: number; height: number; yOffset?: number }[]
   /** 포탈: 근처에서 ↑키로 targetMap으로 이동 (GAME_DESIGN 맵 이동) */
   portals?: PortalDef[]
 }
@@ -81,7 +81,7 @@ const DECOR_TEXTURES: Record<string, { art: string }> = {
   gwan: { art: 'img_gwan' },
   buildings: { art: 'img_buildings' },
   rightWall: { art: 'img_right_wall' },
-  castleOutside: { art: 'img_castle_outside' }, // 성 밖 왼쪽 포탈 옆 성 모형
+  castleModel02: { art: 'img_castle_model_02' }, // 성 밖 왼쪽 포탈 옆 성 모형
 }
 
 /**
@@ -94,7 +94,7 @@ const DECOR_TEXTURES: Record<string, { art: string }> = {
 const UNDER_FLOOR_TEXTURES: Record<string, string> = {
   stone: 'img_courtyard',
   river: 'bg_river',
-  water: 'img_water',
+  water: 'img_pond',
 }
 
 /**
@@ -113,11 +113,11 @@ const NEAR_ART = {
   screenH: 150,
   /** 건물 밑동을 지면선보다 이만큼 아래로 내려 잔디에 묻는다 — 잘린 단면이 보이지 않게 */
   sink: 10,
-  /** 폐허 건물 반복을 성 모형(왼쪽 castle_outside)에서 이만큼 오른쪽으로 띄워 시작한다(월드 px).
+  /** 폐허 건물 반복을 성 모형(왼쪽 castle_model_02)에서 이만큼 오른쪽으로 띄워 시작한다(월드 px).
    *  이 값보다 왼쪽(0~startX)은 폐허 건물이 안 깔려, 성 모형과 겹치지 않는 빈 간격이 생긴다.
    *  키우면 성 모형과 더 멀어지고, 줄이면 가까워진다. (near 레이어는 scrollFactor 0.55라
    *  성 모형과 1:1로 붙지 않고 시차가 있으니, 눈으로 보며 맞추는 값이다.)
-   *  castleOutside decor가 있는 맵에만 적용 — 성 모형이 없는 맵(디펜스 아레나)은 0부터 반복. */
+   *  castleModel02 decor가 있는 맵에만 적용 — 성 모형이 없는 맵(디펜스 아레나)은 0부터 반복. */
   startX: 480,
 } as const
 
@@ -139,11 +139,21 @@ const POND = {
   /** 원본에서 마른 바닥이 시작하는 행 — 이 위(지면·둑)는 길이 대신하므로 잘라낸다.
    *  남는 원본은 724-70=654행 = 화면 654×0.188 ≈ 123px. 밴드가 그보다 높아지면 세로로
    *  반복되어 바닥 한가운데 둑이 다시 나타난다. */
-  floorTop: 70,
+  floorTop: 0,
   /** 연못을 길 아랫변보다 이만큼 위로 끌어올려 겹친다(px). 보행로 아트 밑동이 반투명하거나
    *  살짝 떠서 길과 연못 사이에 뒤 배경(밝은 하늘 등)이 비쳐 보일 때, 그 이음새를 연못으로 덮는다.
    *  연못이 길보다 앞(depth)이라 겹쳐도 자연스럽다. 0이면 딱 맞닿고, 키울수록 연못이 위로 올라온다. */
   rise: 15,
+} as const
+
+/** 성밖 연꽃 연못은 원본 비율을 유지한 채 작게 가로 반복한다. */
+const OUTSIDE_LOTUS_POND = {
+  scale: 0.2,
+  /** 원본 상단 투명 여백 다음, 돌 경계가 시작되는 행. */
+  contentTop: 100,
+  /** 보행로 하단과 돌 경계를 살짝 겹쳐 이음새가 벌어지지 않게 한다. */
+  overlap: 10,
+  background: 0x96c7a4,
 } as const
 
 /** 보행로 밴드 렌더 높이(px). tileScale이 가로·세로 공용이라 이 값이 가로 반복 주기도 정한다
@@ -165,9 +175,9 @@ const WALKWAY_H = 55
 const PLATFORM_ART = {
   /** 성 밖 — 돌 발판 (아래로 초롱/뿌리가 늘어진 아트) */
   stone: {
-    key: 'img_platform_stone_02',
+    key: 'img_platform_stone_01',
     /** 원본 캔버스 세로 */
-    srcH: 368,
+    srcH: 343,
     /** 원본에서 밟는 면(상판 윗면)이 그려진 행 — 실측값 */
     surfaceRow: 40,
     /** 화면에 그릴 높이(px) — 늘리면 발판이 두꺼워지고 늘어진 장식도 함께 길어진다 */
@@ -198,7 +208,9 @@ const PLATFORM_ART = {
  */
 const WALKWAY_SURFACE_ADJUST: Record<string, number> = {
   img_walkway_inside: -30,
-  img_walkway_outside: -3,
+  // bg_walkway_02: 원본 325px 중 투명 여백 123px을 84px 렌더 높이에 맞춰 보정한다.
+  img_walkway_outside: -32,
+  img_walkway_defense: -3,
 }
 
 /**
@@ -248,13 +260,22 @@ export class GameScene extends Phaser.Scene {
   private spawnOverride: { x: number; y: number } | null = null
   private portals: PortalDef[] = []
   private transitioning = false
+  private dragonSlashImpactX = 0
   /** 게임 모드 — 'defense'면 디펜스 시스템(DefenseManager) 활성, 일반 포탈/스폰 대신 웨이브 진행 */
   private mode: 'normal' | 'defense' = 'normal'
   private defense?: DefenseManager
   /** menu 포탈에서 "성밖으로" 선택 시 이동할 타깃 (PORTAL_MENU emit 시 보관) */
   private menuPortalTarget: PortalDef | null = null
   /** 하늘에 떠서 가로로 흘러가는 구름들 — update()에서 x를 밀고 band 밖으로 나가면 반대쪽에서 재진입 */
-  private clouds: { img: Phaser.GameObjects.Image; speed: number; halfW: number }[] = []
+  private clouds: {
+    img: Phaser.GameObjects.Image
+    speed: number
+    halfW: number
+    baseY: number
+    bobHeight: number
+    phase: number
+    flowRate: number
+  }[] = []
   /** 구름이 화면에 잡힐 수 있는 월드 X 우측 한계 (스크롤계수·뷰포트로 산출, 순환 기준) */
   private cloudBandRight = 0
   /** Monster가 참조하는 타깃 뷰 — 매 프레임 객체 재생성 방지용 단일 인스턴스 */
@@ -337,11 +358,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, map.worldWidth, map.worldHeight)
     this.cameras.main.setBackgroundColor(0x87ceeb)
     // 메이플 비율: 줌으로 캐릭터/지형을 크게 (config.CAMERA.ZOOM)
-    this.cameras.main.setZoom(this.getCameraZoom())
+    this.cameras.main.setZoom(CAMERA.ZOOM)
     this.cameras.main.setRoundPixels(true)
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.updateCameraZoom, this)
-    window.addEventListener('fullscreenchange', this.updateCameraZoom)
-    window.addEventListener('resize', this.updateCameraZoom)
 
     // 줌 적용 후 실제 보이는 월드 크기 — 배경 커버 폭 계산용
     const viewW = width / CAMERA.ZOOM
@@ -459,31 +477,47 @@ export class GameScene extends Phaser.Scene {
       // 야외(성 밖): 하늘 → 먼 산 → 언덕/성곽
       addLayer(this.art('bg_sky') ? 'bg_sky' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
       // 감숙성 내부와 동일한 원경 산 능선을 성 밖에도 적용 (⑤⑥ 톤 일관성)
-      if (this.art('bg_mountain')) {
-        addTiledLayer('bg_mountain', 0.08, DEPTH.BG_FAR, 380, 130, 1)
+      // 산 배경은 유지하고, 별도로 반복되던 초록색 임시 중경(bg_hills)만 그리지 않는다.
+      if (this.mode === 'defense') {
+        // 디펜스 전용 키를 사용해 감숙성과 일반 성밖의 산 배경과 완전히 분리한다.
+        if (this.art('bg_mountain_defense')) {
+          // 레이어 영역은 월드 전체를 유지하되 원본만 82%로 축소해 산과 원경이 더 멀리 보이게 한다.
+          const defenseMountain = addLayer('bg_mountain_defense', 0.08, DEPTH.BG_FAR, map.worldHeight, 0)
+          const distantScale = this.tileScaleFor('bg_mountain_defense', map.worldHeight) * 0.82
+          defenseMountain?.setTileScale(distantScale, distantScale)
+        }
+      } else if (this.art('bg_mountain')) {
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 350, 110, 1)
       }
       // 예전엔 중경에 'bg_mountains'(도형 placeholder — PreloadScene에 삼각형 산으로 무조건 생성됨)를
       // 폴백으로 썼는데, 그 키로 실제 아트가 로드되는 일이 없어 항상 삼각형이 보였다. 실제 아트가
       // 생기기 전까진 이 레이어를 아예 생략 — 삼각형 placeholder보다 없는 게 낫다.
-      const nearKey = this.art('bg_broken_buildings')
-        ? 'bg_broken_buildings'
-        : this.art('bg_hills')
-          ? 'bg_hills'
-          : 'ph_wall'
+      // No ruined-building strip outdoors; keep the midground open unless an
+      // optional bright hill layer is supplied.
+      // 초록색 임시 중경 제거는 일반 성밖에만 적용하고 디펜스는 기존 중경을 사용한다.
+      const nearKey: string = this.mode === 'defense'
+        ? this.art('bg_broken_buildings')
+          ? 'bg_broken_buildings'
+          : this.art('bg_hills')
+            ? 'bg_hills'
+            : 'ph_wall'
+        : ''
       if (nearKey === 'bg_broken_buildings') {
         // 투명 여백을 뺀 **건물 실물 높이**를 기준으로 배율을 잡고, 밑동을 지면선(잔디)에 붙인다.
         // addLayer의 tileScale = 레이어높이/원본높이 이므로 캔버스 높이를 역산해서 넘긴다.
         const s = NEAR_ART.screenH / (NEAR_ART.contentBottom - NEAR_ART.contentTop)
         const layerH = NEAR_ART.canvasH * s
         const topY = map.groundY + NEAR_ART.sink - NEAR_ART.contentBottom * s
-        // 성 모형(castleOutside decor)이 있는 맵만 NEAR_ART.startX만큼 오른쪽에서 반복 시작해
+        // 성 모형(castleModel02 decor)이 있는 맵만 NEAR_ART.startX만큼 오른쪽에서 반복 시작해
         // 성 모형과 간격을 둔다. 없는 맵(디펜스 아레나)은 맵 왼쪽 끝(0)부터 바로 반복.
-        const nearStartX = map.decor?.some((d) => d.kind === 'castleOutside') ? NEAR_ART.startX : 0
+        const nearStartX = map.decor?.some((d) => d.kind === 'castleModel02') ? NEAR_ART.startX : 0
         addLayer(nearKey, 0.55, DEPTH.BG_NEAR, layerH, topY, nearStartX)
       } else {
         addLayer(nearKey, 0.55, DEPTH.BG_NEAR, 220, map.groundY - 200)
       }
     }
+
+    if (this.mode === 'defense') this.spawnDefenseCrows(viewW)
 
     // ---- 지형 ----
     const solids = this.physics.add.staticGroup()
@@ -491,11 +525,17 @@ export class GameScene extends Phaser.Scene {
 
     // 보행로(바닥): 지면선 아래 1줄만 물리 충돌. 그 아래는 장식 밴드 (GAME_DESIGN 10.1)
     // 감숙성 내부는 walkway_01(석재), 성 밖은 walkway_03(석벽 위 흙길)으로 별도 텍스처를 쓴다.
-    const walkwayKey = map.theme === 'castle_interior' ? 'img_walkway_inside' : 'img_walkway_outside'
+    const walkwayKey = map.theme === 'castle_interior'
+      ? 'img_walkway_inside'
+      : this.mode === 'defense'
+        ? 'img_walkway_defense'
+        : 'img_walkway_outside'
+    // 성밖 bg_walkway_02는 디펜스 아레나 bg_walkway_03과 동일한 렌더 높이를 사용한다.
+    const walkwayH = map.theme === 'castle_interior' ? WALKWAY_H : 84
     const walkwayArt = this.art(walkwayKey)
     const walkwayY = map.groundY + (WALKWAY_SURFACE_ADJUST[walkwayKey] ?? 0)
+    const walkwayBottom = walkwayArt ? walkwayY + walkwayH : null
     /** 길 아랫변 — 성 밖 연못이 여기에 붙는다. 아트가 없으면(placeholder 폴백) 붙일 데가 없다. */
-    const walkwayBottom = walkwayArt ? walkwayY + WALKWAY_H : null
     for (let x = 0; x < map.worldWidth; x += 32) {
       const t = solids.create(x + 16, map.groundY + 16, 'tile_ground') as Phaser.Physics.Arcade.Sprite
       t.setDepth(DEPTH.GROUND)
@@ -513,7 +553,9 @@ export class GameScene extends Phaser.Scene {
     // 바닥 아래 장식 밴드 — 캐릭터가 화면 bottom에 직접 닿지 않는다 (성 내부는 석재 안뜰)
     const underH = map.underFloorHeight ?? 96
     const underStyle = map.underFloorStyle ?? 'water'
-    const underArtKey = UNDER_FLOOR_TEXTURES[underStyle]
+    const underArtKey = this.mode === 'defense' && underStyle === 'water'
+      ? 'img_pond_defense'
+      : UNDER_FLOOR_TEXTURES[underStyle]
     const underFallback = underStyle === 'stone' ? 'tile_underfloor_stone' : 'tile_underfloor'
     // 바닥 아래 장식(연못/안뜰)은 돌바닥보다 위 depth — 돌바닥 하단 가림 없이 앞에 보인다 (⑦)
     if (this.art(underArtKey)) {
@@ -524,13 +566,36 @@ export class GameScene extends Phaser.Scene {
         // 성 밖: 길 아랫변부터 월드 바닥까지를 마른 연못이 잇는다. tilePositionY로 원본 위쪽
         // (지면·둑)을 잘라내 floorTop 행부터 그리므로, 길이 그린 둑과 겹치지 않는다.
         // POND.rise만큼 위로 끌어올려 길-연못 이음새(뒤 배경이 비치는 틈)를 덮는다.
-        const pondY = (walkwayBottom ?? bandY) - POND.rise
+        // 디펜스의 마른 연못은 기존 55px 바닥 밴드 기준 위치를 유지한다.
+        // 성밖 보행로 렌더 높이를 바꿔도 bg_dried_up_pond가 함께 밀리지 않도록 분리한다.
+        const defensePondY = walkwayArt
+          ? walkwayY + WALKWAY_H - POND.rise
+          : bandY - POND.rise
+        const pondY = this.mode === 'defense'
+          ? defensePondY
+          : (walkwayBottom ?? bandY) - OUTSIDE_LOTUS_POND.overlap
+        const pondHeight = this.mode === 'defense'
+          ? map.worldHeight - pondY
+          : Math.min(
+              map.worldHeight - pondY,
+              (this.textures.get(underArtKey).getSourceImage().height - OUTSIDE_LOTUS_POND.contentTop) * OUTSIDE_LOTUS_POND.scale,
+            )
+        if (this.mode !== 'defense') {
+          this.add.rectangle(0, pondY, map.worldWidth, map.worldHeight - pondY, OUTSIDE_LOTUS_POND.background)
+            .setOrigin(0, 0)
+            .setDepth(DEPTH.FOREGROUND)
+        }
         const pond = this.add
-          .tileSprite(0, pondY, map.worldWidth, map.worldHeight - pondY, underArtKey)
+          .tileSprite(0, pondY, map.worldWidth, pondHeight, underArtKey)
           .setOrigin(0, 0)
           .setDepth(DEPTH.FOREGROUND) // 길 위 — 길 하단이 연못에 자연스럽게 묻힌다
-        pond.setTileScale(POND.scale, POND.scale)
-        pond.tilePositionY = POND.floorTop // 텍스처 좌표(배율 적용 전) 기준
+        if (this.mode === 'defense') {
+          pond.setTileScale(POND.scale, POND.scale)
+          pond.tilePositionY = 70
+        } else {
+          pond.setTileScale(OUTSIDE_LOTUS_POND.scale, OUTSIDE_LOTUS_POND.scale)
+          pond.tilePositionY = OUTSIDE_LOTUS_POND.contentTop
+        }
       } else {
         this.add.tileSprite(0, bandY, map.worldWidth, wh, underArtKey).setOrigin(0, 0)
           .setTileScale(baseScale, baseScale)
@@ -586,8 +651,8 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0, 0).setDepth(DEPTH.FOREGROUND)
     }
     if (walkwayArt) {
-      const walkway = this.add.tileSprite(0, walkwayY, map.worldWidth, WALKWAY_H, walkwayKey).setOrigin(0, 0)
-      walkway.setTileScale(this.tileScaleFor(walkwayKey, WALKWAY_H))
+      const walkway = this.add.tileSprite(0, walkwayY, map.worldWidth, walkwayH, walkwayKey).setOrigin(0, 0)
+      walkway.setTileScale(this.tileScaleFor(walkwayKey, walkwayH))
       walkway.setDepth(DEPTH.GROUND)
     }
 
@@ -684,6 +749,8 @@ export class GameScene extends Phaser.Scene {
     const spawn = this.spawnOverride ?? map.playerSpawn
     this.effects = new EffectManager(this)
     this.player = new Player(this, spawn.x, spawn.y)
+    // Keep the playable character in front of defense structures and scenery.
+    this.player.setDepth(10)
     this.player.setLadders(ladders)
     this.input_ = new InputManager(this)
 
@@ -726,21 +793,46 @@ export class GameScene extends Phaser.Scene {
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
     this.player.onSkillStart = (facing, skillCode) => {
-      if (skillCode === 'skill_glaive_flurry') this.player.startGlaiveMotion()
-      if (skillCode !== 'skill_decisive_strike') return
-      this.effects.decisiveStrike(this.player.x, this.player.y + 10, facing)
+      if (skillCode === 'skill_glaive_flurry') {
+        this.effects.skillGlaive(
+          this.player.x,
+          this.player.y + 18,
+          facing,
+          this.map.groundY,
+          () => this.player.startGlaiveMotion(),
+        )
+        return
+      }
+      if (skillCode === 'skill_decisive_strike') {
+        this.effects.decisiveStrike(
+          this.player.x,
+          this.player.y + 10,
+          facing,
+          () => this.player.releaseDecisiveMotion(),
+        )
+        return
+      }
+      if (skillCode === 'skill_dragon_slash') {
+        this.dragonSlashImpactX = this.player.x + facing * 72
+        this.player.startDragonSlashMotion()
+        // Capture the cast position once. The airborne player no longer drags
+        // the effect after it has appeared.
+        this.effects.dragonSlash(this.dragonSlashImpactX, this.map.groundY, facing)
+      }
     }
     this.player.onSkill = (hitbox, facing, skillCode) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
-      const attackArea = isGlaiveFlurry
+      const isDragonSlash = skillCode === 'skill_dragon_slash'
+      const attackArea = isDragonSlash
+        ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.map.groundY - 42, 125)
+        : isGlaiveFlurry
         // 언월난무는 점프 중 바닥을 내려찍는 기술이므로, 공중에 뜬 캐릭터의
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
         ? new Phaser.Geom.Circle(this.player.x, this.map.groundY - 42, 150)
         : hitbox
-      if (isGlaiveFlurry) this.effects.skillGlaive(this.player.x, this.player.y + 18, facing, this.map.groundY)
-      else if (!isDecisiveStrike) this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
+      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash) this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
       this.resolveAttack(attackArea, isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS, true, isGlaiveFlurry ? 1.25 : 1)
       // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
       this.physics.pause()
@@ -991,22 +1083,6 @@ export class GameScene extends Phaser.Scene {
   private handleDefenseUpgrade = (upgrade: DefenseUpgrade) => this.defense?.chooseUpgrade(upgrade)
 
   /** 디펜스: 맵 클릭 시 포인터 위치(월드 X)에 바리케이트 설치, 마우스 이동 시 설치 미리보기 갱신 */
-  private isFullscreenViewport() {
-    return Boolean(document.fullscreenElement) ||
-      (window.innerWidth >= screen.width - 4 && window.innerHeight >= screen.height - 4)
-  }
-
-  private getCameraZoom() {
-    return this.isFullscreenViewport()
-      ? CAMERA.ZOOM * CAMERA.FULLSCREEN_ZOOM_MULTIPLIER
-      : CAMERA.ZOOM
-  }
-
-  private updateCameraZoom = () => {
-    if (!this.cameras?.main) return
-    this.cameras.main.setZoom(this.getCameraZoom())
-  }
-
   private setupDefenseInput() {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       if (!this.defense || !this.defense.placing) return
@@ -1031,8 +1107,15 @@ export class GameScene extends Phaser.Scene {
 
   private resolveAttack(hitbox: Phaser.Geom.Rectangle | Phaser.Geom.Circle, maxTargets: number, isSkill: boolean, damageMultiplier = 1): Monster[] {
     const attackPower = useGameStore.getState().attackPower
+    const hitsMonsterBody = (monster: Monster) => {
+      const body = monster.body
+      const bounds = new Phaser.Geom.Rectangle(body.x, body.y, body.width, body.height)
+      return hitbox instanceof Phaser.Geom.Circle
+        ? Phaser.Geom.Intersects.CircleToRectangle(hitbox, bounds)
+        : Phaser.Geom.Intersects.RectangleToRectangle(hitbox, bounds)
+    }
     const candidates = this.spawner.monsters
-      .filter((m) => m.alive && hitbox.contains(m.x, m.y))
+      .filter((m) => m.alive && hitsMonsterBody(m))
       .sort((a, b) => Math.abs(a.x - this.player.x) - Math.abs(b.x - this.player.x))
       .slice(0, maxTargets)
 
@@ -1130,7 +1213,7 @@ export class GameScene extends Phaser.Scene {
       : (this.portals[0]?.x ?? 191)
     // 장소 명령은 모델/파서가 좌표를 만들지 않고 승인된 장소 ID만 사용한다.
     const routePortalX = this.portals[0]?.x ?? this.player.x
-    targets.castle_outside = routePortalX
+    targets.castle_model_02 = routePortalX
     targets.outside_combat = routePortalX
     targets.defense_arena = this.mode === 'defense' ? this.player.x : routePortalX
     for (const npc of this.npcs) targets[npc.code] = npc.x
@@ -1274,7 +1357,7 @@ export class GameScene extends Phaser.Scene {
       this.transitionTo({ mapKey: 'map_defense', mode: 'defense', spawnX: 260, spawnY: 440 })
       return
     }
-    if (targetId !== 'castle_outside' && targetId !== 'outside_combat') return
+    if (targetId !== 'castle_model_02' && targetId !== 'outside_combat') return
     if (this.mode === 'defense') {
       if (this.scene.isPaused()) this.scene.resume()
       this.guanYu.execute({
@@ -1393,29 +1476,135 @@ export class GameScene extends Phaser.Scene {
     // 밖에서 시작). y는 아랫변(y + 표시높이/2)이 산 꼭대기(80)를 넘지 않게 잡음(주석 ≈값=아랫변).
     // w=폭px, speed=자체 드리프트(px/초), depth=산 앞(FRONT)/뒤(BEHIND).
     const specs = [
-      { key: 'bg_cloud_01', x: 61, y: 118, w: 80, speed: 0.15, depth: CLOUD_DEPTH_FRONT }, //  아랫변 ≈74
-      { key: 'bg_cloud_03', x: 183, y: 116, w: 33, speed: 0.05, depth: CLOUD_DEPTH_BEHIND }, // 아랫변 ≈72
-      { key: 'bg_cloud_02', x: 304, y: 120, w: 70, speed: 0.06, depth: CLOUD_DEPTH_FRONT }, //  아랫변 ≈74
-      { key: 'bg_cloud_01', x: 426, y: 112, w: 63, speed: 0.07, depth: CLOUD_DEPTH_BEHIND }, // 아랫변 ≈74
-      { key: 'bg_cloud_03', x: 548, y: 114, w: 47, speed: 0.08, depth: CLOUD_DEPTH_FRONT }, //  아랫변 ≈72
-      { key: 'bg_cloud_02', x: 670, y: 123, w: 55, speed: 0.03, depth: CLOUD_DEPTH_BEHIND }, // 아랫변 ≈74
+      { key: 'bg_cloud_01', at: 0.04, y: 72,  w: 82, speed: 5.2, bob: 4, phase: 0.2, depth: CLOUD_DEPTH_FRONT },
+      { key: 'bg_cloud_03', at: 0.21, y: 146, w: 40, speed: 3.8, bob: 7, phase: 1.4, depth: CLOUD_DEPTH_BEHIND },
+      { key: 'bg_cloud_02', at: 0.39, y: 103, w: 68, speed: 4.5, bob: 5, phase: 2.6, depth: CLOUD_DEPTH_FRONT },
+      { key: 'bg_cloud_01', at: 0.58, y: 166, w: 58, speed: 3.2, bob: 6, phase: 3.8, depth: CLOUD_DEPTH_BEHIND },
+      { key: 'bg_cloud_03', at: 0.77, y: 61,  w: 46, speed: 5.8, bob: 4, phase: 5.0, depth: CLOUD_DEPTH_FRONT },
+      { key: 'bg_cloud_02', at: 0.94, y: 128, w: 61, speed: 4.1, bob: 7, phase: 6.2, depth: CLOUD_DEPTH_BEHIND },
     ]
     specs.forEach((s) => {
       if (!this.art(s.key)) return
       const src = this.textures.get(s.key).getSourceImage() as HTMLImageElement
       const dispH = s.w * (src.height / src.width)
       const img = this.add
-        .image(s.x, s.y, s.key)
+        .image(this.cloudBandRight * s.at, s.y, s.key)
         .setOrigin(0.5)
         .setDisplaySize(s.w, dispH)
         .setScrollFactor(scroll, scroll)
         .setDepth(s.depth)
         .setAlpha(0.9)
-      this.clouds.push({ img, speed: s.speed, halfW: s.w / 2 })
+      this.clouds.push({
+        img,
+        speed: s.speed,
+        halfW: s.w / 2,
+        baseY: s.y,
+        bobHeight: s.bob,
+        phase: s.phase,
+        flowRate: 0.00022 + s.at * 0.00005,
+      })
     })
   }
 
-  update(_time: number, delta: number) {
+  /** 디펜스 아레나 전용 하늘 연출: 까마귀 떼가 화면 왼쪽 밖에서 오른쪽 밖으로 천천히 지난다. */
+  private spawnDefenseCrows(viewW: number) {
+    if (!this.art('fx_defense_crows_v4')) return
+    const animationKey = 'fx_defense_crows_fly_v4'
+    if (!this.anims.exists(animationKey)) {
+      this.anims.create({
+        key: animationKey,
+        // The source frames already form one complete 1→8 wingbeat. Keep that
+        // order and play it slowly enough for the individual wing poses to read.
+        frames: this.anims.generateFrameNumbers('fx_defense_crows_v4', { start: 0, end: 7 }),
+        frameRate: 3,
+        repeat: -1,
+      })
+    }
+
+    const schedule = (
+      delay: number,
+      minY: number,
+      maxY: number,
+      minSize: number,
+      maxSize: number,
+      minSpeed: number,
+      maxSpeed: number,
+    ) => {
+      this.time.delayedCall(delay, () => {
+        if (this.mode !== 'defense' || !this.scene.isActive()) return
+        const startY = Phaser.Math.Between(minY, maxY)
+        const startX = -Phaser.Math.Between(60, 145)
+        const endX = viewW + Phaser.Math.Between(60, 145)
+        const flockSize = Phaser.Math.Between(minSize, maxSize)
+        const speed = Phaser.Math.Between(minSpeed, maxSpeed)
+        const travelDuration = Math.round((endX - startX) / speed * 1000)
+        const flock = this.add.sprite(0, 0, 'fx_defense_crows_v4', 0)
+          .setDisplaySize(flockSize, flockSize)
+          .setAlpha(0.82)
+          .play(animationKey)
+        const carrier = this.add.container(startX, startY, [flock])
+          .setScrollFactor(0)
+          .setDepth(CLOUD_DEPTH_FRONT + 1)
+
+        // Each fixed sprite frame adds a tiny backward/downward loop. The bird
+        // anchors still never slide inside the frame; only the entire flock
+        // responds to the current wing pose.
+        flock.on(Phaser.Animations.Events.ANIMATION_UPDATE, (
+          _animation: Phaser.Animations.Animation,
+          _frame: Phaser.Animations.AnimationFrame,
+        ) => {
+          // Every individual frame swap completes one quick up→down pulse.
+          // It does not alternate and hold positions between frames.
+          this.tweens.killTweensOf(flock)
+          flock.setPosition(0, 0)
+          this.tweens.add({
+            targets: flock,
+            y: -1,
+            duration: 55,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              if (!flock.active) return
+              this.tweens.add({
+                targets: flock,
+                y: 0,
+                duration: 135,
+                ease: 'Sine.easeInOut',
+              })
+            },
+          })
+        })
+        this.tweens.add({
+          targets: carrier,
+          x: endX,
+          y: startY,
+          // A small distant flock should drift across the far background rather
+          // than rush past the foreground.
+          duration: travelDuration,
+          ease: 'Sine.easeInOut',
+          onComplete: () => {
+            carrier.destroy(true)
+            // 매번 다른 휴지기를 두어 기계적으로 반복되는 느낌을 줄인다.
+            schedule(
+              Phaser.Math.Between(12_000, 26_000),
+              minY,
+              maxY,
+              minSize,
+              maxSize,
+              minSpeed,
+              maxSpeed,
+            )
+          },
+        })
+      })
+    }
+
+    // Two independent distant flocks: separate altitude bands prevent them
+    // from looking like duplicated sprites travelling on the same path.
+    schedule(1_500, 78, 122, 50, 54, 55, 65)
+    schedule(Phaser.Math.Between(4_000, 8_000), 132, 180, 56, 60, 35, 45)
+  }
+
+  update(time: number, delta: number) {
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
     const commandActive = this.guanYu.isCommandActive()
@@ -1477,7 +1666,10 @@ export class GameScene extends Phaser.Scene {
       const dt = delta / 1000
       for (let i = 0; i < this.clouds.length; i++) {
         const c = this.clouds[i]
-        c.img.x += c.speed * dt
+        // 사인 이징으로 속도와 높이를 연속 변화시켜 구름이 자연스럽게 흘러가게 한다.
+        const flow = Math.sin(time * c.flowRate + c.phase)
+        c.img.x += c.speed * (0.86 + flow * 0.14) * dt
+        c.img.y = c.baseY + Math.sin(time * c.flowRate * 0.72 + c.phase) * c.bobHeight
         if (c.img.x - c.halfW > this.cloudBandRight) c.img.x = -c.halfW
       }
     }

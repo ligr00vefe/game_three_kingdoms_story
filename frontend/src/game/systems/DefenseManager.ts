@@ -21,9 +21,9 @@ export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>
   name: string; cost: number; hp: number; width: number; height: number; tint: number
   damage: number; range: number; cooldownMs: number; groundInset: number; footprint: number; splashRadius?: number
 }> = {
-  watchtower: { name: '망루(활)', cost: 220, hp: 260, width: 270, height: 180, tint: 0xffffff, damage: 18, range: 820, cooldownMs: 2_200, groundInset: 0.038, footprint: 146 },
-  cannonTower: { name: '망루(포)', cost: 330, hp: 380, width: 140, height: 210, tint: 0xffffff, damage: 34, range: 860, cooldownMs: 3_400, groundInset: 0.038, footprint: 124, splashRadius: 64 },
-  bastion: { name: '성루', cost: 450, hp: 520, width: 285, height: 190, tint: 0xffffff, damage: 44, range: 900, cooldownMs: 4_800, groundInset: 0.048, footprint: 204, splashRadius: 92 },
+  watchtower: { name: '망루', cost: 220, hp: 260, width: 270, height: 180, tint: 0xffffff, damage: 18, range: 480, cooldownMs: 2_200, groundInset: 0.066, footprint: 270 },
+  cannonTower: { name: '포탑', cost: 330, hp: 380, width: 140, height: 210, tint: 0xffffff, damage: 34, range: 620, cooldownMs: 3_400, groundInset: 0.062, footprint: 140, splashRadius: 64 },
+  bastion: { name: '성루', cost: 450, hp: 520, width: 285, height: 190, tint: 0xffffff, damage: 44, range: 900, cooldownMs: 4_800, groundInset: 0.075, footprint: 285, splashRadius: 92 },
 }
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
@@ -58,6 +58,10 @@ const DEFENSE = {
   BASE_GATE_OFFSET_X: 130,
   /** 큰 성 이미지의 좌측 여백을 피해 체력바를 성문 쪽으로 옮기는 표시 오프셋. */
   BASE_HP_BAR_OFFSET_X: 104,
+  /** 폭탄 좀비 폭발의 실제 피해 반경. 투척 시점이 아니라 폭발 순간 위치로 판정한다. */
+  ZOMBIE_BOMB_BLAST_RADIUS: 84,
+  /** 포탑(620px)보다 약간 긴 폭탄 좀비의 시설물 공격 사거리. */
+  ZOMBIE_BOMB_STRUCTURE_RANGE: 680,
   /** 기지(성 모형) 렌더 깊이. 액터(플레이어·좀비, 기본 depth 0)보다 **뒤**, 배경/보행로
    *  (GameScene DEPTH.GROUND=-50 이하)보다는 앞. 성 모형이 캐릭터를 가리지 않고
    *  캐릭터가 성문 앞에 서 있는 것처럼 보인다. 바리케이트는 플레이어가 뒤에 숨는 엄폐물이라
@@ -245,16 +249,37 @@ export class DefenseManager {
     const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET - Phaser.Math.Between(0, 180)
     const code = this.monsterCodeFor(this.spawnedCount)
     const monster = this.spawner.spawnAt(code, x, x - 30, x + 20, (m) => this.onZombieDied(m))
+    // Every stage strengthens the whole wave, not only the displayed stage
+    // number. Combat stats grow steadily, while behavioural acceleration is
+    // capped so late waves remain readable and fair.
+    const stageSteps = Math.max(0, this.stage - 1)
+    const hpScale = 1 + stageSteps * 0.04
+    const attackScale = 1 + stageSteps * 0.025
+    const speedScale = 1 + Math.min(stageSteps * 0.012, 0.20)
+    const cooldownScale = 1 - Math.min(stageSteps * 0.008, 0.15)
+    monster.def = {
+      ...monster.def,
+      attack: Math.max(1, Math.round(monster.def.attack * attackScale)),
+      defense: monster.def.defense + Math.floor(stageSteps / 4),
+      moveSpeed: monster.def.moveSpeed * speedScale,
+      attackCooldownMs: Math.round(monster.def.attackCooldownMs * cooldownScale),
+    }
+    monster.maxHp = Math.max(1, Math.round(monster.def.maxHp * hpScale))
+    monster.hp = monster.maxHp
+    monster.onRangedAttack = code === 'zombie_exploder'
+      ? (attacker, impactX) => this.throwZombieBomb(attacker, impactX)
+      : undefined
     // 보스는 기존에 모든 스테이지에서 체력이 고정되어 후반에도 너무 빨리 쓰러졌다.
     // 기본 900에 스테이지마다 6%를 더해 20스테이지에서는 1,926 HP가 된다.
     if (code === 'zombie_boss') {
-      monster.hp = Math.round(monster.def.maxHp * (1 + Math.max(0, this.stage - 1) * 0.06))
+      // Bosses receive an additional 2% HP per stage on top of wave scaling.
+      monster.maxHp = Math.round(monster.def.maxHp * (1 + stageSteps * 0.06))
+      monster.hp = monster.maxHp
     }
     this.scene.time.delayedCall(700, () => {
       if (!monster.active) return
       if (code === 'zombie_runner') monster.setTint(0xffcc80)
       else if (code === 'zombie_shield') monster.setTint(0x90caf9)
-      else if (code === 'zombie_exploder') monster.setTint(0xff8a80)
     })
     this.spawnedCount += 1
   }
@@ -377,6 +402,59 @@ export class DefenseManager {
     })
   }
 
+  private throwZombieBomb(attacker: Monster, aimedX: number) {
+    if (!this.scene.textures.exists('img_bomb')) return
+    const startX = attacker.x + (attacker.flipX ? -24 : 24)
+    const startY = attacker.y - 72
+    const impactX = Phaser.Math.Clamp(aimedX, 0, this.worldWidth)
+    // 풀에 반환된 공격자가 재사용돼도 날아간 폭탄의 공격력이 바뀌지 않도록 투척 시점에 고정한다.
+    const attack = attacker.def.attack
+    const fromX = attacker.x
+    // The target selects horizontal aim only; bombs always explode on terrain.
+    const impactY = this.groundY - 12
+    const explosionY = this.groundY + 8
+    const bomb = this.scene.add.image(startX, startY, 'img_bomb')
+      .setDisplaySize(34, 25).setDepth(8)
+    const flight = { progress: 0 }
+    this.scene.tweens.add({
+      targets: flight,
+      progress: 1,
+      duration: 900,
+      ease: 'Linear',
+      onUpdate: () => {
+        const t = flight.progress
+        const inverse = 1 - t
+        bomb.x = inverse * inverse * startX + 2 * inverse * t * ((startX + impactX) / 2) + t * t * impactX
+        // A high lob makes the delayed projectile visually distinct from the
+        // preceding throw animation and keeps long-range shots readable.
+        bomb.y = inverse * inverse * startY + 2 * inverse * t * (Math.min(startY, impactY) - 240) + t * t * impactY
+        bomb.rotation += 0.16
+      },
+      onComplete: () => {
+        bomb.destroy()
+        // 착탄 자체에는 피해가 없다. 폭발 애니메이션의 화염이 퍼지는 프레임에만 판정한다.
+        this.playCannonImpact(impactX, explosionY, () => {
+          this.applyZombieBombBlast(impactX, attack, fromX)
+        })
+      },
+    })
+  }
+
+  /** 폭발 순간 범위 안에 남아 있는 캐릭터와 시설물만 피해를 받는다. */
+  private applyZombieBombBlast(impactX: number, attack: number, fromX: number) {
+    const radius = DEFENSE.ZOMBIE_BOMB_BLAST_RADIUS
+    if (this.playerTarget.alive && Math.abs(this.playerTarget.x - impactX) <= radius) {
+      this.playerTarget.receiveHit(Math.round(attack), fromX)
+    }
+    for (const structure of this.structures) {
+      if (structure.hp <= 0) continue
+      const left = structure.spr.x - structure.footprint / 2
+      const right = structure.spr.x + structure.footprint / 2
+      const horizontalDistance = impactX < left ? left - impactX : impactX > right ? impactX - right : 0
+      if (horizontalDistance <= radius) this.damageStructure(structure, Math.round(attack * 1.75))
+    }
+  }
+
   private ensureCannonAnimations() {
     if (!this.scene.textures.exists('img_cannon_sheet')) return
     const texture = this.scene.textures.get('img_cannon_sheet')
@@ -408,6 +486,35 @@ export class DefenseManager {
     })
   }
 
+  private playCannonImpact(x: number, y: number, onExplosion?: () => void) {
+    if (!this.scene.anims.exists('cannon_impact_anim')) {
+      onExplosion?.()
+      return
+    }
+    const impact = this.scene.add.sprite(x, y, 'img_cannon_sheet', 'cannon_impact_0')
+      .setOrigin(0.5, 1).setDepth(7)
+    const normalizeImpactSize = () => impact.setDisplaySize(150, 140)
+    let explosionApplied = false
+    let shownFrames = 0
+    const applyExplosionAtBurstFrame = () => {
+      shownFrames += 1
+      // 7컷 중 3번째 컷부터 본격적인 폭발이 보인다. 이 순간 위치를 기준으로 회피를 판정한다.
+      if (!explosionApplied && shownFrames >= 3) {
+        explosionApplied = true
+        onExplosion?.()
+      }
+    }
+    impact.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeImpactSize)
+    impact.on(Phaser.Animations.Events.ANIMATION_UPDATE, applyExplosionAtBurstFrame)
+    impact.play('cannon_impact_anim')
+    normalizeImpactSize()
+    impact.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      // 프레임 메타데이터가 달라져도 폭발 피해가 유실되지 않도록 완료 시 한 번 보장한다.
+      if (!explosionApplied) onExplosion?.()
+      impact.destroy()
+    })
+  }
+
   private fireBastion(structure: Structure, target: Monster, damage: number, splashRadius: number, useCannonArt: boolean) {
     const startX = structure.spr.x + 26
     const startY = structure.spr.y - structure.spr.displayHeight * 0.72
@@ -422,13 +529,7 @@ export class DefenseManager {
       onComplete: () => {
         shell.destroy()
         if (useCannonArt && this.scene.anims.exists('cannon_impact_anim')) {
-          const impact = this.scene.add.sprite(impactX, impactY, 'img_cannon_sheet', 'cannon_impact_0')
-            .setOrigin(0.5, 1).setDepth(7)
-          const normalizeImpactSize = () => impact.setDisplaySize(150, 140)
-          impact.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeImpactSize)
-          impact.play('cannon_impact_anim')
-          normalizeImpactSize()
-          impact.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => impact.destroy())
+          this.playCannonImpact(impactX, impactY)
         } else {
           const impact = this.scene.add.circle(impactX, impactY, splashRadius, 0xff7043, 0.28).setDepth(7)
           this.scene.tweens.add({ targets: impact, scale: 1.25, alpha: 0, duration: 260, onComplete: () => impact.destroy() })
@@ -464,7 +565,10 @@ export class DefenseManager {
     const offensive = kind === 'watchtower' || kind === 'cannonTower' || kind === 'bastion'
     const barW = isBase ? 120 : offensive ? Math.min(bodyW, 96) : bodyW
     const hpBar = this.scene.add.graphics().setDepth(5)
-    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, footprint: bodyW, kind, attackReadyAt: 0 }
+    // All buildable structures render behind the playable character.
+    spr.setDepth(-5)
+    // 배치 점유 폭은 충돌용 내부 바디가 아니라 화면에 보이는 이미지 폭과 일치시킨다.
+    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, footprint: dispW, kind, attackReadyAt: 0 }
     this.structures.push(s)
     this.drawHpBar(s)
     return s
@@ -499,6 +603,8 @@ export class DefenseManager {
       x: targetX,
       y: this.groundY,
       get alive() { return structure.hp > 0 },
+      bombDamageMultiplier: 1.75,
+      rangedAttackRange: DEFENSE.ZOMBIE_BOMB_STRUCTURE_RANGE,
       receiveHit: (attack: number) => this.damageStructure(structure, attack),
     }
   }
@@ -525,6 +631,7 @@ export class DefenseManager {
       const originalX = s.spr.x
       const originalWidth = s.spr.displayWidth
       const originalHeight = s.spr.displayHeight
+      const originalFloorY = s.spr.y + originalHeight / 2
       const ruined = this.brokenStructureDisplay(s, originalWidth, originalHeight)
       this.scene.tweens.add({
         targets: s.spr,
@@ -537,18 +644,31 @@ export class DefenseManager {
         onComplete: () => {
           s.spr.setTexture(brokenTexture).setAngle(0).setAlpha(1).setTint(0xaaaaaa)
           s.spr.setDisplaySize(ruined.width, ruined.height)
-          s.spr.setPosition(originalX + ruined.offsetX, this.groundY - ruined.height / 2)
+          // Preserve the standing image's lowered floor line when swapping to
+          // its ruined texture, even though the ruined image has a new size.
+          s.spr.setPosition(originalX + ruined.offsetX, originalFloorY - ruined.height / 2)
           // 잔해는 액터와 몬스터보다 뒤에서 불투명한 어두운 상태로 유지한다.
           s.spr.setDepth(-6)
           if (!s.isBase) {
             this.scene.time.delayedCall(2200, () => {
               if (!s.spr.active) return
+              const ruinX = s.spr.x
+              // 잔해가 좌우로 잘게 떨리는 동안 함께 흐려진다. y축 위치는 고정한다.
+              this.scene.tweens.add({
+                targets: s.spr,
+                x: ruinX + 3,
+                duration: 36,
+                yoyo: true,
+                repeat: 6,
+                ease: 'Sine.easeInOut',
+              })
               this.scene.tweens.add({
                 targets: s.spr,
                 alpha: 0,
-                duration: 650,
+                delay: 90,
+                duration: 420,
                 ease: 'Quad.easeIn',
-                onComplete: () => s.spr.setVisible(false).setActive(false),
+                onComplete: () => s.spr.setPosition(ruinX, s.spr.y).setVisible(false).setActive(false),
               })
             })
           }
@@ -556,9 +676,11 @@ export class DefenseManager {
       })
       return
     }
+    const originalX = s.spr.x
+    this.scene.tweens.add({ targets: s.spr, x: originalX + 3, duration: 36, yoyo: true, repeat: 5 })
     this.scene.tweens.add({
-      targets: s.spr, alpha: 0, angle: s.isBase ? 0 : 12, duration: 400, ease: 'Quad.easeIn',
-      onComplete: () => s.spr.setVisible(false),
+      targets: s.spr, alpha: 0, delay: 70, duration: 330, ease: 'Quad.easeIn',
+      onComplete: () => s.spr.setPosition(originalX, s.spr.y).setVisible(false).setActive(false),
     })
   }
 
@@ -622,7 +744,8 @@ export class DefenseManager {
     if (this.selectedStructure !== 'barricade' && this.hasStandingStructure(this.selectedStructure)) return false
     return !this.structures.some((structure) => {
       // 파괴된 시설도 잔해가 남아 있는 동안에는 설치 공간을 계속 점유한다.
-      if (structure.isBase) return false
+      // A destroyed structure reserves space only while its visible ruin remains.
+      if (structure.hp <= 0 && !structure.spr.active) return false
       const footprint = this.selectedStructure === 'barricade'
         ? BARRICADE_TIERS[this.selectedTier].width
         : OFFENSIVE_STRUCTURES[this.selectedStructure].footprint
@@ -639,7 +762,7 @@ export class DefenseManager {
     const gold = useGameStore.getState().gold
     useGameStore.getState().setStats({ gold: gold - def.cost })
     const structure = this.addStructure(
-      worldX, def.hp, false, this.structureTexture('barricade', this.selectedTier), def.width, def.height, def.width - 4,
+      worldX, def.hp, false, this.structureTexture('barricade', this.selectedTier), def.width, def.height, def.width,
     )
     structure.tier = this.selectedTier
     structure.spr.setTint(def.tint)

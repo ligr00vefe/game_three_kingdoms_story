@@ -12,6 +12,7 @@ export class EffectManager {
   private skillPool: Phaser.GameObjects.Group
   private glaivePool: Phaser.GameObjects.Group
   private decisivePool: Phaser.GameObjects.Group
+  private dragonPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
@@ -26,6 +27,7 @@ export class EffectManager {
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
     this.glaivePool = scene.add.group({ defaultKey: 'fx_skill_glaive', maxSize: 4 })
     this.decisivePool = scene.add.group({ defaultKey: 'fx_decisive_strike', maxSize: 3 })
+    this.dragonPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 2 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_effect', maxSize: 8 })
@@ -52,21 +54,18 @@ export class EffectManager {
     this.defineLevelUpFrames()
     this.defineGlaiveFrames()
     this.defineDecisiveFrames()
+    this.defineDragonFrames()
   }
 
   private defineGlaiveFrames() {
     if (!this.scene.textures.exists('fx_skill_glaive')) return
     const texture = this.scene.textures.get('fx_skill_glaive')
-    const frameXs = [0, 307, 614, 922, 1229]
-    const frameWs = [307, 307, 308, 307, 307]
-    const frameYs = [0, 341, 682]
-    const frameHs = [341, 341, 342]
     let index = 0
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 5 && index < 13; col++, index++) {
         const frameName = String(index)
         if (texture.has(frameName)) texture.remove(frameName)
-        texture.add(index, 0, frameXs[col], frameYs[row], frameWs[col], frameHs[row])
+        texture.add(index, 0, col * 384, row * 384, 384, 384)
       }
     }
     for (const [key, start, length, frameRate] of [
@@ -86,29 +85,29 @@ export class EffectManager {
 
   private defineDecisiveFrames() {
     if (!this.scene.textures.exists('fx_decisive_strike')) return
-    const texture = this.scene.textures.get('fx_decisive_strike')
-    let index = 0
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 6; col++, index++) {
-        const frameName = String(index)
-        if (texture.has(frameName)) texture.remove(frameName)
-        const frameY = row === 0 ? 0 : row === 1 ? 341 : 682
-        const frameH = row === 2 ? 342 : 341
-        texture.add(index, 0, col * 256, frameY, 256, frameH)
-      }
-    }
     if (this.scene.anims.exists('fx_decisive_scope_anim')) this.scene.anims.remove('fx_decisive_scope_anim')
     if (this.scene.anims.exists('fx_decisive_thrust_anim')) this.scene.anims.remove('fx_decisive_thrust_anim')
     this.scene.anims.create({
       key: 'fx_decisive_scope_anim',
       frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i })),
-      frameRate: 45,
+      frameRate: 24,
       repeat: 0,
     })
     this.scene.anims.create({
       key: 'fx_decisive_thrust_anim',
       frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i + 9 })),
       frameRate: 30,
+      repeat: 0,
+    })
+  }
+
+  private defineDragonFrames() {
+    if (!this.scene.textures.exists('fx_skill_dragon')) return
+    if (this.scene.anims.exists('fx_skill_dragon_slam')) this.scene.anims.remove('fx_skill_dragon_slam')
+    this.scene.anims.create({
+      key: 'fx_skill_dragon_slam',
+      frames: Array.from({ length: 10 }, (_, frame) => ({ key: 'fx_skill_dragon', frame })),
+      frameRate: 12,
       repeat: 0,
     })
   }
@@ -393,7 +392,6 @@ export class EffectManager {
    * 같은 구도면 성립한다. 꼬리→코어 길이를 SKILL_REACH(200)에 맞춘다.
    */
   private static readonly SKILL_FX = { originX: 0.831, originY: 0.471, lenFrac: 0.831 } as const
-  private static readonly SKILL_FX_LEN_FROM = 200
   private static readonly SKILL_FX_LEN_TO = 240
   /**
    * ★ 참마돌격 이펙트 속도 조절값 — 이펙트가 퍼지며 사라지기까지의 시간(ms). 크게 잡을수록 느리다.
@@ -413,37 +411,53 @@ export class EffectManager {
     if (!img) return
     const srcW = img.frame.realWidth || img.width || 1
     const spec = EffectManager.SKILL_FX
-    const from = EffectManager.SKILL_FX_LEN_FROM / (srcW * spec.lenFrac)
-    const to = EffectManager.SKILL_FX_LEN_TO / (srcW * spec.lenFrac)
-    img.setOrigin(facing === 1 ? spec.originX : 1 - spec.originX, spec.originY)
+    const fixedScale = EffectManager.SKILL_FX_LEN_TO / (srcW * spec.lenFrac)
+    // 단일 효과 이미지는 중심을 고정한다. 스케일을 키우며 한쪽으로 미는 연출을 제거한다.
+    img.setOrigin(0.5, spec.originY)
     img.setActive(true).setVisible(true)
-    img.setPosition(x, y).setAlpha(0.95).setScale(from).setFlipX(facing === -1)
+    img.setPosition(x, y).setAlpha(0.95).setScale(fixedScale).setFlipX(facing === -1)
     this.scene.tweens.add({
-      targets: img, scale: to, alpha: 0,
+      targets: img, alpha: 0,
       // Cubic.easeOut은 초반에 몰아서 끝나 알맹이를 놓친다 — Sine이 더 고르게 보인다
       duration: EffectManager.SKILL_FX_DURATION_MS, ease: 'Sine.easeOut',
       onComplete: () => { img.setActive(false).setVisible(false) },
     })
   }
 
-  skillGlaive(x: number, y: number, facing: -1 | 1, groundY?: number) {
+  skillGlaive(
+    x: number,
+    y: number,
+    facing: -1 | 1,
+    groundY: number,
+    onJump?: () => void,
+  ) {
     const spr = this.glaivePool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!spr) return
     this.scene.tweens.killTweensOf(spr)
     spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
     spr.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 0.62)
       .setFlipX(facing === -1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 245)
-    const sequence = ['fx_skill_glaive_slash_left', 'fx_skill_glaive_slash_right', 'fx_skill_glaive_slam']
+    const sequence = ['fx_skill_glaive_slash_left', 'fx_skill_glaive_slash_right']
     let sequenceIndex = 0
     const playNext = (animation: string) => {
       spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
       spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
         sequenceIndex += 1
-        if (sequenceIndex < sequence.length) {
-          if (sequenceIndex === 2 && groundY !== undefined) spr.setPosition(x, groundY).setOrigin(0.5, 1)
-          playNext(sequence[sequenceIndex])
+        if (sequenceIndex < sequence.length) playNext(sequence[sequenceIndex])
+        else {
+          // 두 번의 지상 베기가 끝난 뒤 점프하고, 낙하 시점에 바닥 고정 내려찍기를 재생한다.
+          spr.setVisible(false)
+          onJump?.()
+          this.scene.time.delayedCall(320, () => {
+            if (!spr.active) return
+            spr.setVisible(true).setPosition(x, groundY).setOrigin(0.5, 1)
+            spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+            spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+              spr.setActive(false).setVisible(false)
+            })
+            spr.play('fx_skill_glaive_slam')
+          })
         }
-        else spr.setActive(false).setVisible(false)
       })
       spr.play(animation)
     }
@@ -451,7 +465,7 @@ export class EffectManager {
   }
 
   /** 조준 스코프가 먼저 나타난 뒤, 타격 시점에 창 찌르기로 이어지는 일격필살 이펙트. */
-  decisiveStrike(x: number, y: number, facing: -1 | 1) {
+  decisiveStrike(x: number, y: number, facing: -1 | 1, onThrustStart?: () => void) {
     const scope = this.decisivePool.get(x, y) as Phaser.GameObjects.Sprite | null
     const thrust = this.decisivePool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!scope || !thrust) return
@@ -469,13 +483,29 @@ export class EffectManager {
       .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
     scope.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       hide(scope)
+      onThrustStart?.()
       thrust.setActive(true).setVisible(true).setPosition(thrustX, y).setOrigin(0.5, 0.55)
         .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
       thrust.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => hide(thrust))
       thrust.play('fx_decisive_thrust_anim')
-      this.scene.tweens.add({ targets: thrust, x: x + facing * (COMBAT.SKILL_REACH + 30), duration: 300, ease: 'Quad.easeOut' })
     })
     scope.play('fx_decisive_scope_anim')
+  }
+
+  /** 청룡참: 시전 좌표에 고정된 용이 내려와 마지막 컷을 지면에 맞춘다. */
+  dragonSlash(x: number, groundY: number, facing: -1 | 1) {
+    const sprite = this.dragonPool.get(x, groundY) as Phaser.GameObjects.Sprite | null
+    if (!sprite) return
+    this.scene.tweens.killTweensOf(sprite)
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true)
+      .setPosition(x, groundY).setOrigin(0.5, 1)
+      .setDisplaySize(150, 380).setFlipX(facing === -1)
+      .setAlpha(0.96).setDepth(7)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      sprite.setActive(false).setVisible(false)
+    })
+    sprite.play('fx_skill_dragon_slam')
   }
 
   hitSpark(x: number, y: number) {

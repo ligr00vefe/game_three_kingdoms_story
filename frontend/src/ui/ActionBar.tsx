@@ -10,8 +10,8 @@ const QUICKSLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit
 const QUICKSLOT_LABELS = ['1', '2', '3', '4', '5', '6', '7'] as const
 
 const SKILL_INFO: Record<string, { name: string; icon: string }> = {
-  skill_charge_slash: { name: '참마돌격', icon: '/assets/img/fx/skill_wild_horse_charge.png' },
-  skill_glaive_flurry: { name: '언월난무', icon: '/assets/img/fx/skill_crescent_moon_dance.png' },
+  skill_charge_slash: { name: '참마돌격', icon: '⚔️' },
+  skill_glaive_flurry: { name: '언월난무', icon: '🌙' },
   skill_decisive_strike: { name: '일격필살', icon: '💀' },
   skill_dragon_slash: { name: '청룡참', icon: '🐉' },
   skill_lightning_descent: { name: '뇌신강림', icon: '🌩️' },

@@ -196,7 +196,7 @@ export class PreloadScene extends Phaser.Scene {
     }
     // 3단 패럴랙스 far/mid placeholder (⑤⑥) — 가로 심리스 반복
     if (!this.textures.exists('ph_bg_far')) {
-      // 먼 배경: 단색 하늘만 (구름/봉우리 실루엣 placeholder는 제거 — bg_mountain.png 실제 아트가 그 역할을 대신한다.
+      // 먼 배경: 단색 하늘만 (구름/봉우리 실루엣 placeholder는 제거 — bg_mountain_01.png 실제 아트가 그 역할을 대신한다.
       // 예전엔 안개띠(fillRect)와 산 실루엣(fillTriangle)이 있었는데, 색 경계가 성벽 흉벽(총안) 틈으로 비쳐
       // 가로 선/삼각형 도형처럼 보였다 — 카메라 배경색(0xa8dde0)과 동일한 단색으로 통일해 그 경계를 없앤다.
       g.clear()

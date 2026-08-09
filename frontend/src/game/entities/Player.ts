@@ -99,6 +99,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private actionUntil = 0
   private actionHitAt = 0
   private actionHitDone = false
+  /** 일격필살은 조준 표시가 끝난 뒤에만 캐릭터의 찌르기 모션을 재생한다. */
+  private skillMotionReleased = true
   /** 콤보: 지금 재생 중/직전에 낸 단계(0:찌르기 1:휘두르기 2:깊게 찌르기) */
   private comboStep = 0
   /** 콤보: 현재 모션 중 공격키가 눌려 다음 단계가 예약됨 (선입력 버퍼) */
@@ -216,7 +218,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'jumpdash': return 'jump'
       case 'climb': return 'climb'
       case 'attack': return 'attack'
-      case 'skill': return this.hasAnim('skill') ? 'skill' : 'attack'
+      case 'skill':
+        if (!this.skillMotionReleased) return 'idle'
+        return this.hasAnim('skill') ? 'skill' : 'attack'
       case 'hit': return 'hit'
       case 'dead': return 'dead'
       default: return 'idle'
@@ -517,13 +521,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.state_ = kind
     this.lastCombatAt = now
     this.comboQueued = false // 새 모션 시작 — 이전 예약은 소비됐거나 무효
-    const duration = kind === 'attack' ? COMBAT.ATTACK_DURATION_MS : COMBAT.SKILL_DURATION_MS
+    const duration = kind === 'attack'
+      ? COMBAT.ATTACK_DURATION_MS
+      : this.skillQueuedCode === 'skill_glaive_flurry'
+        ? COMBAT.GLAIVE_DURATION_MS
+      : this.skillQueuedCode === 'skill_decisive_strike'
+          ? COMBAT.DECISIVE_DURATION_MS
+          : this.skillQueuedCode === 'skill_dragon_slash'
+            ? COMBAT.DRAGON_DURATION_MS
+          : COMBAT.SKILL_DURATION_MS
     const hitAt = kind === 'attack'
       ? COMBAT.ATTACK_HIT_AT_MS
-      : this.skillQueuedCode === 'skill_glaive_flurry' ? COMBAT.GLAIVE_HIT_AT_MS : COMBAT.SKILL_HIT_AT_MS
+      : this.skillQueuedCode === 'skill_glaive_flurry'
+        ? COMBAT.GLAIVE_HIT_AT_MS
+      : this.skillQueuedCode === 'skill_decisive_strike'
+          ? COMBAT.DECISIVE_HIT_AT_MS
+          : this.skillQueuedCode === 'skill_dragon_slash'
+            ? COMBAT.DRAGON_HIT_AT_MS
+          : COMBAT.SKILL_HIT_AT_MS
     this.actionUntil = now + duration
     this.actionHitAt = now + hitAt
     this.actionHitDone = false
+    this.skillMotionReleased = kind !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike'
     if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
     // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
     const isDashLunge = kind === 'attack' && this.comboStep === 2
@@ -599,6 +618,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   startGlaiveMotion() {
     if (this.body.blocked.down) this.setVelocityY(-420)
+  }
+
+  startDragonSlashMotion() {
+    if (this.body.blocked.down) this.setVelocityY(-390)
+  }
+
+  /** 조준 단계가 끝난 프레임부터 일격필살의 찌르기 모션을 처음부터 재생한다. */
+  releaseDecisiveMotion() {
+    if (this.state_ !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike') return
+    this.skillMotionReleased = true
+    this.currentAnimKey = null
+    this.anims.stop()
   }
 
   // ---------- 피격/사망 (GAME_DESIGN 4.3, 5.2) ----------

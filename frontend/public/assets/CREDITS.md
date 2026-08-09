@@ -14,7 +14,7 @@
 | assets/img/bg/bg_river_animation.png (수면 밴드 애니메이션, 4프레임 세로 스프라이트시트)       | AI 생성 | 자체 생성물 | - | 2026-07-13 |
 | assets/img/structures/right_wall.png (감숙성 내부 우측 성벽 마감)                    | AI 생성 | 자체 생성물 | - | 2026-07-14 |
 | assets/img/bg/bg_walkway_01.png (보행로)                                     | AI 생성 (GPT, B1) | 자체 생성물 | - | 2026-07-10 |
-| assets/img/bg/bg_underfloor_water.png (수면 밴드 — 마른 연못으로 교체돼 현재 미사용)        | AI 생성 (GPT, B2) | 자체 생성물 | - | 2026-07-10 |
+| assets/img/bg/bg_underfloor_pond.png (수면 밴드 — 마른 연못으로 교체돼 현재 미사용)        | AI 생성 (GPT, B2) | 자체 생성물 | - | 2026-07-10 |
 | assets/img/bg/bg_dried_up_pond.jpg (성 밖 바닥 아래 밴드 — 물이 마른 연못)             | AI 생성 | 자체 생성물 | - | 2026-07-17 |
 | assets/img/structures/platform_stone_01.png (돌 발판 — 02로 교체돼 현재 미사용)      | AI 생성 (GPT, B3) | 자체 생성물 | - | 2026-07-10 |
 | assets/img/structures/platform_stone_02.png (돌 발판 — 초롱/뿌리가 늘어진 성 밖용)   | AI 생성 | 자체 생성물 | - | 2026-07-17 |

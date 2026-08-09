@@ -26,11 +26,11 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   {
-    code: 'skill_charge_slash', name: '참마돌격', icon: '⚡', iconImage: '/assets/img/fx/skill_wild_horse_charge.png', type: 'active', maxLevel: 10, unlockLevel: 2,
+    code: 'skill_charge_slash', name: '참마돌격', icon: '⚔️', type: 'active', maxLevel: 10, unlockLevel: 1,
     desc: (lv) => `전방으로 돌진하며 베기. 데미지 ${180 + lv * 20}%, MP 12, 쿨타임 8초.`,
   },
   {
-    code: 'skill_glaive_flurry', name: '언월난무', icon: '🌀', iconImage: '/assets/img/fx/skill_crescent_moon_dance.png', type: 'active', maxLevel: 10, unlockLevel: 7,
+    code: 'skill_glaive_flurry', name: '언월난무', icon: '🌙', type: 'active', maxLevel: 10, unlockLevel: 7,
     desc: (lv) => `전방을 ${3 + Math.floor(lv / 4)}회 연속 타격. 타격당 데미지 ${90 + lv * 10}%, MP 20, 쿨타임 10초.`,
   },
   {
@@ -62,7 +62,9 @@ interface SkillState {
   unlockScheduled: (characterLevel: number) => void
 }
 
-const INITIAL_LEVELS: Record<string, number> = Object.fromEntries(SKILLS.map((s) => [s.code, 0]))
+const INITIAL_LEVELS: Record<string, number> = Object.fromEntries(
+  SKILLS.map((skill) => [skill.code, skill.unlockLevel <= 1 ? 1 : 0]),
+)
 
 export const useSkillStore = create<SkillState>()(
   persist(

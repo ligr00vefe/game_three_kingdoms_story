@@ -39,6 +39,8 @@ export interface MonsterDef {
   attackRange: number
   attackCooldownMs: number
   attackWindupMs: number
+  /** Complete the windup by launching a projectile instead of applying a melee hit. */
+  rangedAttack?: boolean
 }
 
 type MonsterState = 'spawning' | 'wander' | 'chase' | 'windup' | 'hit' | 'dead' | 'inactive'
@@ -61,6 +63,10 @@ export interface MonsterTarget {
   alive: boolean
   /** 몬스터의 공격 적중 시 호출 */
   receiveHit: (attack: number, fromX: number) => void
+  /** Bomb zombies deal extra damage to defensive structures. */
+  bombDamageMultiplier?: number
+  /** 대상 종류별 원거리 공격 사거리. 시설물과 캐릭터 사거리를 분리할 때 사용한다. */
+  rangedAttackRange?: number
 }
 
 /**
@@ -73,6 +79,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   def!: MonsterDef
   monsterCode = ''
   hp = 0
+  maxHp = 0
   private hpBar: Phaser.GameObjects.Graphics
   private state_: MonsterState = 'inactive'
   private homeXMin = 0
@@ -87,6 +94,9 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   private nextShamblePauseAt = 0
   private shamblePauseUntil = 0
   onDied?: (m: Monster) => void
+  onRangedAttack?: (m: Monster, impactX: number) => void
+  /** 원거리 공격 준비를 시작한 순간 고정한 지면 목표 좌표. */
+  private windupAimX = 0
 
   constructor(scene: Phaser.Scene, def: MonsterDef) {
     super(scene, 0, 0, def.textureKey)
@@ -135,21 +145,33 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
 
   /** 스폰 (땅에서 기어나오는 연출, GAME_DESIGN 6.3) */
   spawnAt(x: number, groundY: number, xMin: number, xMax: number, riseMs: number) {
+    // Pooled monsters can change archetype between waves, so register the new definition's animations here too.
+    this.createAnims()
     this.homeXMin = xMin
     this.homeXMax = xMax
     this.hp = this.def.maxHp
+    this.maxHp = this.def.maxHp
     this.setActive(true).setVisible(true)
     // 풀에서 재사용되므로 이전 생의 애니메이션을 지우고 대기 모습으로 되돌린다
     this.anims.stop()
     this.anims.timeScale = 1
     this.setTexture(this.def.textureKey)
+    // Pooled instances can switch archetypes between waves. Recalculate the
+    // body so 256px bomb-zombie frames never inherit normal-zombie offsets.
+    const spriteScale = this.def.spriteScale ?? 1
+    const bodyWidth = 36 / spriteScale
+    const bodyHeight = 52 / spriteScale
+    this.body.setSize(bodyWidth, bodyHeight)
+    this.body.setOffset(
+      (this.width - bodyWidth) / 2,
+      this.def.spriteScale ? this.height - bodyHeight - 16 : 12,
+    )
     this.currentAnimKey = null
     this.currentAttackKey = null
     this.attackSequence = 0
     this.shamblePauseUntil = 0
     this.scheduleNextShamble(this.scene.time.now)
     this.setPosition(x, groundY - 26)
-    const spriteScale = this.def.spriteScale ?? 1
     this.setAlpha(0).setScale(spriteScale, spriteScale * 0.2).setOrigin(0.5, 1)
     this.y = groundY
     this.body.enable = false
@@ -159,8 +181,11 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.scene.tweens.add({
       targets: this, alpha: 1, scaleY: spriteScale, duration: riseMs, ease: 'Back.easeOut',
       onComplete: () => {
-        this.setOrigin(0.5, this.def.spriteOriginY ?? 0.5)
-        this.y = groundY - 32
+        const originY = this.def.spriteOriginY ?? 0.5
+        this.setOrigin(0.5, originY)
+        // Align the rendered feet for every source frame size and scale. The
+        // fixed -32 offset left the bomb zombie visibly airborne.
+        this.y = groundY - this.height * (1 - originY) * spriteScale
         this.clearTint()
         this.body.enable = true
         this.state_ = 'wander'
@@ -181,14 +206,20 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
       bar.clear()
       return
     }
-    const width = 26
-    const height = 3
-    const ratio = Phaser.Math.Clamp(this.hp / Math.max(1, this.def.maxHp), 0, 1)
+    const isBoss = this.monsterCode === 'zombie_boss'
+    const width = isBoss ? 46 : 26
+    const height = isBoss ? 5 : 3
+    const ratio = Phaser.Math.Clamp(this.hp / Math.max(1, this.maxHp), 0, 1)
     const x = this.x - width / 2
     const y = this.getBounds().top - 5
     bar.clear()
     bar.fillStyle(0x111318, 0.82).fillRect(x - 1, y - 1, width + 2, height + 2)
-    bar.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffc107 : 0xef5350, 1)
+    const color = ratio > 0.8 ? 0xab47bc
+      : ratio > 0.6 ? 0x42a5f5
+        : ratio > 0.4 ? 0x66bb6a
+          : ratio > 0.2 ? 0xffc107
+            : 0xef5350
+    bar.fillStyle(color, 1)
     bar.fillRect(x, y, width * ratio, height)
     bar.setAlpha(this.alpha)
   }
@@ -224,18 +255,27 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
 
     const dx = target.x - this.x
     const dist = Math.abs(dx)
+    const attackRange = this.def.rangedAttack
+      ? (target.rangedAttackRange ?? this.def.attackRange)
+      : this.def.attackRange
     // 세로 거리 판정: 발판 위 등 높이가 다르면 감지/공격 대상이 아니다
     const dy = Math.abs(target.y - this.y)
 
     if (this.state_ === 'windup') {
+      // 원거리 공격은 준비를 시작한 순간의 위치와 방향을 끝까지 유지한다.
+      const attackDx = this.def.rangedAttack ? this.windupAimX - this.x : dx
+      if (Math.abs(attackDx) > 1) this.setFlipX(attackDx < 0)
       const lungeSpeed = this.def.attackLungeSpeed ?? 0
       const remaining = this.windupUntil - now
-      this.setVelocityX(lungeSpeed > 0 && remaining <= 180 ? (dx >= 0 ? lungeSpeed : -lungeSpeed) : 0)
+      this.setVelocityX(lungeSpeed > 0 && remaining <= 180 ? (attackDx >= 0 ? lungeSpeed : -lungeSpeed) : 0)
       if (now >= this.windupUntil) {
         this.setVelocityX(0)
         this.clearTint()
         // 공격 판정: 윈드업 종료 시점에 사거리 안 + 몸통 높이가 겹칠 때만 적중 (GAME_DESIGN 6.2)
-        if (target.alive && dist <= this.def.attackRange + 12 && dy <= ATTACK_VERTICAL_RANGE) {
+        if (this.def.rangedAttack) {
+          // 대상이 준비 중 이동하거나 사망해도 이미 시작한 투척은 고정 좌표로 완료한다.
+          this.onRangedAttack?.(this, this.windupAimX)
+        } else if (target.alive && dist <= attackRange + 12 && dy <= ATTACK_VERTICAL_RANGE) {
           target.receiveHit(this.def.attack, this.x)
           if (this.currentAttackKey === this.def.specialAttackTextureKey && this.def.attackCameraShake) {
             this.scene.cameras.main.shake(140, this.def.attackCameraShake)
@@ -248,12 +288,16 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     }
 
     if (target.alive && dist <= this.def.detectRange && dy <= DETECT_VERTICAL_RANGE) {
+      // Face the detected target before an attack or shamble pause can return.
+      const dir: -1 | 1 = dx >= 0 ? 1 : -1
+      this.setFlipX(dir === -1)
       // 추적 (느릿하게, GAME_DESIGN 6.2)
-      if (dist <= this.def.attackRange && dy <= ATTACK_VERTICAL_RANGE) {
+      if (dist <= attackRange && dy <= ATTACK_VERTICAL_RANGE) {
         this.setVelocityX(0)
         if (now >= this.nextAttackAt) {
           this.state_ = 'windup'
           this.windupUntil = now + this.def.attackWindupMs
+          this.windupAimX = target.x
           this.attackSequence += 1
           this.currentAttackKey = this.attackSequence % (this.def.specialAttackEvery ?? 3) === 0
             ? (this.def.specialAttackTextureKey ?? this.def.attackTextureKey ?? null)
@@ -266,9 +310,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
           this.setVelocityX(0)
           return
         }
-        const dir = dx > 0 ? 1 : -1
         this.setVelocityX(this.def.moveSpeed * dir)
-        this.setFlipX(dir === -1)
       }
     } else {
       // 배회: 스폰 지역 좌우 왕복

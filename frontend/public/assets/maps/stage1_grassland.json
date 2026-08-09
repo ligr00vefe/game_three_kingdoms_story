@@ -53,12 +53,6 @@
       "width": 72,
       "height": 52,
       "kind": "rock"
-    },
-    {
-      "x": 2100,
-      "width": 96,
-      "height": 60,
-      "kind": "barricade"
     }
   ],
   "ladders": [
@@ -77,50 +71,30 @@
   ],
   "decor": [
     {
-      "kind": "castleOutside",
+      "kind": "castleModel02",
       "x": 190,
-      "width": 500,
-      "height": 285,
-      "yOffset": 10
+      "width": 635,
+      "height": 250,
+      "yOffset": 20
     }
   ],
   "npcSpawns": [
     {
       "code": "npc_village_chief",
-      "x": 300,
+      "x": 450,
       "y": 494
     }
   ],
   "portals": [
     {
-      "x": 191,
+      "x": 220,
       "name": "감숙성 내부",
       "targetMap": "map_ye_castle",
-      "targetX": 2100,
+      "targetX": 2500,
       "targetY": 440
     }
   ],
-  "monsterSpawns": [
-    {
-      "code": "zombie_yellow",
-      "xMin": 700,
-      "xMax": 1400,
-      "max": 3
-    },
-    {
-      "code": "zombie_yellow",
-      "xMin": 1800,
-      "xMax": 3000,
-      "max": 5
-    }
-  ],
+  "monsterSpawns": [],
   "underFloorHeight": 96,
-  "stairs": [
-    {
-      "x": 2226,
-      "baseY": 536,
-      "dir": 1,
-      "steps": 7
-    }
-  ]
+  "stairs": []
 }

@@ -98,11 +98,13 @@
     "drops": [{ "code": "coin", "chance": 1.0, "min": 4, "max": 8 }]
   },
   "zombie_exploder": {
-    "name": "황건 화약병", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
-    "runFrameRate": 3,
-    "attackTextureKey": "normal_zombie_attack", "deathTextureKey": "normal_zombie_death", "spriteScale": 0.62, "spriteOriginY": 0.55,
-    "maxHp": 28, "attack": 18, "defense": 1, "exp": 25, "moveSpeed": 16,
-    "detectRange": 99999, "attackRange": 48, "attackCooldownMs": 1800, "attackWindupMs": 500,
+    "name": "황건 폭탄 좀비", "textureKey": "bomb_zombie_idle", "runTextureKey": "bomb_zombie_walk",
+    "idleFrameRate": 8, "runFrameRate": 7,
+    "attackTextureKey": "bomb_zombie_throwing", "attackFrameRate": 14,
+    "deathTextureKey": "normal_zombie_death", "spriteScale": 0.28, "spriteOriginY": 1.0,
+    "rangedAttack": true,
+    "maxHp": 28, "attack": 24, "defense": 1, "exp": 25, "moveSpeed": 10,
+    "detectRange": 1800, "attackRange": 900, "attackCooldownMs": 2800, "attackWindupMs": 1000,
     "drops": [{ "code": "coin", "chance": 1.0, "min": 3, "max": 7 }]
   },
   "zombie_boss": {
@@ -110,11 +112,11 @@
     "textureKey": "big_zombie_idle", "runTextureKey": "big_zombie_walk",
     "attackTextureKey": "big_zombie_punch", "specialAttackTextureKey": "big_zombie_attack",
     "deathTextureKey": "big_zombie_damaged", "deathFrameRate": 10,
-    "idleFrameRate": 3, "runFrameRate": 6,
+    "idleFrameRate": 3, "runFrameRate": 3.5,
     "attackFrameRate": 14, "specialAttackFrameRate": 16,
     "specialAttackEvery": 2, "attackLungeSpeed": 90, "attackCameraShake": 0.006,
-    "spriteScale": 0.72, "spriteOriginY": 0.745,
-    "maxHp": 900, "attack": 16, "defense": 8, "exp": 120, "moveSpeed": 38,
+    "spriteScale": 0.54, "spriteOriginY": 0.745,
+    "maxHp": 900, "attack": 16, "defense": 8, "exp": 120, "moveSpeed": 24,
     "detectRange": 99999, "attackRange": 72, "attackCooldownMs": 950, "attackWindupMs": 500,
     "drops": [{ "code": "coin", "chance": 1.0, "min": 35, "max": 55 }]
   }

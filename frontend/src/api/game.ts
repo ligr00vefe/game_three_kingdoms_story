@@ -4,6 +4,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useInventoryStore, INVENTORY_SIZE } from '../stores/inventoryStore'
 import type { ItemDef, ItemType } from '../stores/inventoryStore'
 import { useScreenStore } from '../stores/screenStore'
+import { useSkillStore } from '../stores/skillStore'
 
 interface ServerItemDef {
   code: string
@@ -43,6 +44,9 @@ export async function loadGameState(): Promise<void> {
     attackPower: c.attackPower, gold: c.gold,
     stageCode: c.stageCode, defenseStage: c.defenseStage,
   })
+  // Repair persisted skill data after loading, including older level-1 saves
+  // where the starting skill was incorrectly left locked.
+  useSkillStore.getState().unlockScheduled(c.level)
   const defs: ItemDef[] = data.itemDefinitions.map((d) => ({
     code: d.code, name: d.name, itemType: d.itemType, iconKey: d.iconKey,
     effect: d.effectJson ? JSON.parse(d.effectJson) : null,

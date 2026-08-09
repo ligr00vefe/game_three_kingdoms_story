@@ -1,20 +1,37 @@
 import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useUiStore } from '../stores/uiStore'
+import { DEFAULT_WINDOW_POSITIONS, useUiStore } from '../stores/uiStore'
 import type { UiWindowId } from '../stores/uiStore'
 
 const MIN_VISIBLE = 80
+const EDGE_GAP = 8
+
+const RESPONSIVE_DEFAULT_STYLE: Record<UiWindowId, CSSProperties> = {
+  minimap: { left: EDGE_GAP, top: EDGE_GAP },
+  stats: { left: EDGE_GAP, top: 110 },
+  // Character info is 272px wide plus borders; keep the same 8px gap between windows.
+  skillbook: { left: 292, top: 110 },
+  aiHelp: { right: EDGE_GAP, top: 54 },
+}
 
 export function useDraggableWindow(id: UiWindowId) {
   const position = useUiStore((state) => state.windowPositions[id])
   const setWindowPosition = useUiStore((state) => state.setWindowPosition)
   const dragRef = useRef<{ startX: number; startY: number; left: number; top: number } | null>(null)
+  const initial = DEFAULT_WINDOW_POSITIONS[id]
+  const untouched = position.left === initial.left && position.top === initial.top
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if ((event.target as HTMLElement).closest('button')) return
     event.preventDefault()
-    dragRef.current = { startX: event.clientX, startY: event.clientY, left: position.left, top: position.top }
     const windowElement = event.currentTarget.parentElement
+    dragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      left: windowElement?.offsetLeft ?? position.left,
+      top: windowElement?.offsetTop ?? position.top,
+    }
     const boundsElement = windowElement?.offsetParent as HTMLElement | null
     const onMove = (move: PointerEvent) => {
       const drag = dragRef.current
@@ -40,7 +57,9 @@ export function useDraggableWindow(id: UiWindowId) {
   useEffect(() => () => { dragRef.current = null }, [])
 
   return {
-    style: { left: position.left, top: position.top, transform: 'none' as const },
+    style: untouched
+      ? { ...RESPONSIVE_DEFAULT_STYLE[id], transform: 'none' as const }
+      : { left: position.left, top: position.top, transform: 'none' as const },
     onPointerDown,
   }
 }

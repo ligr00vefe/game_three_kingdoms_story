@@ -89,7 +89,7 @@ export function parseLocalCommand(input: string): GuanYuCommand {
   if (hasAny(text, ['성밖', '성외곽'])) {
     const fightAfterMove = hasAny(text, ['싸', '전투', '공격', '적을', '처치'])
     return validateCommand({
-      action: 'MOVE_TO', targetId: fightAfterMove ? 'outside_combat' : 'castle_outside', priority: 'HIGH',
+      action: 'MOVE_TO', targetId: fightAfterMove ? 'outside_combat' : 'castle_model_02', priority: 'HIGH',
       reply: fightAfterMove ? '성 밖으로 나가 적과 싸우겠습니다.' : '성 밖으로 이동하겠습니다.',
     })
   }

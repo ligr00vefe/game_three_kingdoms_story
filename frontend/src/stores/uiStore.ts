@@ -10,6 +10,13 @@ import { EventBus, GameEvents } from '../game/EventBus'
 export type UiWindowId = 'stats' | 'skillbook' | 'minimap' | 'aiHelp'
 export interface UiWindowPosition { left: number; top: number }
 
+export const DEFAULT_WINDOW_POSITIONS: Record<UiWindowId, UiWindowPosition> = {
+  stats: { left: 20, top: 110 },
+  skillbook: { left: 476, top: 110 },
+  minimap: { left: 10, top: 10 },
+  aiHelp: { left: 1251, top: 54 },
+}
+
 interface UiState {
   settingsOpen: boolean
   keySettingsOpen: boolean
@@ -48,12 +55,9 @@ export const useUiStore = create<UiState>()(
     skillbookOpen: false,
     chatFocused: false,
     cinematicOpen: false,
-    windowPositions: {
-    stats: { left: 20, top: 110 },
-    skillbook: { left: 476, top: 110 },
-    minimap: { left: 10, top: 10 },
-    aiHelp: { left: 1063, top: 185 },
-    },
+    // These sentinel values identify untouched windows. Their actual default
+    // layout is responsive and supplied by useDraggableWindow.
+    windowPositions: { ...DEFAULT_WINDOW_POSITIONS },
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setKeySettingsOpen: (keySettingsOpen) => set({ keySettingsOpen }),
     setCommandHelpOpen: (commandHelpOpen) => set({ commandHelpOpen }),
