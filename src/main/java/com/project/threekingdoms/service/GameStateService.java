@@ -9,6 +9,9 @@ import com.project.threekingdoms.api.dto.GameStateDtos.ItemDefinitionDto;
 import com.project.threekingdoms.api.dto.GameStateDtos.SaveStateRequest;
 import com.project.threekingdoms.domain.GameCharacter;
 import com.project.threekingdoms.domain.InventoryItem;
+import com.project.threekingdoms.domain.CharacterQuickslot;
+import com.project.threekingdoms.repository.CharacterQuickslotRepository;
+import com.project.threekingdoms.api.dto.GameStateDtos.QuickslotDto;
 import com.project.threekingdoms.repository.GameCharacterRepository;
 import com.project.threekingdoms.repository.InventoryItemRepository;
 import com.project.threekingdoms.repository.ItemDefinitionRepository;
@@ -31,6 +34,7 @@ public class GameStateService {
 	private final GameCharacterRepository characterRepository;
 	private final InventoryItemRepository inventoryRepository;
 	private final ItemDefinitionRepository itemDefinitionRepository;
+	private final CharacterQuickslotRepository quickslotRepository;
 
 	@Transactional
 	public GameStateResponse loadState() {
@@ -46,7 +50,7 @@ public class GameStateService {
 				d.getCode(), d.getName(), d.getItemType(), d.getIconKey(), d.getEffectJson(), d.getDescription()))
 			.toList();
 
-		return new GameStateResponse(toDto(character), inventory, defs);
+		return new GameStateResponse(toDto(character), inventory, defs, loadQuickslots(character.getId()));
 	}
 
 	@Transactional
@@ -62,7 +66,7 @@ public class GameStateService {
 			.map(i -> new InventoryItemDto(i.getItemCode(), i.getQuantity(), i.getSlotIndex(), i.isEquipped())).toList();
 		List<ItemDefinitionDto> defs = itemDefinitionRepository.findAll().stream()
 			.map(d -> new ItemDefinitionDto(d.getCode(), d.getName(), d.getItemType(), d.getIconKey(), d.getEffectJson(), d.getDescription())).toList();
-		return new GameStateResponse(toDto(character), inventory, defs);
+		return new GameStateResponse(toDto(character), inventory, defs, loadQuickslots(character.getId()));
 	}
 
 	/**
@@ -88,6 +92,7 @@ public class GameStateService {
 			.map(i -> new InventoryItem(character, i.itemCode(), i.quantity(), i.slotIndex(), i.equipped()))
 			.toList();
 		inventoryRepository.saveAll(items);
+		saveQuickslots(character, request.quickslots());
 	}
 
 	@Transactional
@@ -104,6 +109,20 @@ public class GameStateService {
 		List<InventoryItem> items = request.inventory().stream()
 			.map(i -> new InventoryItem(character, i.itemCode(), i.quantity(), i.slotIndex(), i.equipped())).toList();
 		inventoryRepository.saveAll(items);
+		saveQuickslots(character, request.quickslots());
+	}
+
+	private List<QuickslotDto> loadQuickslots(Long characterId) {
+		return quickslotRepository.findByCharacterIdOrderBySlotIndex(characterId).stream()
+			.map(q -> new QuickslotDto(q.getSlotIndex(), q.getEntryKind(), q.getEntryCode())).toList();
+	}
+
+	private void saveQuickslots(GameCharacter character, List<QuickslotDto> slots) {
+		quickslotRepository.deleteByCharacterId(character.getId());
+		var valid = slots.stream()
+			.filter(q -> "item".equals(q.kind()) || "skill".equals(q.kind()))
+			.map(q -> new CharacterQuickslot(character, q.slotIndex(), q.kind(), q.code())).toList();
+		quickslotRepository.saveAll(valid);
 	}
 
 	private void applyState(GameCharacter character, SaveStateRequest request) {

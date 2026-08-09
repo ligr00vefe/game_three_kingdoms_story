@@ -69,6 +69,8 @@ export const COMBAT = {
   COMBO_WINDOW_MS: 2000,        // 이 시간 안에 다시 공격하면 콤보 유지, 넘기면 찌르기부터 재시작
   COMBO_DASH_VX: 320,           // 2단계(깊게 찌르기) 전진 속도(px/s)
   COMBO_DASH_MS: 150,           // 전진 유지 시간 — 이후 그 자리에 멈춰 마무리
+  DECISIVE_DASH_VX: 520,        // 일격필살: 깊게 찌르기보다 빠른 전방 돌진
+  DECISIVE_DASH_MS: 220,        // 약 114px 전진해 찌르기 관통감을 강화
   /** 3단계(깊게 찌르기) 타격 리치. 기존 115px의 2/3 수준으로 축소했다. */
   COMBO_DASH_REACH: 77,
 
@@ -90,17 +92,20 @@ export const COMBAT = {
   } as Record<string, number>,
   SKILL_REACH: 200,
   SKILL_HEIGHT: 110,
+  CHARGE_SKILL_REACH: 140,
+  CHARGE_SKILL_HEIGHT: 85,
+  CHARGE_EFFECT_CENTER_OFFSET: 70,
   SKILL_MAX_TARGETS: 8,
   SKILL_DURATION_MS: 450,
   GLAIVE_DURATION_MS: 950,
-  DECISIVE_DURATION_MS: 760,
+  DECISIVE_DURATION_MS: 900,
   DRAGON_DURATION_MS: 900,
   // 스킬 전용 아트가 없어 기본 공격 모션을 450ms에 맞춰 압축 재생한다(Player.updateAnimation).
   // 그때 f3(최대 신장)이 205~311ms 구간이라 그 시작에 맞췄다 — 250 × (450/550) ≈ 205.
   // 스킬 전용 아트(8프레임)가 들어오면 그 시트 기준으로 다시 잡아야 한다.
   SKILL_HIT_AT_MS: 205,
   GLAIVE_HIT_AT_MS: 830,
-  DECISIVE_HIT_AT_MS: 500,
+  DECISIVE_HIT_AT_MS: 680,
   DRAGON_HIT_AT_MS: 720,
   SKILL_HITSTOP_MS: 70,
 

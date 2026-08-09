@@ -27,6 +27,7 @@ interface QuickslotState {
   placeHeld: (index: number) => void
   discardHeld: () => void
   clearSlot: (index: number) => void
+  hydrate: (slots: (QSEntry | null)[]) => void
   /** 슬롯 간 이동(드래그) — 대상이 점유면 서로 교체 */
   moveSlot: (from: number, to: number) => void
   /** 숫자키/클릭 발동: 아이템 사용 또는 스킬 시전 */
@@ -62,6 +63,11 @@ export const useQuickslotStore = create<QuickslotState>()(
         slots[index] = null
         set({ slots })
       },
+
+      hydrate: (saved) => set({
+        slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null),
+        held: null,
+      }),
 
       moveSlot: (from, to) => {
         if (from === to) return

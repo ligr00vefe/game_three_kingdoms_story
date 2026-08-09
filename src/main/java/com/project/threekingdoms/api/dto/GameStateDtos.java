@@ -29,10 +29,17 @@ public class GameStateDtos {
 		String iconKey, String effectJson, String description
 	) {}
 
+	public record QuickslotDto(
+		@Min(0) @Max(6) int slotIndex,
+		@NotBlank String kind,
+		@NotBlank String code
+	) {}
+
 	public record GameStateResponse(
 		CharacterDto character,
 		List<InventoryItemDto> inventory,
-		List<ItemDefinitionDto> itemDefinitions
+		List<ItemDefinitionDto> itemDefinitions,
+		List<QuickslotDto> quickslots
 	) {}
 
 	public record SaveStateRequest(
@@ -43,11 +50,12 @@ public class GameStateDtos {
 		@Min(1) int attackPower,
 		@Min(0) long gold,
 		@NotNull @Valid List<InventoryItemDto> inventory,
+		@NotNull @Valid List<QuickslotDto> quickslots,
 		String stageCode, @Min(1) int defenseStage
 	) {
 		public SaveStateRequest(int level, long exp, int maxHp, int hp, int maxMp, int mp,
 			int attackPower, long gold, List<InventoryItemDto> inventory) {
-			this(level, exp, maxHp, hp, maxMp, mp, attackPower, gold, inventory, "stage1_grassland", 1);
+			this(level, exp, maxHp, hp, maxMp, mp, attackPower, gold, inventory, List.of(), "stage1_grassland", 1);
 		}
 	}
 }

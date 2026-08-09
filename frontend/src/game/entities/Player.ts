@@ -589,10 +589,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private buildHitbox(isSkill: boolean): Phaser.Geom.Rectangle {
     // 대쉬찌르기(2단계)는 돌진하며 찔러 리치가 더 길다
+    const isChargeSlash = isSkill && this.skillQueuedCode === 'skill_charge_slash'
     const reach = isSkill
-      ? COMBAT.SKILL_REACH
+      ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH : COMBAT.SKILL_REACH
       : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
-    const h = isSkill ? COMBAT.SKILL_HEIGHT : COMBAT.ATTACK_HEIGHT
+    const h = isSkill
+      ? isChargeSlash ? COMBAT.CHARGE_SKILL_HEIGHT : COMBAT.SKILL_HEIGHT
+      : COMBAT.ATTACK_HEIGHT
     const x = this.facing === 1 ? this.x : this.x - reach
     return new Phaser.Geom.Rectangle(x, this.y - h / 2, reach, h)
   }
@@ -630,6 +633,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.skillMotionReleased = true
     this.currentAnimKey = null
     this.anims.stop()
+    // Deep-thrust style forward dash, synchronized with the instant the
+    // targeting scope hands off to the decisive thrust effect.
+    if (this.body.blocked.down || this.body.touching.down) {
+      this.dashLungeUntil = this.scene.time.now + COMBAT.DECISIVE_DASH_MS
+      this.setVelocityX(this.facing * COMBAT.DECISIVE_DASH_VX)
+    }
   }
 
   // ---------- 피격/사망 (GAME_DESIGN 4.3, 5.2) ----------

@@ -145,7 +145,10 @@ export function DefenseHud() {
     useDefenseStore.getState().setPurchaseOpen(false)
     EventBus.emit(GameEvents.DEFENSE_ARCHER_VOLLEY)
   }
-  const repair = (target: 'base' | 'barricades') => EventBus.emit(GameEvents.DEFENSE_REPAIR, target)
+  const repair = (target: 'base' | 'barricades') => {
+    EventBus.emit(GameEvents.DEFENSE_REPAIR, target)
+    useDefenseStore.getState().setPurchaseOpen(false)
+  }
   const chooseUpgrade = (upgrade: DefenseUpgrade) => EventBus.emit(GameEvents.DEFENSE_CHOOSE_UPGRADE, upgrade)
   const cancelPlacing = () => {
     useDefenseStore.getState().setPlacing(false)

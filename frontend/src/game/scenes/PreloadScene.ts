@@ -35,7 +35,9 @@ export class PreloadScene extends Phaser.Scene {
     this.load.json('monster_defs', 'assets/data/monsters.json')
     this.load.json('npc_defs', 'assets/data/npcs.json')
     // manifest 등록 에셋 일괄 로드 (아직 비어 있음 — 이미지 도입 시 여기만 통과하면 됨)
-    this.load.json('asset_manifest', 'assets/manifest.json')
+    // Version the manifest request so a browser refresh cannot reuse an old
+    // images/spritesheets classification after an asset-layout deployment.
+    this.load.json('asset_manifest', 'assets/manifest.json?v=20260810-2')
   }
 
   create() {
