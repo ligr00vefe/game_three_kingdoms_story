@@ -6,6 +6,10 @@ import { COMBAT } from '../config'
  * 새 이펙트가 필요하면 반드시 이 클래스에 풀을 추가한다. 씬에서 직접 생성 금지.
  */
 export class EffectManager {
+  /** Player is depth 10; combat effects must render over characters and scenery. */
+  private static readonly COMBAT_FX_DEPTH = 20
+  /** Bottom-most visible alpha row in fixed_v5 frames 1-13. */
+  private static readonly GLAIVE_ALPHA_BOTTOM = [404, 409, 409, 409, 420, 355, 355, 359, 361, 364, 380, 390, 420] as const
   private scene: Phaser.Scene
   private attackPool: Phaser.GameObjects.Group
   private attackHitPool: Phaser.GameObjects.Group
@@ -59,15 +63,6 @@ export class EffectManager {
 
   private defineGlaiveFrames() {
     if (!this.scene.textures.exists('fx_skill_glaive')) return
-    const texture = this.scene.textures.get('fx_skill_glaive')
-    let index = 0
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 5 && index < 13; col++, index++) {
-        const frameName = String(index)
-        if (texture.has(frameName)) texture.remove(frameName)
-        texture.add(index, 0, col * 384, row * 384, 384, 384)
-      }
-    }
     for (const [key, start, length, frameRate] of [
       ['fx_skill_glaive_slash_left', 0, 5, 28],
       ['fx_skill_glaive_slash_right', 5, 5, 28],
@@ -90,13 +85,16 @@ export class EffectManager {
     this.scene.anims.create({
       key: 'fx_decisive_scope_anim',
       frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i })),
-      frameRate: 24,
+      frameRate: 14,
       repeat: 0,
     })
     this.scene.anims.create({
       key: 'fx_decisive_thrust_anim',
-      frames: Array.from({ length: 9 }, (_, i) => ({ key: 'fx_decisive_strike', frame: i + 9 })),
-      frameRate: 30,
+      // Frames 14-16 in the source contact sheet contain pixels spilled from
+      // their neighbours. Skip those dirty panels; the remaining six frames
+      // form a clean, straight punch with no eased tween.
+      frames: [9, 10, 11, 12, 16, 17].map((frame) => ({ key: 'fx_decisive_strike', frame })),
+      frameRate: 60,
       repeat: 0,
     })
   }
@@ -392,7 +390,7 @@ export class EffectManager {
    * 같은 구도면 성립한다. 꼬리→코어 길이를 SKILL_REACH(200)에 맞춘다.
    */
   private static readonly SKILL_FX = { originX: 0.831, originY: 0.471, lenFrac: 0.831 } as const
-  private static readonly SKILL_FX_LEN_TO = 240
+  private static readonly SKILL_FX_LEN_TO = 160
   /**
    * ★ 참마돌격 이펙트 속도 조절값 — 이펙트가 퍼지며 사라지기까지의 시간(ms). 크게 잡을수록 느리다.
    * 시전 모션/판정(COMBAT.SKILL_DURATION_MS=450, SKILL_HIT_AT_MS)과는 분리돼 있어
@@ -416,6 +414,7 @@ export class EffectManager {
     img.setOrigin(0.5, spec.originY)
     img.setActive(true).setVisible(true)
     img.setPosition(x, y).setAlpha(0.95).setScale(fixedScale).setFlipX(facing === -1)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH)
     this.scene.tweens.add({
       targets: img, alpha: 0,
       // Cubic.easeOut은 초반에 몰아서 끝나 알맹이를 놓친다 — Sine이 더 고르게 보인다
@@ -426,17 +425,26 @@ export class EffectManager {
 
   skillGlaive(
     x: number,
-    y: number,
     facing: -1 | 1,
     groundY: number,
     onJump?: () => void,
+    isGrounded?: () => boolean,
+    impactYOffset = 0,
   ) {
-    const spr = this.glaivePool.get(x, y) as Phaser.GameObjects.Sprite | null
+    const spr = this.glaivePool.get(x, groundY) as Phaser.GameObjects.Sprite | null
     if (!spr) return
     this.scene.tweens.killTweensOf(spr)
     spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    spr.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 0.62)
-      .setFlipX(facing === -1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 245)
+    spr.setActive(true).setVisible(true).setPosition(x, groundY).setOrigin(0.5, 1)
+      .setFlipX(facing === -1).setAngle(0).setAlpha(0.98).setScale(0.64)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH)
+    const pinPaintedFrameToGround = (_animation: Phaser.Animations.Animation, frame: Phaser.Animations.AnimationFrame) => {
+      const textureFrame = Number(frame.textureFrame)
+      const visibleBottom = EffectManager.GLAIVE_ALPHA_BOTTOM[textureFrame] ?? 420
+      const impactOffset = textureFrame >= 10 ? impactYOffset : 0
+      spr.setY(groundY + (420 - visibleBottom) * Math.abs(spr.scaleY) + impactOffset)
+    }
+    spr.on(Phaser.Animations.Events.ANIMATION_UPDATE, pinPaintedFrameToGround)
     const sequence = ['fx_skill_glaive_slash_left', 'fx_skill_glaive_slash_right']
     let sequenceIndex = 0
     const playNext = (animation: string) => {
@@ -448,15 +456,26 @@ export class EffectManager {
           // 두 번의 지상 베기가 끝난 뒤 점프하고, 낙하 시점에 바닥 고정 내려찍기를 재생한다.
           spr.setVisible(false)
           onJump?.()
-          this.scene.time.delayedCall(320, () => {
+          let hasLeftGround = false
+          const waitForLanding = () => {
             if (!spr.active) return
+            const grounded = isGrounded?.() ?? true
+            if (!grounded) hasLeftGround = true
+            // Never play the impact in mid-air: wait until the body has first
+            // left the surface and then reports an actual landing.
+            if (!hasLeftGround || !grounded) {
+              this.scene.time.delayedCall(16, waitForLanding)
+              return
+            }
             spr.setVisible(true).setPosition(x, groundY).setOrigin(0.5, 1)
             spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
             spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+              spr.off(Phaser.Animations.Events.ANIMATION_UPDATE, pinPaintedFrameToGround)
               spr.setActive(false).setVisible(false)
             })
             spr.play('fx_skill_glaive_slam')
-          })
+          }
+          this.scene.time.delayedCall(16, waitForLanding)
         }
       })
       spr.play(animation)
@@ -480,12 +499,14 @@ export class EffectManager {
     hide(thrust)
     scope.setActive(true).setVisible(true).setPosition(scopeX, y).setOrigin(0.5, 0.55)
       // 원본 시트의 창은 왼쪽을 향하므로 오른쪽 공격일 때 반전한다.
-      .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
+      .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(192, 192)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH)
     scope.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       hide(scope)
       onThrustStart?.()
       thrust.setActive(true).setVisible(true).setPosition(thrustX, y).setOrigin(0.5, 0.55)
-        .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(220, 293)
+        .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(230, 230)
+        .setDepth(EffectManager.COMBAT_FX_DEPTH)
       thrust.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => hide(thrust))
       thrust.play('fx_decisive_thrust_anim')
     })
@@ -500,8 +521,8 @@ export class EffectManager {
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
     sprite.setActive(true).setVisible(true)
       .setPosition(x, groundY).setOrigin(0.5, 1)
-      .setDisplaySize(150, 380).setFlipX(facing === -1)
-      .setAlpha(0.96).setDepth(7)
+      .setScale(1.1, 0.8).setFlipX(facing === -1)
+      .setAlpha(0.96).setDepth(EffectManager.COMBAT_FX_DEPTH)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       sprite.setActive(false).setVisible(false)
     })

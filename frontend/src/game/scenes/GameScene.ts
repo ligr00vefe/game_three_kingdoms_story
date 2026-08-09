@@ -243,6 +243,14 @@ const CLOUD_DEPTH_FRONT = -90 // 빠른 구름 — 산 앞
 // 정지한 듯 움직이게 한다 (구름만 크면 걸을 때 산보다 빨리 미끄러져 "빠르다"고 느껴진다).
 const MOUNTAIN_SCROLL = 0.08
 
+/** Skill position tuning: positive X moves right, positive Y moves down. */
+const SKILL_EFFECT_OFFSET = {
+  glaiveX: 24,          // 언월난무 전체 중심의 좌우 위치
+  glaiveY: 20,          // 언월난무 1~10번 프레임 높이
+  glaiveImpactY: 30,    // 마지막 3개 폭발 프레임에만 추가되는 아래쪽 이동량
+  dragonY: 30,
+} as const
+
 /**
  * 스테이지 1: 초원 (GAME_DESIGN 7장). 맵은 JSON 데이터 주도.
  * Phase 2 범위 추가: 전투(참격/청룡참), 황건당 좀비, 데미지/경험치/레벨업, 피격/사망.
@@ -261,6 +269,8 @@ export class GameScene extends Phaser.Scene {
   private portals: PortalDef[] = []
   private transitioning = false
   private dragonSlashImpactX = 0
+  private dragonSlashImpactY = 0
+  private glaiveImpactY = 0
   /** 게임 모드 — 'defense'면 디펜스 시스템(DefenseManager) 활성, 일반 포탈/스폰 대신 웨이브 진행 */
   private mode: 'normal' | 'defense' = 'normal'
   private defense?: DefenseManager
@@ -535,6 +545,22 @@ export class GameScene extends Phaser.Scene {
     const walkwayArt = this.art(walkwayKey)
     const walkwayY = map.groundY + (WALKWAY_SURFACE_ADJUST[walkwayKey] ?? 0)
     const walkwayBottom = walkwayArt ? walkwayY + walkwayH : null
+
+    // 성밖(stage1) 전용 강변 폐허 초원 중경. 이미지 하단을 walkway_02의
+    // 상단에 붙이고 월드 전체에 가로 반복한다. 감숙성/디펜스에는 생성하지 않는다.
+    if (this.mapKey === 'map_stage1' && this.mode !== 'defense' && this.art('bg_bamboo_forest')) {
+      // 이 값은 새로 추가한 강변 폐허 초원 이미지에만 적용된다.
+      const bambooForestScale = 0.45
+      const bambooForestSource = this.textures.get('bg_bamboo_forest').getSourceImage() as HTMLImageElement
+      // tileSprite의 width/height는 확대·축소가 아니라 표시 영역(클리핑 영역)이다.
+      // 원본 높이 × tileScale을 사용해야 축소된 이미지 전체가 잘리지 않고 표시된다.
+      const bambooForestHeight = bambooForestSource.height * bambooForestScale
+      this.add
+        .tileSprite(0, walkwayY + 150, map.worldWidth, bambooForestHeight, 'bg_bamboo_forest')
+        .setOrigin(0, 1)
+        .setTileScale(bambooForestScale, bambooForestScale)
+        .setDepth(DEPTH.BG_NEAR)
+    }
     /** 길 아랫변 — 성 밖 연못이 여기에 붙는다. 아트가 없으면(placeholder 폴백) 붙일 데가 없다. */
     for (let x = 0; x < map.worldWidth; x += 32) {
       const t = solids.create(x + 16, map.groundY + 16, 'tile_ground') as Phaser.Physics.Arcade.Sprite
@@ -794,12 +820,20 @@ export class GameScene extends Phaser.Scene {
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
     this.player.onSkillStart = (facing, skillCode) => {
       if (skillCode === 'skill_glaive_flurry') {
+        // Capture the surface under the player's feet before the skill jump.
+        // map.groundY would place the impact in mid-air when cast on a platform.
+        const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.glaiveY
+        this.glaiveImpactY = castGroundY
         this.effects.skillGlaive(
-          this.player.x,
-          this.player.y + 18,
+          this.player.x + SKILL_EFFECT_OFFSET.glaiveX,
           facing,
-          this.map.groundY,
+          castGroundY,
           () => this.player.startGlaiveMotion(),
+          () => {
+            const body = this.player.body as Phaser.Physics.Arcade.Body
+            return body.blocked.down || body.touching.down
+          },
+          SKILL_EFFECT_OFFSET.glaiveImpactY,
         )
         return
       }
@@ -813,11 +847,13 @@ export class GameScene extends Phaser.Scene {
         return
       }
       if (skillCode === 'skill_dragon_slash') {
+        const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.dragonY
         this.dragonSlashImpactX = this.player.x + facing * 72
+        this.dragonSlashImpactY = castGroundY
         this.player.startDragonSlashMotion()
         // Capture the cast position once. The airborne player no longer drags
         // the effect after it has appeared.
-        this.effects.dragonSlash(this.dragonSlashImpactX, this.map.groundY, facing)
+        this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
       }
     }
     this.player.onSkill = (hitbox, facing, skillCode) => {
@@ -826,13 +862,19 @@ export class GameScene extends Phaser.Scene {
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
       const attackArea = isDragonSlash
-        ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.map.groundY - 42, 125)
+        ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.dragonSlashImpactY - 42, 125)
         : isGlaiveFlurry
         // 언월난무는 점프 중 바닥을 내려찍는 기술이므로, 공중에 뜬 캐릭터의
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
-        ? new Phaser.Geom.Circle(this.player.x, this.map.groundY - 42, 150)
+        ? new Phaser.Geom.Circle(this.player.x, this.glaiveImpactY - 42, 150)
         : hitbox
-      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash) this.effects.skillCharge(this.player.x + facing * COMBAT.SKILL_REACH, this.player.y + 22, facing)
+      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash) {
+        this.effects.skillCharge(
+          this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET,
+          this.player.y + 22,
+          facing,
+        )
+      }
       this.resolveAttack(attackArea, isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS, true, isGlaiveFlurry ? 1.25 : 1)
       // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
       this.physics.pause()

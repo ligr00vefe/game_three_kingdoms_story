@@ -5,6 +5,7 @@ import { useInventoryStore, INVENTORY_SIZE } from '../stores/inventoryStore'
 import type { ItemDef, ItemType } from '../stores/inventoryStore'
 import { useScreenStore } from '../stores/screenStore'
 import { useSkillStore } from '../stores/skillStore'
+import { QUICKSLOT_COUNT, useQuickslotStore } from '../stores/quickslotStore'
 
 interface ServerItemDef {
   code: string
@@ -30,6 +31,7 @@ interface GameStateResponse {
   }
   inventory: ServerInventoryItem[]
   itemDefinitions: ServerItemDef[]
+  quickslots: { slotIndex: number; kind: 'item' | 'skill'; code: string }[]
 }
 
 /** 접속 시 서버 상태 로드 → 스토어 하이드레이트 (첫 Phaser↔React↔서버 3자 연동) */
@@ -53,6 +55,13 @@ export async function loadGameState(): Promise<void> {
     description: d.description ?? '',
   }))
   useInventoryStore.getState().hydrate(data.inventory, defs)
+  const quickslots = Array(QUICKSLOT_COUNT).fill(null)
+  for (const slot of data.quickslots ?? []) {
+    if (slot.slotIndex >= 0 && slot.slotIndex < QUICKSLOT_COUNT) {
+      quickslots[slot.slotIndex] = { kind: slot.kind, code: slot.code }
+    }
+  }
+  useQuickslotStore.getState().hydrate(quickslots)
 }
 
 function buildSaveRequest() {
@@ -69,6 +78,8 @@ function buildSaveRequest() {
     attackPower: g.attackPower, gold: g.gold,
     stageCode: g.stageCode, defenseStage: g.defenseStage,
     inventory,
+    quickslots: useQuickslotStore.getState().slots.flatMap((entry, slotIndex) =>
+      entry ? [{ slotIndex, kind: entry.kind, code: entry.code }] : []),
   }
 }
 
