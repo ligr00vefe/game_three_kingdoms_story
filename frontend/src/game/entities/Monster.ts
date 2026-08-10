@@ -345,7 +345,8 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   /** 플레이어 공격 적중 (GameScene 전투 판정에서 호출) */
   /** @returns true면 이 공격으로 사망 (경험치 지급 트리거) */
   receiveHit(amount: number, crit: boolean, fromX: number, effects: EffectManager, now: number): boolean {
-    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning') return false
+    // 공격 모션(windup)을 끝까지 우선 재생한다. 공격 중에는 피해와 피격 반응을 모두 무시한다.
+    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning' || this.state_ === 'windup') return false
     this.hp -= amount
     effects.damageNumber(this.x, this.y - 40, amount, 'deal', crit, this) // 연타 스택 키 = 몬스터 자신
     effects.hitSpark(this.x, this.y - 10)

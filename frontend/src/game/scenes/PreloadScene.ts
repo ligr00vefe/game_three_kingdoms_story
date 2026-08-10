@@ -200,9 +200,9 @@ export class PreloadScene extends Phaser.Scene {
     if (!this.textures.exists('ph_bg_far')) {
       // 먼 배경: 단색 하늘만 (구름/봉우리 실루엣 placeholder는 제거 — bg_mountain_01.png 실제 아트가 그 역할을 대신한다.
       // 예전엔 안개띠(fillRect)와 산 실루엣(fillTriangle)이 있었는데, 색 경계가 성벽 흉벽(총안) 틈으로 비쳐
-      // 가로 선/삼각형 도형처럼 보였다 — 카메라 배경색(0xa8dde0)과 동일한 단색으로 통일해 그 경계를 없앤다.
+      // 가로 선/삼각형 도형처럼 보였다 — 밝은 하늘색 단색으로 통일해 그 경계를 없앤다.
       g.clear()
-      g.fillStyle(0xa8dde0); g.fillRect(0, 0, 512, 400)
+      g.fillStyle(0xb9e3ff); g.fillRect(0, 0, 512, 400)
       g.generateTexture('ph_bg_far', 512, 400)
     }
     // 성 내부 바닥 아래 장식(석재 안뜰) — 물 대신 사용

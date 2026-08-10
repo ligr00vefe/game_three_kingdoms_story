@@ -644,7 +644,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // ---------- 피격/사망 (GAME_DESIGN 4.3, 5.2) ----------
   receiveHit(attack: number, fromX: number) {
     const now = this.scene.time.now
-    if (this.state_ === 'dead' || this.invincible || now < this.invincibleUntil) return
+    // 스킬 시전이 최우선이다. 시전 중에는 피해·넉백·피격 모션을 모두 무시한다.
+    if (this.state_ === 'dead' || this.state_ === 'skill' || this.invincible || now < this.invincibleUntil) return
     if (this.state_ === 'sit') this.exitSit() // 앉은 채 피격 → 자세 복구
     const store = useGameStore.getState()
     const amount = Math.max(1, Math.round(attack))
@@ -684,6 +685,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   get isHittable() {
-    return this.state_ !== 'dead' && !this.invincible && this.scene.time.now >= this.invincibleUntil
+    return this.state_ !== 'dead' && this.state_ !== 'skill'
+      && !this.invincible && this.scene.time.now >= this.invincibleUntil
   }
 }

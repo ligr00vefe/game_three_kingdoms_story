@@ -219,7 +219,7 @@ export function DefenseHud() {
       {/* 하단중앙: 대기·전투 중 언제나 사용 가능한 보급소 */}
       {(phase === 'wait' || phase === 'combat') && !placing && (
         <button className="def-buy-btn" onClick={() => useDefenseStore.getState().setPurchaseOpen(true)}>
-          <span>구매하기</span>
+          <span>전장 보급소</span>
           <span className="def-buy-key">단축키: B</span>
         </button>
       )}

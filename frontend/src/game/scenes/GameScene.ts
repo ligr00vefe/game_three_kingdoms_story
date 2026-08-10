@@ -457,7 +457,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (map.theme === 'castle_interior') {
-      this.cameras.main.setBackgroundColor(0x88badb)
+      this.cameras.main.setBackgroundColor(0xb9e3ff)
       // far: 하늘 + 먼 원경 (아주 느림)
       addLayer(this.art('bg_castle_interior') ? 'bg_castle_interior' : 'ph_bg_far', 0.1, DEPTH.BG_FAR, map.worldHeight, 0)
       // 제일 먼 배경: 성벽 위로 아스라이 보이는 산 능선 (반복, 아주 느린 시차 — 하늘보다도 느리진 않되 성벽/건물보다 훨씬 느리게)
@@ -499,6 +499,8 @@ export class GameScene extends Phaser.Scene {
       } else if (this.art('bg_mountain')) {
         addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 350, 110, 1)
       }
+      // 일반 성 밖에도 구름을 띄운다. 디펜스 아레나는 전용 까마귀 연출만 유지한다.
+      if (this.mode !== 'defense') this.spawnClouds(map.worldWidth, viewW, true)
       // 예전엔 중경에 'bg_mountains'(도형 placeholder — PreloadScene에 삼각형 산으로 무조건 생성됨)를
       // 폴백으로 썼는데, 그 키로 실제 아트가 로드되는 일이 없어 항상 삼각형이 보였다. 실제 아트가
       // 생기기 전까진 이 레이어를 아예 생략 — 삼각형 placeholder보다 없는 게 낫다.
@@ -1509,7 +1511,7 @@ export class GameScene extends Phaser.Scene {
    * (표시높이 = w × 원본세로/원본가로. cloud_01·02 ≈ w×0.39, cloud_03 ≈ w×0.35)
    * speed(px/초)는 자체 드리프트 — 아주 작게 잡아 "거의 멈춘 듯" 서서히 흐르게 한다.
    */
-  private spawnClouds(worldWidth: number, viewW: number) {
+  private spawnClouds(worldWidth: number, viewW: number, randomized = false) {
     // 패럴랙스는 산과 동일(MOUNTAIN_SCROLL) — 걸을 때 산과 함께 거의 정지한 듯 움직인다.
     const scroll = MOUNTAIN_SCROLL
     // 이 스크롤계수에서 구름이 화면에 잡힐 수 있는 월드 X 범위는 [0, bandRight] — 순환(wrap) 기준.
@@ -1525,7 +1527,17 @@ export class GameScene extends Phaser.Scene {
       { key: 'bg_cloud_03', at: 0.77, y: 61,  w: 46, speed: 5.8, bob: 4, phase: 5.0, depth: CLOUD_DEPTH_FRONT },
       { key: 'bg_cloud_02', at: 0.94, y: 128, w: 61, speed: 4.1, bob: 7, phase: 6.2, depth: CLOUD_DEPTH_BEHIND },
     ]
-    specs.forEach((s) => {
+    specs.forEach((base) => {
+      const s = randomized
+        ? {
+            ...base,
+            at: Phaser.Math.FloatBetween(Math.max(0.02, base.at - 0.06), Math.min(0.98, base.at + 0.06)),
+            y: base.y + Phaser.Math.Between(-12, 12),
+            w: Math.round(base.w * Phaser.Math.FloatBetween(0.85, 1.15)),
+            speed: base.speed * Phaser.Math.FloatBetween(0.85, 1.15),
+            phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+          }
+        : base
       if (!this.art(s.key)) return
       const src = this.textures.get(s.key).getSourceImage() as HTMLImageElement
       const dispH = s.w * (src.height / src.width)
@@ -1642,8 +1654,8 @@ export class GameScene extends Phaser.Scene {
 
     // Two independent distant flocks: separate altitude bands prevent them
     // from looking like duplicated sprites travelling on the same path.
-    schedule(1_500, 78, 122, 50, 54, 55, 65)
-    schedule(Phaser.Math.Between(4_000, 8_000), 132, 180, 56, 60, 35, 45)
+    schedule(1_500, 78, 122, 54, 60, 55, 65)
+    schedule(Phaser.Math.Between(4_000, 8_000), 132, 180, 60, 66, 35, 45)
   }
 
   update(time: number, delta: number) {

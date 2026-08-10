@@ -12,18 +12,22 @@ export type DefenseUpgrade = 'attack' | 'vitality' | 'mana' | 'salvage' | 'forti
 export const BARRICADE_TIERS: Record<BarricadeTier, {
   name: string; cost: number; hp: number; width: number; height: number; tint: number
 }> = {
-  low: { name: '목책', cost: 10, hp: 25, width: 65, height: 50, tint: 0xffffff },
+  // barricade_03 원본(558×588) 비율. 폭은 기존 65px을 유지하고 높이만 정비율로 복원한다.
+  low: { name: '목책', cost: 10, hp: 25, width: 65, height: 68.5, tint: 0xffffff },
   mid: { name: '사대', cost: 150, hp: 240, width: 55, height: 101, tint: 0xffffff },
-  high: { name: '상급', cost: 500, hp: 500, width: 66, height: 82, tint: 0xffd778 },
+  // barricade_04 원본(553×628) 비율로, 사대와 같은 높이까지 키운다.
+  high: { name: '상급', cost: 500, hp: 500, width: 89, height: 101, tint: 0xffd778 },
 }
 
 export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>, {
   name: string; cost: number; hp: number; width: number; height: number; tint: number
   damage: number; range: number; cooldownMs: number; groundInset: number; footprint: number; splashRadius?: number
 }> = {
-  watchtower: { name: '망루', cost: 220, hp: 260, width: 270, height: 180, tint: 0xffffff, damage: 18, range: 480, cooldownMs: 2_200, groundInset: 0.066, footprint: 270 },
-  cannonTower: { name: '포탑', cost: 330, hp: 380, width: 140, height: 210, tint: 0xffffff, damage: 34, range: 620, cooldownMs: 3_400, groundInset: 0.062, footprint: 140, splashRadius: 64 },
-  bastion: { name: '성루', cost: 450, hp: 520, width: 285, height: 190, tint: 0xffffff, damage: 44, range: 900, cooldownMs: 4_800, groundInset: 0.075, footprint: 285, splashRadius: 92 },
+  // footprint는 투명 캔버스가 아니라 이미지에서 실제로 보이는 시설물의 가로 폭이다.
+  // 망루는 가로·세로를 동일 비율로 축소한 195×195 캔버스로 표시해 포탑보다 조금 작게 둔다.
+  watchtower: { name: '망루', cost: 220, hp: 260, width: 195, height: 195, tint: 0xffffff, damage: 18, range: 480, cooldownMs: 2_200, groundInset: 0.066, footprint: 109 },
+  cannonTower: { name: '포탑', cost: 330, hp: 380, width: 140, height: 210, tint: 0xffffff, damage: 34, range: 620, cooldownMs: 3_400, groundInset: 0.062, footprint: 124, splashRadius: 64 },
+  bastion: { name: '성루', cost: 450, hp: 520, width: 285, height: 190, tint: 0xffffff, damage: 44, range: 900, cooldownMs: 4_800, groundInset: 0.075, footprint: 205, splashRadius: 92 },
 }
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
@@ -567,8 +571,9 @@ export class DefenseManager {
     const hpBar = this.scene.add.graphics().setDepth(5)
     // All buildable structures render behind the playable character.
     spr.setDepth(-5)
-    // 배치 점유 폭은 충돌용 내부 바디가 아니라 화면에 보이는 이미지 폭과 일치시킨다.
-    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, footprint: dispW, kind, attackReadyAt: 0 }
+    // 공격 시설은 투명 캔버스를 제외한 실제 가시 폭(bodyW), 방벽과 기지는 표시 폭을 점유한다.
+    const footprint = offensive ? bodyW : dispW
+    const s: Structure = { spr, hpBar, hp, maxHp: hp, isBase, barW, footprint, kind, attackReadyAt: 0 }
     this.structures.push(s)
     this.drawHpBar(s)
     return s
@@ -652,23 +657,13 @@ export class DefenseManager {
           if (!s.isBase) {
             this.scene.time.delayedCall(2200, () => {
               if (!s.spr.active) return
-              const ruinX = s.spr.x
-              // 잔해가 좌우로 잘게 떨리는 동안 함께 흐려진다. y축 위치는 고정한다.
-              this.scene.tweens.add({
-                targets: s.spr,
-                x: ruinX + 3,
-                duration: 36,
-                yoyo: true,
-                repeat: 6,
-                ease: 'Sine.easeInOut',
-              })
+              // 잔해는 위치를 고정한 채 자연스럽게 흐려져 사라진다.
               this.scene.tweens.add({
                 targets: s.spr,
                 alpha: 0,
-                delay: 90,
-                duration: 420,
+                duration: 650,
                 ease: 'Quad.easeIn',
-                onComplete: () => s.spr.setPosition(ruinX, s.spr.y).setVisible(false).setActive(false),
+                onComplete: () => s.spr.setVisible(false).setActive(false),
               })
             })
           }
@@ -698,7 +693,9 @@ export class DefenseManager {
     const key = kind === 'watchtower' ? 'img_watch_tower_01'
       : kind === 'cannonTower' ? 'img_watch_tower_02'
         : kind === 'bastion' ? 'img_watch_tower_03'
-          : tier === 'mid' ? 'img_barricade_02' : 'img_barricade'
+          : tier === 'low' ? 'img_barricade_03'
+            : tier === 'mid' ? 'img_barricade_02'
+              : 'img_barricade_04'
     if (this.scene.textures.exists(key)) return key
     return 'img_barricade'
   }
@@ -707,9 +704,10 @@ export class DefenseManager {
     const key = structure.kind === 'watchtower' ? 'img_broken_watch_tower_01'
       : structure.kind === 'cannonTower' ? 'img_broken_watch_tower_02'
         : structure.kind === 'bastion' ? 'img_broken_watch_tower_03'
-          : structure.kind === 'barricade' && structure.tier === 'low' ? 'img_broken_barricade_01'
+          : structure.kind === 'barricade' && structure.tier === 'low' ? 'img_broken_barricade_03'
             : structure.kind === 'barricade' && structure.tier === 'mid' ? 'img_broken_barricade_02'
-              : null
+              : structure.kind === 'barricade' && structure.tier === 'high' ? 'img_broken_barricade_04'
+                : null
     return key && this.scene.textures.exists(key) ? key : null
   }
 
@@ -724,9 +722,20 @@ export class DefenseManager {
       const height = originalHeight * 699 / 867
       return { width, height, offsetX: (width - originalWidth) / 2 }
     }
+    // 파손 아트도 각 파일의 원본 비율을 유지하되, 정상 시설물과 같은 표시 높이를 사용한다.
+    if (structure.kind === 'barricade' && structure.tier === 'low') {
+      const width = originalHeight * 1230 / 1109
+      return { width, height: originalHeight, offsetX: (width - originalWidth) / 2 }
+    }
+    if (structure.kind === 'barricade' && structure.tier === 'high') {
+      const width = originalHeight * 1167 / 1308
+      return { width, height: originalHeight, offsetX: (width - originalWidth) / 2 }
+    }
     // 정상 망루의 투명 여백을 제외한 실루엣과 파괴 이미지의 보이는 크기를 일치시킨 값.
-    if (structure.kind === 'watchtower') return { width: originalWidth * 863 / 1536, height: originalHeight * 916 / 1024, offsetX: 0 }
-    if (structure.kind === 'cannonTower') return { width: originalWidth * 913 / 1024, height: originalHeight * 1460 / 1536, offsetX: 0 }
+    // 망루 잔해는 무너져 펼쳐진 느낌이 나도록 정상 실루엣보다 가로 폭을 약 10% 넓힌다.
+    if (structure.kind === 'watchtower') return { width: originalWidth * 950 / 1536, height: originalHeight * 916 / 1024, offsetX: 0 }
+    // 포탑 잔해는 정상 포탑보다 낮게 주저앉도록 기존 파손 높이에서 약 4% 낮춘다.
+    if (structure.kind === 'cannonTower') return { width: originalWidth * 913 / 1024, height: originalHeight * 1400 / 1536, offsetX: 0 }
     if (structure.kind === 'bastion') return { width: originalWidth * 1110 / 1536, height: originalHeight * 966 / 1024, offsetX: 0 }
     return { width: originalWidth, height: originalHeight, offsetX: 0 }
   }
