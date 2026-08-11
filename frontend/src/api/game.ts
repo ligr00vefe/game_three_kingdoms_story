@@ -6,6 +6,7 @@ import type { ItemDef, ItemType } from '../stores/inventoryStore'
 import { useScreenStore } from '../stores/screenStore'
 import { useSkillStore } from '../stores/skillStore'
 import { QUICKSLOT_COUNT, useQuickslotStore } from '../stores/quickslotStore'
+import { useAuthStore } from '../stores/authStore'
 
 interface ServerItemDef {
   code: string
@@ -28,6 +29,7 @@ interface GameStateResponse {
     name: string; level: number; exp: number
     maxHp: number; hp: number; maxMp: number; mp: number
     attackPower: number; gold: number; stageCode: string; defenseStage: number
+    positionX: number | null; positionY: number | null
   }
   inventory: ServerInventoryItem[]
   itemDefinitions: ServerItemDef[]
@@ -45,10 +47,15 @@ export async function loadGameState(): Promise<void> {
     maxHp: c.maxHp, hp: c.hp, maxMp: c.maxMp, mp: c.mp,
     attackPower: c.attackPower, gold: c.gold,
     stageCode: c.stageCode, defenseStage: c.defenseStage,
+    playerX: c.positionX, playerY: c.positionY,
   })
-  // Repair persisted skill data after loading, including older level-1 saves
-  // where the starting skill was incorrectly left locked.
-  useSkillStore.getState().unlockScheduled(c.level)
+  // 스킬 데이터는 계정+캐릭터별로 분리하고 현재 레벨보다 높은 스킬을 반드시 잠근다.
+  const accountId = useAuthStore.getState().user?.accountId
+  if (accountId !== undefined) {
+    useSkillStore.getState().loadCharacterProfile(accountId, characterCode, c.level)
+  } else {
+    useSkillStore.getState().unlockScheduled(c.level)
+  }
   const defs: ItemDef[] = data.itemDefinitions.map((d) => ({
     code: d.code, name: d.name, itemType: d.itemType, iconKey: d.iconKey,
     effect: d.effectJson ? JSON.parse(d.effectJson) : null,
@@ -77,6 +84,7 @@ function buildSaveRequest() {
     maxHp: g.maxHp, hp: g.hp, maxMp: g.maxMp, mp: g.mp,
     attackPower: g.attackPower, gold: g.gold,
     stageCode: g.stageCode, defenseStage: g.defenseStage,
+    positionX: g.playerX, positionY: g.playerY,
     inventory,
     quickslots: useQuickslotStore.getState().slots.flatMap((entry, slotIndex) =>
       entry ? [{ slotIndex, kind: entry.kind, code: entry.code }] : []),
@@ -86,6 +94,14 @@ function buildSaveRequest() {
 export async function saveGameState(): Promise<void> {
   const characterCode = useScreenStore.getState().selectedCharacter
   await api.post('/game/state', buildSaveRequest(), { params: { characterCode } })
+}
+
+/** 탭/브라우저 종료 직전에도 마지막 좌표를 전송한다. */
+function saveGameStateOnExit() {
+  if (useGameStore.getState().serverStatus !== 'ok') return
+  const characterCode = encodeURIComponent(useScreenStore.getState().selectedCharacter)
+  const body = new Blob([JSON.stringify(buildSaveRequest())], { type: 'application/json' })
+  navigator.sendBeacon(`/api/game/state?characterCode=${characterCode}`, body)
 }
 
 /**
@@ -102,7 +118,11 @@ export function startAutosave(intervalMs = 10_000): () => void {
       void saveGameState().catch(() => {})
     }
   }
+  const saveMapChange = () => {
+    if (useGameStore.getState().serverStatus === 'ok') void saveGameState().catch(() => {})
+  }
   document.addEventListener('visibilitychange', onHide)
+  window.addEventListener('pagehide', saveGameStateOnExit)
 
   // 주요 이벤트 직후 저장 (1초 디바운스 — 연속 레벨업 대비)
   let eventSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -114,13 +134,16 @@ export function startAutosave(intervalMs = 10_000): () => void {
   EventBus.on(GameEvents.LEVEL_UP, saveSoon)
   EventBus.on(GameEvents.PLAYER_DIED, saveSoon)
   EventBus.on(GameEvents.DEFENSE_STATE, saveSoon)
+  EventBus.on(GameEvents.MAP_CHANGED, saveMapChange)
 
   return () => {
     clearInterval(timer)
     document.removeEventListener('visibilitychange', onHide)
+    window.removeEventListener('pagehide', saveGameStateOnExit)
     if (eventSaveTimer) clearTimeout(eventSaveTimer)
     EventBus.off(GameEvents.LEVEL_UP, saveSoon)
     EventBus.off(GameEvents.PLAYER_DIED, saveSoon)
     EventBus.off(GameEvents.DEFENSE_STATE, saveSoon)
+    EventBus.off(GameEvents.MAP_CHANGED, saveMapChange)
   }
 }

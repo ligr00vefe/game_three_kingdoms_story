@@ -16,6 +16,7 @@ interface DefenseState {
   timeLeftMs: number
   stage: number
   zombiesLeft: number
+  gold: number
   baseHp: number
   maxBaseHp: number
   archerCooldownMs: number
@@ -30,7 +31,7 @@ interface DefenseState {
   pauseOpen: boolean       // ESC 일시정지 메뉴 열림
   setFromEvent: (p: {
     phase: DefensePhase; timeLeftMs: number; stage: number
-    zombiesLeft: number; baseHp: number; maxBaseHp: number; defeatReason: DefeatReason; archerCooldownMs: number
+    zombiesLeft: number; gold: number; baseHp: number; maxBaseHp: number; defeatReason: DefeatReason; archerCooldownMs: number
     combo: number; eventName: string | null; rewardChoices: DefenseUpgrade[]; supplyLevel: number; builtOffensive: OffensiveBuildState
   }) => void
   setPurchaseOpen: (open: boolean) => void
@@ -45,6 +46,7 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   timeLeftMs: 0,
   stage: 1,
   zombiesLeft: 0,
+  gold: 0,
   baseHp: 100,
   maxBaseHp: 100,
   archerCooldownMs: 0,
@@ -64,7 +66,7 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   setPauseOpen: (pauseOpen) => { set({ pauseOpen }); EventBus.emit(GameEvents.DEFENSE_PAUSE, pauseOpen) },
   reset: () => set({
     active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false,
-    archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
+    gold: 0, archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
     builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
   }),
 }))

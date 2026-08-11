@@ -55,10 +55,16 @@ public class GameCharacter {
 	private long gold = 0;
 
 	@Column(name = "stage_code", nullable = false, length = 30)
-	private String stageCode = "stage1_grassland";
+	private String stageCode = "map_ye_castle";
 
 	@Column(name = "defense_stage", nullable = false)
 	private int defenseStage = 1;
+
+	@Column(name = "position_x")
+	private Integer positionX = 1100;
+
+	@Column(name = "position_y")
+	private Integer positionY = 440;
 
 	public GameCharacter(String name) {
 		this.name = name;

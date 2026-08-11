@@ -14,7 +14,8 @@ public class GameStateDtos {
 	public record CharacterDto(
 		String name, String characterCode, int level, long exp,
 		int maxHp, int hp, int maxMp, int mp,
-		int attackPower, long gold, String stageCode, int defenseStage
+		int attackPower, long gold, String stageCode, int defenseStage,
+		Integer positionX, Integer positionY
 	) {}
 
 	public record InventoryItemDto(
@@ -51,11 +52,13 @@ public class GameStateDtos {
 		@Min(0) long gold,
 		@NotNull @Valid List<InventoryItemDto> inventory,
 		@NotNull @Valid List<QuickslotDto> quickslots,
-		String stageCode, @Min(1) int defenseStage
+		String stageCode, @Min(1) int defenseStage,
+		@Min(0) @Max(100000) Integer positionX,
+		@Min(0) @Max(100000) Integer positionY
 	) {
 		public SaveStateRequest(int level, long exp, int maxHp, int hp, int maxMp, int mp,
 			int attackPower, long gold, List<InventoryItemDto> inventory) {
-			this(level, exp, maxHp, hp, maxMp, mp, attackPower, gold, inventory, List.of(), "stage1_grassland", 1);
+			this(level, exp, maxHp, hp, maxMp, mp, attackPower, gold, inventory, List.of(), "map_ye_castle", 1, null, null);
 		}
 	}
 }

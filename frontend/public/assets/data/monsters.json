@@ -90,12 +90,21 @@
     "drops": [{ "code": "coin", "chance": 1.0, "min": 2, "max": 5 }]
   },
   "zombie_shield": {
-    "name": "황건 방패병", "textureKey": "zombie_yellow_idle", "runTextureKey": "zombie_yellow_run",
-    "runFrameRate": 1.5,
-    "attackTextureKey": "normal_zombie_attack", "deathTextureKey": "normal_zombie_death", "spriteScale": 0.62, "spriteOriginY": 0.55,
-    "maxHp": 75, "attack": 7, "defense": 6, "exp": 28, "moveSpeed": 8,
-    "detectRange": 99999, "attackRange": 46, "attackCooldownMs": 1300, "attackWindupMs": 420,
-    "drops": [{ "code": "coin", "chance": 1.0, "min": 4, "max": 8 }]
+    "name": "황건 방패 좀비",
+    "textureKey": "shield_zombie_walk", "runTextureKey": "shield_zombie_walk",
+    "idleFrameRate": 2, "runFrameRate": 2,
+    "attackTextureKey": "shield_zombie_walk", "attackFrameRate": 6,
+    "fallingTextureKey": "shield_zombie_falling", "fallingSpriteScale": 0.13,
+    "dropEffectTextureKey": "fx_shield_zombie_drop", "dropEffectScale": 0.55,
+    "dropDamage": 14, "dropDamageRadius": 120,
+    "dashEffectTextureKey": "fx_shield_zombie_dash",
+    "chargeSpeed": 95, "chargeTriggerRange": 520, "chargeCooldownMs": 2400,
+    "attackLungeSpeed": 95,
+    "deathTextureKey": "normal_zombie_death", "spriteScale": 0.28, "spriteOriginY": 1.0, "spriteFootYRatio": 0.968,
+    "facesLeftByDefault": true,
+    "maxHp": 160, "attack": 18, "defense": 12, "exp": 42, "moveSpeed": 7,
+    "detectRange": 99999, "attackRange": 52, "attackCooldownMs": 1800, "attackWindupMs": 650,
+    "drops": [{ "code": "coin", "chance": 1.0, "min": 6, "max": 12 }]
   },
   "zombie_exploder": {
     "name": "황건 폭탄 좀비", "textureKey": "bomb_zombie_idle", "runTextureKey": "bomb_zombie_walk",
@@ -115,9 +124,9 @@
     "idleFrameRate": 3, "runFrameRate": 3.5,
     "attackFrameRate": 14, "specialAttackFrameRate": 16,
     "specialAttackEvery": 2, "attackLungeSpeed": 90, "attackCameraShake": 0.006,
-    "spriteScale": 0.54, "spriteOriginY": 0.745,
-    "maxHp": 900, "attack": 16, "defense": 8, "exp": 120, "moveSpeed": 24,
-    "detectRange": 99999, "attackRange": 72, "attackCooldownMs": 950, "attackWindupMs": 500,
+    "spriteScale": 0.68, "spriteOriginY": 0.745,
+    "maxHp": 750, "attack": 14, "defense": 6, "exp": 120, "moveSpeed": 22,
+    "detectRange": 99999, "attackRange": 72, "attackCooldownMs": 1100, "attackWindupMs": 550,
     "drops": [{ "code": "coin", "chance": 1.0, "min": 35, "max": 55 }]
   }
 }

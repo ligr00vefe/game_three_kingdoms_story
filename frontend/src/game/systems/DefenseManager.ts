@@ -211,7 +211,7 @@ export class DefenseManager {
 
   private rollStageEvent() {
     this.spawnIntervalMs = DEFENSE.SPAWN_INTERVAL_MS
-    if (this.stage % 5 === 0) {
+    if (this.stage % 10 === 0) {
       this.eventName = '대장 출현: 보스 웨이브'
       return
     }
@@ -273,6 +273,9 @@ export class DefenseManager {
     monster.onRangedAttack = code === 'zombie_exploder'
       ? (attacker, impactX) => this.throwZombieBomb(attacker, impactX)
       : undefined
+    monster.onDropImpact = code === 'zombie_shield'
+      ? (attacker, radius, damage) => this.applyShieldDropDamage(attacker, radius, damage)
+      : undefined
     // 보스는 기존에 모든 스테이지에서 체력이 고정되어 후반에도 너무 빨리 쓰러졌다.
     // 기본 900에 스테이지마다 6%를 더해 20스테이지에서는 1,926 HP가 된다.
     if (code === 'zombie_boss') {
@@ -289,10 +292,12 @@ export class DefenseManager {
   }
 
   private monsterCodeFor(index: number): string {
-    if (this.stage % 5 === 0 && index === this.waveTotal - 1) return 'zombie_boss'
+    if (this.stage % 10 === 0 && index === this.waveTotal - 1) return 'zombie_boss'
+    // 특수 좀비는 지정된 스테이지에 웨이브당 한 마리만 출현한다.
+    // 10단위 스테이지에서는 대장 좀비와 서로 다른 순번에 배치한다.
+    if (this.stage % 5 === 0 && index === this.waveTotal - 2) return 'zombie_exploder'
+    if ((this.stage % 7 === 0 || this.stage % 10 === 0) && index === this.waveTotal - 3) return 'zombie_shield'
     const eliteBoost = this.eventName?.startsWith('정예') ? 2 : 1
-    if (this.stage >= 4 && index % Math.max(3, 7 - eliteBoost) === 2) return 'zombie_exploder'
-    if (this.stage >= 3 && index % Math.max(3, 6 - eliteBoost) === 1) return 'zombie_shield'
     if (this.stage >= 2 && index % Math.max(2, 5 - eliteBoost) === 0) return 'zombie_runner'
     return 'zombie_defense'
   }
@@ -404,6 +409,20 @@ export class DefenseManager {
         if (target.alive) this.damageMonster(target, damage, structure.spr.x, now)
       },
     })
+  }
+
+  private applyShieldDropDamage(attacker: Monster, radius: number, damage: number) {
+    const playerDistance = Phaser.Math.Distance.Between(
+      attacker.x, this.groundY, this.playerTarget.x, this.playerTarget.y,
+    )
+    if (this.playerTarget.alive && playerDistance <= radius) {
+      this.playerTarget.receiveHit(damage, attacker.x)
+    }
+    for (const structure of this.structures) {
+      if (structure.hp <= 0) continue
+      const distanceToEdge = Math.max(0, Math.abs(structure.spr.x - attacker.x) - structure.footprint / 2)
+      if (distanceToEdge <= radius) this.damageStructure(structure, damage)
+    }
   }
 
   private throwZombieBomb(attacker: Monster, aimedX: number) {
@@ -960,6 +979,7 @@ export class DefenseManager {
       timeLeftMs,
       stage: this.stage,
       zombiesLeft: Math.max(0, this.waveRemaining),
+      gold: useGameStore.getState().gold,
       baseHp: this.base.hp,
       maxBaseHp: this.base.maxHp,
       defeatReason: this.defeatReason,

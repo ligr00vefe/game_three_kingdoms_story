@@ -22,6 +22,8 @@ interface GameState {
   gold: number
   stageCode: string
   defenseStage: number
+  playerX: number | null
+  playerY: number | null
   /** 1차 스탯 (스탯창 표시 — 관우는 STR 주스탯) */
   str: number
   dex: number
@@ -52,8 +54,11 @@ export const useGameStore = create<GameState>()(
     expToNext: 100,
     attackPower: 10,
     gold: 0,
-    stageCode: 'stage1_grassland',
+    stageCode: 'map_ye_castle',
     defenseStage: 1,
+    // 서버 연결 전 최초 화면도 감숙성 내부 동탁 앞에서 시작한다.
+    playerX: 1100,
+    playerY: 440,
     str: 20,
     dex: 10,
     int: 5,

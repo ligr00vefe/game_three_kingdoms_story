@@ -1,26 +1,13 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
-/**
- * 스킬창 (SKILL) — 빠르고 강력한 액션 RPG 컨셉의 직책별 해금 스케줄.
- * - 각 스킬은 캐릭터 레벨이 unlockLevel에 도달하면 자동으로 1레벨 해금된다(포인트 소모 없음).
- * - 해금 이후엔 레벨업으로 받는 스킬 포인트로 maxLevel까지 추가 강화 가능.
- * - 직책(외형 티어)과의 대응은 playerAnimations.ts의 tierForLevel/titleForLevel 참고.
- *
- * ⚠️ 데이터/UI만 구현됨: 실제 전투 동작(돌진 물리·다단히트·즉사·광역·소환 등)은 아직 배선 전이다
- * (GameScene.handleCastSkill이 스킬 코드와 무관하게 항상 같은 상태머신만 재생함). 동작 구현은 별도 작업.
- */
 export interface SkillDef {
   code: string
   name: string
-  /** 아이콘 placeholder 이모지 (아트 도입 전) */
   icon: string
   iconImage?: string
   type: 'active' | 'passive'
   maxLevel: number
-  /** 이 레벨이 되면 자동으로 1레벨 해금 (character-progression-pivot 직책 스케줄) */
   unlockLevel: number
-  /** 레벨별 설명 생성 */
   desc: (lv: number) => string
 }
 
@@ -47,61 +34,93 @@ export const SKILLS: SkillDef[] = [
   },
 ]
 
-interface SkillState {
-  /** 스킬 코드별 현재 레벨 (0 = 미해금) */
+interface SavedSkillProfile {
   levels: Record<string, number>
-  /** 배분 가능한 스킬 포인트 */
   points: number
-  /** @returns 성공 여부 (포인트 부족/최대치/미해금이면 false) */
+}
+
+interface SkillState extends SavedSkillProfile {
+  profileKey: string | null
   addPoint: (code: string) => boolean
-  /** 레벨 1 감소, 포인트 환불. 해금 레벨(1) 밑으로는 못 내림 */
   removePoint: (code: string) => boolean
-  /** 레벨업 등으로 스킬 포인트 지급 */
   grantPoints: (n: number) => void
-  /** 캐릭터 레벨이 unlockLevel에 도달한 스킬을 자동 1레벨 해금 (포인트 소모 없음) */
   unlockScheduled: (characterLevel: number) => void
+  /** 로그인 계정과 캐릭터별 스킬 데이터를 불러오고 현재 레벨에 맞게 잠금 상태를 교정한다. */
+  loadCharacterProfile: (accountId: number, characterCode: string, characterLevel: number) => void
 }
 
 const INITIAL_LEVELS: Record<string, number> = Object.fromEntries(
   SKILLS.map((skill) => [skill.code, skill.unlockLevel <= 1 ? 1 : 0]),
 )
 
-export const useSkillStore = create<SkillState>()(
-  persist(
-    (set, get) => ({
-      levels: { ...INITIAL_LEVELS },
-      points: 0,
+const storageKey = (profileKey: string) => `tks-skills-v3-${profileKey}`
 
-      addPoint: (code) => {
-        const def = SKILLS.find((s) => s.code === code)
-        if (!def) return false
-        const cur = get().levels[code] ?? 0
-        if (cur <= 0 || get().points <= 0 || cur >= def.maxLevel) return false // 미해금 스킬은 포인트로 못 올림
-        set((st) => ({ levels: { ...st.levels, [code]: cur + 1 }, points: st.points - 1 }))
-        return true
-      },
+function saveProfile(profileKey: string | null, levels: Record<string, number>, points: number) {
+  if (!profileKey) return
+  localStorage.setItem(storageKey(profileKey), JSON.stringify({ levels, points }))
+}
 
-      removePoint: (code) => {
-        const cur = get().levels[code] ?? 0
-        if (cur <= 1) return false // 해금된 스킬은 1 미만으로 못 내림(잠그려면 별도 기능 필요)
-        set((st) => ({ levels: { ...st.levels, [code]: cur - 1 }, points: st.points + 1 }))
-        return true
-      },
+function levelsForCharacter(saved: Record<string, number>, characterLevel: number) {
+  return Object.fromEntries(SKILLS.map((def) => {
+    if (characterLevel < def.unlockLevel) return [def.code, 0]
+    return [def.code, Math.max(1, Math.min(def.maxLevel, saved[def.code] ?? 0))]
+  }))
+}
 
-      grantPoints: (n) => set((st) => ({ points: st.points + n })),
+export const useSkillStore = create<SkillState>()((set, get) => ({
+  levels: { ...INITIAL_LEVELS },
+  points: 0,
+  profileKey: null,
 
-      unlockScheduled: (characterLevel) => {
-        set((st) => {
-          const levels = { ...st.levels }
-          for (const def of SKILLS) {
-            if (characterLevel >= def.unlockLevel && (levels[def.code] ?? 0) <= 0) {
-              levels[def.code] = 1
-            }
-          }
-          return { levels }
-        })
-      },
-    }),
-    { name: 'tks-skills-v2' }, // v1(청룡참 상시 해금 + 구 스킬 6종) 대비 스키마 변경으로 버전업
-  ),
-)
+  loadCharacterProfile: (accountId, characterCode, characterLevel) => {
+    const profileKey = `${accountId}-${characterCode}`
+    let saved: SavedSkillProfile = { levels: { ...INITIAL_LEVELS }, points: 0 }
+    try {
+      const raw = localStorage.getItem(storageKey(profileKey))
+      if (raw) saved = JSON.parse(raw) as SavedSkillProfile
+    } catch {
+      // 손상된 로컬 데이터는 안전한 초기값으로 복구한다.
+    }
+    const levels = levelsForCharacter(saved.levels ?? {}, characterLevel)
+    const points = Math.max(0, saved.points ?? 0)
+    set({ profileKey, levels, points })
+    saveProfile(profileKey, levels, points)
+  },
+
+  addPoint: (code) => {
+    const def = SKILLS.find((skill) => skill.code === code)
+    const state = get()
+    const current = state.levels[code] ?? 0
+    if (!def || current <= 0 || state.points <= 0 || current >= def.maxLevel) return false
+    const levels = { ...state.levels, [code]: current + 1 }
+    const points = state.points - 1
+    set({ levels, points })
+    saveProfile(state.profileKey, levels, points)
+    return true
+  },
+
+  removePoint: (code) => {
+    const state = get()
+    const current = state.levels[code] ?? 0
+    if (current <= 1) return false
+    const levels = { ...state.levels, [code]: current - 1 }
+    const points = state.points + 1
+    set({ levels, points })
+    saveProfile(state.profileKey, levels, points)
+    return true
+  },
+
+  grantPoints: (amount) => {
+    const state = get()
+    const points = Math.max(0, state.points + amount)
+    set({ points })
+    saveProfile(state.profileKey, state.levels, points)
+  },
+
+  unlockScheduled: (characterLevel) => {
+    const state = get()
+    const levels = levelsForCharacter(state.levels, characterLevel)
+    set({ levels })
+    saveProfile(state.profileKey, levels, state.points)
+  },
+}))

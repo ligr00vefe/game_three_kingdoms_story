@@ -37,14 +37,49 @@ export class PreloadScene extends Phaser.Scene {
     // manifest 등록 에셋 일괄 로드 (아직 비어 있음 — 이미지 도입 시 여기만 통과하면 됨)
     // Version the manifest request so a browser refresh cannot reuse an old
     // images/spritesheets classification after an asset-layout deployment.
-    this.load.json('asset_manifest', 'assets/manifest.json?v=20260810-2')
+    this.load.json('asset_manifest', 'assets/manifest.json?v=20260812-6')
   }
 
   create() {
     Promise.all([this.loadManifestAssets(), this.loadFonts()]).then(() => {
+      this.registerIrregularStripFrames()
       this.generatePlaceholders()
       this.scene.start('Game')
     })
+  }
+
+  /** 크기가 서로 다른 이펙트 컷을 투명 간격 기준의 독립 프레임으로 등록한다. */
+  private registerIrregularStripFrames() {
+    const registerFrames = (
+      key: string,
+      frames: Array<{ x: number; y: number; width: number; height: number }>,
+    ) => {
+      if (!this.textures.exists(key)) return
+      const texture = this.textures.get(key)
+      frames.forEach((frame, index) => {
+        texture.add(index, 0, frame.x, frame.y, frame.width, frame.height)
+      })
+    }
+    // 3621×627 Drop 스트립: 알파 픽셀 범위와 컷 사이의 넓어진 투명 간격을 기준으로 8개를 개별 절단.
+    registerFrames('fx_shield_zombie_drop', [
+      { x: 0, y: 0, width: 235, height: 627 },
+      { x: 316, y: 0, width: 292, height: 627 },
+      { x: 716, y: 0, width: 315, height: 627 },
+      { x: 1148, y: 0, width: 365, height: 627 },
+      { x: 1618, y: 0, width: 499, height: 627 },
+      { x: 2268, y: 0, width: 361, height: 627 },
+      { x: 2789, y: 0, width: 319, height: 627 },
+      { x: 3246, y: 0, width: 302, height: 627 },
+    ])
+    // 1672×941 Dash 시트: 위 3개/아래 3개의 서로 다른 실제 폭을 보존한다.
+    registerFrames('fx_shield_zombie_dash', [
+      { x: 133, y: 0, width: 476, height: 470 },
+      { x: 708, y: 0, width: 456, height: 470 },
+      { x: 1280, y: 0, width: 284, height: 470 },
+      { x: 48, y: 470, width: 657, height: 471 },
+      { x: 706, y: 470, width: 537, height: 471 },
+      { x: 1244, y: 470, width: 424, height: 471 },
+    ])
   }
 
   /**

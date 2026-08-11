@@ -59,9 +59,13 @@
     "fx_level_up": "assets/img/fx/effect_level_up.png",
     "icon_coin": "assets/img/items/coin.png",
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",
-    "fx_dash": "assets/img/fx/effect_dash.png"
+    "fx_dash": "assets/img/fx/effect_dash.png",
+    "shield_zombie_falling": "assets/img/monster/shield_zombie_falling.png",
+    "fx_shield_zombie_drop": "assets/img/fx/effect_shield_zombie_drop.png",
+    "fx_shield_zombie_dash": "assets/img/fx/effect_shield_zombie_dash.png"
   },
   "spritesheets": {
+    "shield_zombie_walk": { "url": "assets/img/monster/shield_zombie_walk.png", "frameWidth": 527, "frameHeight": 500 },
     "fx_skill_glaive": { "url": "assets/img/fx/skill_crescent_moon_dance_fixed_v5.png", "frameWidth": 896, "frameHeight": 420 },
     "fx_skill_dragon": { "url": "assets/img/fx/skill_blue_dragon_slash_fixed_v3.png", "frameWidth": 320, "frameHeight": 648 },
     "fx_defense_crows_v4": { "url": "assets/img/bg/a_flock_of_crows_fixed_v4.png", "frameWidth": 320, "frameHeight": 256 },

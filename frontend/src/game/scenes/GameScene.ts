@@ -334,12 +334,18 @@ export class GameScene extends Phaser.Scene {
   init(data: { mapKey?: string; spawnX?: number; spawnY?: number; mode?: 'normal' | 'defense' }) {
     // 이전 맵에서 아직 응답 중인 로컬 AI 요청이 새 맵에 명령을 적용하지 못하게 무효화한다.
     this.commandRequestId += 1
-    const savedStage = useGameStore.getState().stageCode
+    const savedState = useGameStore.getState()
+    const savedStage = savedState.stageCode
     const savedMap = savedStage === 'map_defense' ? 'map_defense'
       : savedStage === 'map_stage1' ? 'map_stage1' : 'map_ye_castle'
     this.mapKey = data.mapKey ?? savedMap
-    this.spawnOverride =
-      data.spawnX !== undefined ? { x: data.spawnX, y: data.spawnY ?? 440 } : null
+    const savedPosition = data.mapKey === undefined
+      && savedState.playerX !== null && savedState.playerY !== null
+      ? { x: savedState.playerX, y: savedState.playerY }
+      : null
+    this.spawnOverride = data.spawnX !== undefined
+      ? { x: data.spawnX, y: data.spawnY ?? 440 }
+      : savedPosition
     this.mode = data.mode ?? (this.mapKey === 'map_defense' ? 'defense' : 'normal')
     useGameStore.getState().setStats({ stageCode: this.mapKey })
     this.defense = undefined
@@ -774,9 +780,19 @@ export class GameScene extends Phaser.Scene {
     }
 
     // ---- 플레이어 / 이펙트 ----
-    const spawn = this.spawnOverride ?? map.playerSpawn
+    const requestedSpawn = this.spawnOverride ?? map.playerSpawn
+    const spawn = {
+      x: Phaser.Math.Clamp(requestedSpawn.x, 24, map.worldWidth - 24),
+      y: Phaser.Math.Clamp(requestedSpawn.y, 24, map.worldHeight - 24),
+    }
     this.effects = new EffectManager(this)
     this.player = new Player(this, spawn.x, spawn.y)
+    useGameStore.getState().setStats({
+      stageCode: this.mapKey,
+      playerX: Math.round(spawn.x),
+      playerY: Math.round(spawn.y),
+    })
+    EventBus.emit(GameEvents.MAP_CHANGED)
     // Keep the playable character in front of defense structures and scenery.
     this.player.setDepth(10)
     this.player.setLadders(ladders)
@@ -995,6 +1011,10 @@ export class GameScene extends Phaser.Scene {
     // 플레이어 위치는 100ms 간격 스로틀 전송 — React 리렌더 부담 최소화
     this.time.addEvent({
       delay: 100, loop: true, callback: () => {
+        useGameStore.getState().setStats({
+          playerX: Math.round(this.player.x),
+          playerY: Math.round(this.player.y),
+        })
         EventBus.emit(GameEvents.PLAYER_MOVED, {
           x: this.player.x,
           y: this.player.y,
@@ -1084,6 +1104,7 @@ export class GameScene extends Phaser.Scene {
     const store = useGameStore.getState()
     store.setStats({ hp: store.maxHp, mp: store.maxMp })
     store.setPlayerDead(false)
+    // 감숙성 내부 문지기(x=2270) 뒤편이자 '성 밖' 포탈(x=2500) 바로 안쪽 지점.
     this.transitionTo({ mapKey: 'map_ye_castle', spawnX: 2400, spawnY: 440 })
   }
 

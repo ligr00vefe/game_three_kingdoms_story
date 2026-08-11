@@ -27,9 +27,24 @@ export interface MonsterDef {
   hitFrameRate?: number
   deathTextureKey?: string
   deathFrameRate?: number
+  /** Optional aerial entrance and shield-charge presentation. */
+  fallingTextureKey?: string
+  fallingSpriteScale?: number
+  dropEffectTextureKey?: string
+  dropEffectScale?: number
+  dropDamage?: number
+  dropDamageRadius?: number
+  dashEffectTextureKey?: string
+  chargeSpeed?: number
+  chargeTriggerRange?: number
+  chargeCooldownMs?: number
   /** Render scale and foot-aligned origin for oversized source frames. */
   spriteScale?: number
   spriteOriginY?: number
+  /** Actual foot line inside a frame, measured from its top (0..1). */
+  spriteFootYRatio?: number
+  /** True when the source artwork faces left without horizontal flipping. */
+  facesLeftByDefault?: boolean
   maxHp: number
   attack: number
   defense: number
@@ -43,7 +58,7 @@ export interface MonsterDef {
   rangedAttack?: boolean
 }
 
-type MonsterState = 'spawning' | 'wander' | 'chase' | 'windup' | 'hit' | 'dead' | 'inactive'
+type MonsterState = 'spawning' | 'wander' | 'chase' | 'charge' | 'windup' | 'hit' | 'dead' | 'inactive'
 
 /** 공격이 닿는 세로 허용 거리 — 몸통(52px)이 실제로 겹치는 수준만 인정 (발판 위 플레이어 오폭 방지) */
 const ATTACK_VERTICAL_RANGE = 48
@@ -85,16 +100,20 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   private homeXMin = 0
   private homeXMax = 0
   private wanderDir: -1 | 1 = 1
+  private facingDir: -1 | 1 = 1
   private nextAttackAt = 0
   private windupUntil = 0
   private hitStunUntil = 0
   private currentAnimKey: string | null = null
   private currentAttackKey: string | null = null
   private attackSequence = 0
+  private nextChargeAt = 0
+  private dashEffect?: Phaser.GameObjects.Sprite
   private nextShamblePauseAt = 0
   private shamblePauseUntil = 0
   onDied?: (m: Monster) => void
   onRangedAttack?: (m: Monster, impactX: number) => void
+  onDropImpact?: (m: Monster, radius: number, damage: number) => void
   /** 원거리 공격 준비를 시작한 순간 고정한 지면 목표 좌표. */
   private windupAimX = 0
 
@@ -141,6 +160,33 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
         repeat,
       })
     }
+    const dashKey = this.def.dashEffectTextureKey
+    if (dashKey && this.scene.textures.exists(dashKey) && !this.scene.anims.exists(`${dashKey}_anim`)) {
+      const frames = this.scene.textures.get(dashKey).frameTotal - 1
+      if (frames > 1) {
+        const generated = this.scene.anims.generateFrameNumbers(dashKey, { start: 0, end: frames - 1 })
+        // 새 3×2 시트는 작은 먼지(우상단) → 확산 → 큰 먼지(좌하단) → 잔류 순서다.
+        const order = [2, 1, 0, 3, 4, 5]
+        this.scene.anims.create({
+          key: `${dashKey}_anim`,
+          frames: order.map((index) => generated[index]).filter(Boolean),
+          frameRate: 14,
+          repeat: -1,
+        })
+      }
+    }
+    const dropKey = this.def.dropEffectTextureKey
+    if (dropKey && this.scene.textures.exists(dropKey) && !this.scene.anims.exists(`${dropKey}_anim`)) {
+      const frames = this.scene.textures.get(dropKey).frameTotal - 1
+      if (frames > 1) {
+        this.scene.anims.create({
+          key: `${dropKey}_anim`,
+          frames: this.scene.anims.generateFrameNumbers(dropKey, { start: 0, end: frames - 1 }),
+          frameRate: 14,
+          repeat: 0,
+        })
+      }
+    }
   }
 
   /** 스폰 (땅에서 기어나오는 연출, GAME_DESIGN 6.3) */
@@ -169,9 +215,30 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.currentAnimKey = null
     this.currentAttackKey = null
     this.attackSequence = 0
+    this.nextChargeAt = 0
+    this.stopDashEffect()
     this.shamblePauseUntil = 0
     this.scheduleNextShamble(this.scene.time.now)
     this.setPosition(x, groundY - 26)
+    if (this.def.fallingTextureKey && this.scene.textures.exists(this.def.fallingTextureKey)) {
+      const fallingScale = this.def.fallingSpriteScale ?? spriteScale
+      this.setTexture(this.def.fallingTextureKey)
+      this.setOrigin(0.5, 1).setScale(fallingScale).setAlpha(1).clearTint()
+      this.setPosition(x, groundY - 430)
+      this.body.enable = false
+      this.state_ = 'spawning'
+      this.scene.tweens.add({
+        targets: this,
+        y: groundY,
+        duration: 850,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          this.playDropEffect(x, groundY)
+          this.finishSpawn(groundY)
+        },
+      })
+      return
+    }
     this.setAlpha(0).setScale(spriteScale, spriteScale * 0.2).setOrigin(0.5, 1)
     this.y = groundY
     this.body.enable = false
@@ -181,22 +248,57 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.scene.tweens.add({
       targets: this, alpha: 1, scaleY: spriteScale, duration: riseMs, ease: 'Back.easeOut',
       onComplete: () => {
-        const originY = this.def.spriteOriginY ?? 0.5
-        this.setOrigin(0.5, originY)
-        // Align the rendered feet for every source frame size and scale. The
-        // fixed -32 offset left the bomb zombie visibly airborne.
-        this.y = groundY - this.height * (1 - originY) * spriteScale
-        this.clearTint()
-        this.body.enable = true
-        this.state_ = 'wander'
-        this.wanderDir = Math.random() < 0.5 ? -1 : 1
+        this.finishSpawn(groundY)
       },
     })
+  }
+
+  private finishSpawn(groundY: number) {
+    const spriteScale = this.def.spriteScale ?? 1
+    this.anims.stop()
+    this.setTexture(this.def.textureKey).setScale(spriteScale).setAlpha(1)
+    const originY = this.def.spriteOriginY ?? 0.5
+    this.setOrigin(0.5, originY)
+    const footY = this.def.spriteFootYRatio ?? 1
+    this.y = groundY - this.height * (footY - originY) * spriteScale
+    this.clearTint()
+    this.body.enable = true
+    this.state_ = 'wander'
+    this.wanderDir = Math.random() < 0.5 ? -1 : 1
+    this.currentAnimKey = null
+  }
+
+  private playDropEffect(x: number, groundY: number) {
+    const key = this.def.dropEffectTextureKey
+    if (!key || !this.scene.textures.exists(key)) return
+    // 원본 프레임의 실제 바닥선은 y≈528/627이다. 이 지점을 groundY에 고정해
+    // 투명 캔버스 하단 여백 때문에 폭발이 공중에 뜨거나 땅속으로 묻히지 않게 한다.
+    const effect = this.scene.add.sprite(x, groundY, key, 0)
+      .setOrigin(0.5, 528 / 627)
+      .setScale(this.def.dropEffectScale ?? 0.55)
+      .setDepth(this.depth + 1)
+    const animKey = `${key}_anim`
+    if (!this.scene.anims.exists(animKey)) {
+      effect.destroy()
+      return
+    }
+    effect.play(animKey)
+    effect.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => effect.destroy())
+    // 폭발이 충분히 펼쳐지는 세 번째 프레임 무렵에 주변 피해를 한 번만 적용한다.
+    const radius = this.def.dropDamageRadius ?? 0
+    const damage = this.def.dropDamage ?? 0
+    if (radius > 0 && damage > 0) {
+      this.scene.time.delayedCall(140, () => {
+        if (this.state_ === 'inactive' || this.state_ === 'dead') return
+        this.onDropImpact?.(this, radius, damage)
+      })
+    }
   }
 
   update(target: MonsterTarget, now: number) {
     this.updateBehaviour(target, now)
     this.updateAnimation()
+    this.updateDashEffect()
     this.updateHpBar()
   }
 
@@ -231,7 +333,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     const runKey = this.def.runTextureKey
     const moving = speed > 1 && !!runKey && this.scene.anims.exists(runKey)
 
-    const attacking = this.state_ === 'windup' && !!this.currentAttackKey
+    const attacking = (this.state_ === 'windup' || this.state_ === 'charge') && !!this.currentAttackKey
     const reacting = this.state_ === 'hit' && !!this.def.hitTextureKey && this.scene.anims.exists(this.def.hitTextureKey)
     const key = reacting ? this.def.hitTextureKey! : (attacking ? this.currentAttackKey! : (moving ? runKey! : this.def.textureKey))
     if (key !== this.currentAnimKey) {
@@ -241,7 +343,9 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
       else { this.anims.stop(); this.setTexture(key) }
     }
     // 배회는 추적의 절반 속도라 같은 재생속도로 돌리면 발이 미끄러진다 — 속도에 비례시킨다
-    this.anims.timeScale = moving && !attacking && !reacting ? Math.min(1, speed / this.def.moveSpeed) : 1
+    this.anims.timeScale = this.state_ === 'charge'
+      ? 2.5
+      : moving && !attacking && !reacting ? Math.min(1, speed / this.def.moveSpeed) : 1
   }
 
   private updateBehaviour(target: MonsterTarget, now: number) {
@@ -261,10 +365,29 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     // 세로 거리 판정: 발판 위 등 높이가 다르면 감지/공격 대상이 아니다
     const dy = Math.abs(target.y - this.y)
 
+    if (this.state_ === 'charge') {
+      const dir: -1 | 1 = dx >= 0 ? 1 : -1
+      this.faceDirection(dir)
+      if (!target.alive || dy > DETECT_VERTICAL_RANGE) {
+        this.stopDashEffect()
+        this.state_ = 'chase'
+        return
+      }
+      if (dist <= attackRange) {
+        this.setVelocityX(0)
+        this.state_ = 'windup'
+        this.windupUntil = now + this.def.attackWindupMs
+        this.windupAimX = target.x
+        return
+      }
+      this.setVelocityX((this.def.chargeSpeed ?? this.def.moveSpeed) * dir)
+      return
+    }
+
     if (this.state_ === 'windup') {
       // 원거리 공격은 준비를 시작한 순간의 위치와 방향을 끝까지 유지한다.
       const attackDx = this.def.rangedAttack ? this.windupAimX - this.x : dx
-      if (Math.abs(attackDx) > 1) this.setFlipX(attackDx < 0)
+      if (Math.abs(attackDx) > 1) this.faceDirection(attackDx < 0 ? -1 : 1)
       const lungeSpeed = this.def.attackLungeSpeed ?? 0
       const remaining = this.windupUntil - now
       this.setVelocityX(lungeSpeed > 0 && remaining <= 180 ? (attackDx >= 0 ? lungeSpeed : -lungeSpeed) : 0)
@@ -282,6 +405,8 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
           }
         }
         this.nextAttackAt = now + this.def.attackCooldownMs
+        this.nextChargeAt = now + (this.def.chargeCooldownMs ?? 0)
+        this.stopDashEffect()
         this.state_ = 'chase'
       }
       return
@@ -290,7 +415,14 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     if (target.alive && dist <= this.def.detectRange && dy <= DETECT_VERTICAL_RANGE) {
       // Face the detected target before an attack or shamble pause can return.
       const dir: -1 | 1 = dx >= 0 ? 1 : -1
-      this.setFlipX(dir === -1)
+      this.faceDirection(dir)
+      if (this.def.chargeSpeed && dist <= (this.def.chargeTriggerRange ?? 0) && dist > attackRange && now >= this.nextChargeAt) {
+        this.state_ = 'charge'
+        this.currentAttackKey = this.def.runTextureKey ?? this.def.textureKey
+        this.startDashEffect()
+        this.setVelocityX(this.def.chargeSpeed * dir)
+        return
+      }
       // 추적 (느릿하게, GAME_DESIGN 6.2)
       if (dist <= attackRange && dy <= ATTACK_VERTICAL_RANGE) {
         this.setVelocityX(0)
@@ -318,7 +450,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
       if (this.x <= this.homeXMin) this.wanderDir = 1
       if (this.x >= this.homeXMax) this.wanderDir = -1
       this.setVelocityX(this.def.moveSpeed * 0.5 * this.wanderDir)
-      this.setFlipX(this.wanderDir === -1)
+      this.faceDirection(this.wanderDir)
     }
   }
 
@@ -346,7 +478,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   /** @returns true면 이 공격으로 사망 (경험치 지급 트리거) */
   receiveHit(amount: number, crit: boolean, fromX: number, effects: EffectManager, now: number): boolean {
     // 공격 모션(windup)을 끝까지 우선 재생한다. 공격 중에는 피해와 피격 반응을 모두 무시한다.
-    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning' || this.state_ === 'windup') return false
+    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning' || this.state_ === 'charge' || this.state_ === 'windup') return false
     this.hp -= amount
     effects.damageNumber(this.x, this.y - 40, amount, 'deal', crit, this) // 연타 스택 키 = 몬스터 자신
     effects.hitSpark(this.x, this.y - 10)
@@ -363,6 +495,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   }
 
   private die() {
+    this.stopDashEffect()
     this.state_ = 'dead'
     this.body.enable = false
     this.setVelocity(0, 0)
@@ -391,6 +524,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   }
 
   private deactivate() {
+    this.stopDashEffect()
     this.state_ = 'inactive'
     this.setActive(false).setVisible(false)
     this.body.enable = false
@@ -401,5 +535,55 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
 
   get alive() {
     return this.state_ !== 'inactive' && this.state_ !== 'dead' && this.state_ !== 'spawning'
+  }
+
+  private startDashEffect() {
+    const key = this.def.dashEffectTextureKey
+    if (!key || !this.scene.textures.exists(key) || this.dashEffect?.active) return
+    this.dashEffect = this.scene.add.sprite(this.x, this.y, key, 0)
+      // 컷마다 원본 크기가 다르므로 고정 폭/높이로 찌그러뜨리지 않고 동일 배율을 적용한다.
+      .setScale(0.24)
+      .setOrigin(0.5, 390 / 470)
+      .setAlpha(0.9)
+      // 먼지가 방패와 몸에 가려지지 않도록 방패 좀비보다 한 단계 앞에 표시한다.
+      .setDepth(this.depth + 1)
+    const animKey = `${key}_anim`
+    if (this.scene.anims.exists(animKey)) {
+      const groundLines = [390, 396, 396, 234, 234, 232]
+      this.dashEffect.on(Phaser.Animations.Events.ANIMATION_UPDATE, (
+        _animation: Phaser.Animations.Animation,
+        frame: Phaser.Animations.AnimationFrame,
+      ) => {
+        // 재배열된 애니메이션 프레임의 원본 인덱스로 실제 지면선을 선택한다.
+        const sourceIndex = frame.textureFrame as number
+        const frameHeight = this.dashEffect?.frame.height ?? 470
+        this.dashEffect?.setOrigin(0.5, (groundLines[sourceIndex] ?? 396) / frameHeight)
+      })
+      this.dashEffect.play(animKey)
+    }
+  }
+
+  private updateDashEffect() {
+    if (!this.dashEffect?.active) return
+    if (this.state_ !== 'charge' && this.state_ !== 'windup') {
+      this.stopDashEffect()
+      return
+    }
+    const dir = this.facingDir
+    const groundY = this.y + this.height * ((this.def.spriteFootYRatio ?? 1) - this.originY) * this.scaleY
+    this.dashEffect
+      .setPosition(this.x - dir * 48, groundY)
+      .setFlipX(dir > 0)
+  }
+
+  private stopDashEffect() {
+    this.dashEffect?.destroy()
+    this.dashEffect = undefined
+  }
+
+  private faceDirection(dir: -1 | 1) {
+    this.facingDir = dir
+    // 기본 왼쪽 원본은 오른쪽 이동 때 반전하고, 기존 오른쪽 원본은 왼쪽 이동 때 반전한다.
+    this.setFlipX(this.def.facesLeftByDefault ? dir === 1 : dir === -1)
   }
 }

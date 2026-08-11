@@ -78,14 +78,7 @@ public class GameStateService {
 		GameCharacter character = characterRepository.findByName(DEFAULT_CHARACTER_NAME)
 			.orElseGet(() -> characterRepository.save(new GameCharacter(DEFAULT_CHARACTER_NAME)));
 
-		character.setLevel(request.level());
-		character.setExp(request.exp());
-		character.setMaxHp(request.maxHp());
-		character.setHp(Math.min(request.hp(), request.maxHp()));
-		character.setMaxMp(request.maxMp());
-		character.setMp(Math.min(request.mp(), request.maxMp()));
-		character.setAttackPower(request.attackPower());
-		character.setGold(request.gold());
+		applyState(character, request);
 
 		inventoryRepository.deleteByCharacterId(character.getId());
 		List<InventoryItem> items = request.inventory().stream()
@@ -136,12 +129,15 @@ public class GameStateService {
 		character.setGold(request.gold());
 		if (request.stageCode() != null && !request.stageCode().isBlank()) character.setStageCode(request.stageCode());
 		character.setDefenseStage(request.defenseStage());
+		character.setPositionX(request.positionX());
+		character.setPositionY(request.positionY());
 	}
 
 	private CharacterDto toDto(GameCharacter c) {
 		return new CharacterDto(
 			c.getName(), c.getCharacterCode(), c.getLevel(), c.getExp(),
 			c.getMaxHp(), c.getHp(), c.getMaxMp(), c.getMp(),
-			c.getAttackPower(), c.getGold(), c.getStageCode(), c.getDefenseStage());
+			c.getAttackPower(), c.getGold(), c.getStageCode(), c.getDefenseStage(),
+			c.getPositionX(), c.getPositionY());
 	}
 }

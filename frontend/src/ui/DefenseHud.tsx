@@ -12,6 +12,7 @@ interface DefenseStatePayload {
   timeLeftMs: number
   stage: number
   zombiesLeft: number
+  gold: number
   baseHp: number
   maxBaseHp: number
   defeatReason: DefeatReason
@@ -66,6 +67,7 @@ export function DefenseHud() {
   const timeLeftMs = useDefenseStore((s) => s.timeLeftMs)
   const stage = useDefenseStore((s) => s.stage)
   const zombiesLeft = useDefenseStore((s) => s.zombiesLeft)
+  const gold = useDefenseStore((s) => s.gold)
   const baseHp = useDefenseStore((s) => s.baseHp)
   const maxBaseHp = useDefenseStore((s) => s.maxBaseHp)
   const defeatReason = useDefenseStore((s) => s.defeatReason)
@@ -78,7 +80,6 @@ export function DefenseHud() {
   const rewardChoices = useDefenseStore((s) => s.rewardChoices)
   const supplyLevel = useDefenseStore((s) => s.supplyLevel)
   const builtOffensive = useDefenseStore((s) => s.builtOffensive)
-  const gold = useGameStore((s) => s.gold)
   const hp = useGameStore((s) => s.hp)
   const maxHp = useGameStore((s) => s.maxHp)
   const mp = useGameStore((s) => s.mp)
