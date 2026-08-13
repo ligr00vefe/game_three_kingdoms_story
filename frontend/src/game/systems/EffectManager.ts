@@ -336,17 +336,19 @@ export class EffectManager {
     if (!spr) return
     spr.setActive(true).setVisible(true)
     spr.setOrigin(s.ox, s.oy)
-    spr.setPosition(px, y).setAlpha(0.85).setFlipX(facing === -1).setAngle(0)
+    // 현재 대시 아트의 기본 방향이 게임 이동 방향과 반대이므로 양쪽 방향 모두 반전한다.
+    spr.setPosition(px, y).setAlpha(0.85).setFlipX(facing === 1).setAngle(0)
     if (this.scene.anims.exists('fx_dash_anim')) {
       this.playAnimOnce(spr, 'fx_dash_anim')
-      const normalizeDashSize = () => spr.setDisplaySize(92, s.h)
+      // 프레임 갱신으로 표시 크기를 다시 맞출 때도 좌측 대시의 반전을 유지한다.
+      const normalizeDashSize = () => spr.setDisplaySize(92, s.h).setFlipX(facing === 1)
       spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_UPDATE)
       spr.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeDashSize)
       normalizeDashSize()
     } else {
       // 폴백: 단일 placeholder 이미지 — 뒤로 흘리며 사라짐
       const base = s.h / (spr.frame.realHeight || 1)
-      spr.setScale(base)
+      spr.setScale(base).setFlipX(facing === 1)
       this.scene.tweens.add({
         targets: spr, x: x - facing * 70, alpha: 0, scaleX: base * 1.3,
         duration: 240, ease: 'Quad.easeOut',
@@ -489,7 +491,8 @@ export class EffectManager {
     const thrust = this.decisivePool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!scope || !thrust) return
     const scopeX = x + facing * 52
-    const thrustX = x + facing * 82
+    // 찌르기 창끝이 캐릭터 뒤쪽에서 시작해 보이지 않도록 전방으로 조금 이동한다.
+    const thrustX = x + facing * 112
     const hide = (sprite: Phaser.GameObjects.Sprite) => {
       sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
       this.scene.tweens.killTweensOf(sprite)
@@ -505,7 +508,7 @@ export class EffectManager {
       hide(scope)
       onThrustStart?.()
       thrust.setActive(true).setVisible(true).setPosition(thrustX, y).setOrigin(0.5, 0.55)
-        .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(230, 230)
+        .setFlipX(facing === 1).setAngle(0).setAlpha(0.98).setDisplaySize(345, 230)
         .setDepth(EffectManager.COMBAT_FX_DEPTH)
       thrust.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => hide(thrust))
       thrust.play('fx_decisive_thrust_anim')

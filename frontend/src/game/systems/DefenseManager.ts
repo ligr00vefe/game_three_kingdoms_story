@@ -397,7 +397,8 @@ export class DefenseManager {
 
   private fireWatchtower(structure: Structure, target: Monster, damage: number, now: number) {
     const startX = structure.spr.x + 22
-    const startY = structure.spr.y - structure.spr.displayHeight * 0.65
+    // 활은 지붕 꼭대기가 아니라 누각 아래의 활 거치대 높이에서 발사한다.
+    const startY = structure.spr.y - structure.spr.displayHeight * 0.16
     const hitY = target.y - 18
     const arrow = this.scene.add.image(startX, startY, 'img_arrow_flying')
       .setDisplaySize(38, 12).setDepth(8)
@@ -540,7 +541,8 @@ export class DefenseManager {
 
   private fireBastion(structure: Structure, target: Monster, damage: number, splashRadius: number, useCannonArt: boolean) {
     const startX = structure.spr.x + 26
-    const startY = structure.spr.y - structure.spr.displayHeight * 0.72
+    // 포탄은 지붕 위가 아니라 누각 안쪽의 포구 높이에서 출발시킨다.
+    const startY = structure.spr.y - structure.spr.displayHeight * 0.12
     const impactX = target.x
     // 몬스터 몸체가 아니라 아레나의 실제 지면까지 포탄을 낙하시킨다.
     const impactY = this.groundY

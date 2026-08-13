@@ -874,13 +874,17 @@ export class GameScene extends Phaser.Scene {
         this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
       }
     }
-    this.player.onSkill = (hitbox, facing, skillCode) => {
+    this.player.onSkill = (hitbox, facing, skillCode, hitIndex) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
+      const isGlaiveSlash = isGlaiveFlurry && hitIndex < 2
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
       const attackArea = isDragonSlash
         ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.dragonSlashImpactY - 42, 125)
+        : isGlaiveSlash
+        // 좌·우 베기는 시전 중 현재 플레이어 전방에서 각각 판정한다.
+        ? hitbox
         : isGlaiveFlurry
         // 언월난무는 점프 중 바닥을 내려찍는 기술이므로, 공중에 뜬 캐릭터의
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
@@ -893,7 +897,15 @@ export class GameScene extends Phaser.Scene {
           facing,
         )
       }
-      this.resolveAttack(attackArea, isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS, true, isGlaiveFlurry ? 1.25 : 1)
+      const damageMultiplier = isGlaiveSlash
+        ? COMBAT.GLAIVE_SLASH_DAMAGE_MULTIPLIER
+        : isGlaiveFlurry ? COMBAT.GLAIVE_SLAM_DAMAGE_MULTIPLIER : 1
+      this.resolveAttack(
+        attackArea,
+        isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS,
+        true,
+        damageMultiplier,
+      )
       // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
       this.physics.pause()
       this.cameras.main.shake(90, 0.004)

@@ -91,14 +91,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** GameScene이 주입: 히트박스 안 몬스터 판정. comboStep(0:찌르기/1:휘두르기/2:깊게 찌르기)로
    *  단계별 이펙트를 고른다 */
   onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, comboStep: number) => void
-  onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, skillCode: string) => void
+  onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, skillCode: string, hitIndex: number) => void
   onSkillStart?: (facing: -1 | 1, skillCode: string) => void
   /** GameScene이 주입: 공중 액션 이펙트 훅 */
   onAirDash?: (x: number, y: number, facing: -1 | 1) => void
   onDoubleJump?: (x: number, y: number) => void
   private actionUntil = 0
-  private actionHitAt = 0
+  private actionStartedAt = 0
   private actionHitDone = false
+  private actionHitTimes: number[] = []
+  private actionHitIndex = 0
   /** 일격필살은 조준 표시가 끝난 뒤에만 캐릭터의 찌르기 모션을 재생한다. */
   private skillMotionReleased = true
   /** 콤보: 지금 재생 중/직전에 낸 단계(0:찌르기 1:휘두르기 2:깊게 찌르기) */
@@ -540,8 +542,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             ? COMBAT.DRAGON_HIT_AT_MS
           : COMBAT.SKILL_HIT_AT_MS
     this.actionUntil = now + duration
-    this.actionHitAt = now + hitAt
+    this.actionStartedAt = now
     this.actionHitDone = false
+    this.actionHitIndex = 0
+    this.actionHitTimes = this.skillQueuedCode === 'skill_glaive_flurry' && kind === 'skill'
+      ? [COMBAT.GLAIVE_SLASH_1_HIT_AT_MS, COMBAT.GLAIVE_SLASH_2_HIT_AT_MS, COMBAT.GLAIVE_HIT_AT_MS]
+      : [hitAt]
     this.skillMotionReleased = kind !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike'
     if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
     // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
@@ -566,11 +572,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.comboQueued = true
     }
 
-    if (!this.actionHitDone && now >= this.actionHitAt) {
-      this.actionHitDone = true
+    while (!this.actionHitDone && this.actionHitIndex < this.actionHitTimes.length
+      && now >= this.actionStartedAt + this.actionHitTimes[this.actionHitIndex]) {
+      const hitIndex = this.actionHitIndex
+      this.actionHitIndex += 1
       const hitbox = this.buildHitbox(this.state_ === 'skill')
-      if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing, this.skillQueuedCode)
+      if (this.state_ === 'skill') this.onSkill?.(hitbox, this.facing, this.skillQueuedCode, hitIndex)
       else this.onBasicAttack?.(hitbox, this.facing, this.comboStep)
+      this.actionHitDone = this.actionHitIndex >= this.actionHitTimes.length
     }
     if (now >= this.actionUntil) {
       // 모션 중 선입력(버퍼)이 있었으면 모션이 끝나는 즉시 다음 단계로 이어 재생
@@ -590,8 +599,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private buildHitbox(isSkill: boolean): Phaser.Geom.Rectangle {
     // 대쉬찌르기(2단계)는 돌진하며 찔러 리치가 더 길다
     const isChargeSlash = isSkill && this.skillQueuedCode === 'skill_charge_slash'
+    const isDecisiveStrike = isSkill && this.skillQueuedCode === 'skill_decisive_strike'
     const reach = isSkill
-      ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH : COMBAT.SKILL_REACH
+      ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH
+        : isDecisiveStrike ? COMBAT.DECISIVE_SKILL_REACH
+          : COMBAT.SKILL_REACH
       : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
     const h = isSkill
       ? isChargeSlash ? COMBAT.CHARGE_SKILL_HEIGHT : COMBAT.SKILL_HEIGHT

@@ -386,11 +386,90 @@ html, body, #root { height: 100%; }
     radial-gradient(circle at 50% 100%, rgba(25, 65, 60, .16), transparent 42%),
     #101014;
 }
+.launcher-shell {
+  position: relative;
+  width: min(1040px, 94vw);
+  min-height: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.launcher-core {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.launcher-logo { align-self: center; }
+.launcher-auth, .launcher-running { align-self: center; }
+.launcher-community {
+  position: fixed;
+  top: 24px;
+  right: 32px;
+  width: 310px; max-width: 100%; box-sizing: border-box; padding: 14px 14px 11px;
+  margin-top: 0;
+  color: #eee3c9; background: linear-gradient(145deg, rgba(43, 34, 25, .97), rgba(18, 18, 23, .98));
+  border: 1px solid #80652e; border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55), inset 0 0 24px rgba(255, 204, 82, .05);
+}
+.launcher-community--hidden { visibility: hidden; pointer-events: none; }
+.community-heading { margin-bottom: 16px; }
+.community-eyebrow { color: #d9a83d; font-size: 10px; font-weight: 800; letter-spacing: .18em; }
+.community-heading h2 { margin: 5px 0 4px; color: #ffe6a1; font-family: Gugi, sans-serif; font-size: 18px; }
+.community-heading p { margin: 0; color: #a99d85; font-size: 12px; }
+.community-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.community-tabs button, .community-list-caption button {
+  padding: 8px 6px; color: #a99d85; background: rgba(255,255,255,.04);
+  border: 1px solid #4e463a; border-radius: 7px; cursor: pointer; font-size: 11px; font-weight: 800;
+}
+.community-tabs button.is-active { color: #241b0b; background: linear-gradient(#ffe99b, #d99a2b); border-color: #b67f20; }
+.community-list-caption { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: #b7aa8e; font-size: 10px; letter-spacing: .12em; }
+.community-list-caption b { color: #d9a83d; font-size: 10px; }
+.community-list-caption button { padding: 5px 8px; color: #f3d995; border-color: #80652e; letter-spacing: 0; }
+.ranking-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 35px; padding: 2px 6px; border-bottom: 1px solid rgba(128,101,46,.18); }
+.ranking-row--me { position: relative; grid-template-columns: 30px minmax(0, 1fr) auto; background: rgba(217,168,61,.06); }
+.ranking-row--me::before { content: '▶'; position: absolute; left: -3px; color: #ffd45f; font-size: 11px; font-weight: 900; }
+.ranking-row--top { background: rgba(217,168,61,.07); }
+.ranking-rank { color: #968d7d; font-size: 12px; text-align: center; }
+.ranking-row--top .ranking-rank { font-size: 15px; }
+.ranking-medal {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 23px; height: 23px; color: #39270a; border: 1px solid rgba(255,255,255,.5);
+  border-radius: 50%; font-size: 11px; font-weight: 900; box-shadow: inset 0 1px 2px rgba(255,255,255,.65), 0 2px 5px rgba(0,0,0,.38);
+}
+.ranking-medal::after { content: ''; position: absolute; top: 3px; left: 5px; width: 8px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.65); transform: rotate(-25deg); }
+.ranking-rank--1 .ranking-medal { background: linear-gradient(145deg, #fff0a6, #d99a2b); }
+.ranking-rank--2 .ranking-medal { color: #26313a; background: linear-gradient(145deg, #f4f7f8, #9da9b2); }
+.ranking-rank--3 .ranking-medal { background: linear-gradient(145deg, #f3c18d, #a96337); }
+.ranking-identity { min-width: 0; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+.ranking-identity b { overflow: hidden; color: #e9e1d1; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-identity small { overflow: hidden; color: #8e877b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-stage { color: #8e877b; font-size: 10px; }
+.ranking-stage b { color: #f5ca63; font-size: 13px; }
+.community-empty { margin: 22px 0; color: #918979; font-size: 12px; text-align: center; }
+.bug-report-form { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+.bug-report-form input, .bug-report-form textarea, .bug-report-form select {
+  box-sizing: border-box; width: 100%; padding: 9px 10px; color: #f8efd8; background: rgba(10,10,14,.78);
+  border: 1px solid #4f4637; border-radius: 7px; outline: none; font: inherit; font-size: 11px;
+}
+.bug-report-form textarea { resize: vertical; min-height: 72px; line-height: 1.45; }
+.bug-report-form input:focus, .bug-report-form textarea:focus, .bug-report-form select:focus { border-color: #d9a83d; box-shadow: 0 0 0 2px rgba(217,168,61,.12); }
+.bug-report-form button { padding: 9px; color: #241b0b; background: linear-gradient(#ffe99b, #d99a2b); border: 1px solid #b67f20; border-radius: 7px; cursor: pointer; font-weight: 800; }
+.bug-report-form button:disabled { opacity: .45; cursor: not-allowed; }
+.report-row { padding: 9px 7px; border-bottom: 1px solid rgba(128,101,46,.18); }
+.report-row > div { display: flex; align-items: center; gap: 6px; }
+.report-row strong { overflow: hidden; color: #e9e1d1; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.report-category { padding: 2px 5px; color: #241b0b; background: #d9a83d; border-radius: 3px; font-size: 8px; font-weight: 900; }
+.report-row p { display: -webkit-box; overflow: hidden; margin: 6px 0 4px; color: #a99d85; font-size: 10px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.report-row small { color: #766e60; font-size: 9px; }
+.community-message { margin: 10px 0 0; color: #d9b96d; font-size: 11px; line-height: 1.4; text-align: center; }
 /* 로고 원본(1536×1024)은 배경이 검정이라 .launcher 배경(#101014)에 그대로 녹아든다.
    창이 작아도 버튼이 화면 밖으로 밀리지 않도록 세로를 vh로 함께 제한한다. */
 .launcher-logo {
-  width: min(460px, 72vw);
-  max-height: 44vh;
+  width: min(470px, 47vw);
+  max-height: 48vh;
   object-fit: contain;
   filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .48));
 }
@@ -417,9 +496,9 @@ html, body, #root { height: 100%; }
   color: #e8b64c;
 }
 .launcher-auth {
-  width: min(390px, 88vw);
-  margin-top: 18px;
-  padding: 30px 30px 26px;
+  width: min(340px, 82vw);
+  margin-top: 30px;
+  padding: 22px 22px 18px;
   display: flex;
   flex-direction: column;
   gap: 13px;
@@ -431,10 +510,10 @@ html, body, #root { height: 100%; }
 }
 .launcher-auth--register { border-color: #4e7b71; }
 .launcher-kicker { margin: 0; color: #d9a83d; font-size: 11px; letter-spacing: .18em; }
-.launcher-auth h1 { margin: 0; font-family: Gugi, sans-serif; font-size: 22px; }
+.launcher-auth h1 { margin: 0; font-family: Gugi, sans-serif; font-size: 20px; }
 .launcher-subtitle { margin: -4px 0 6px; color: #b7aa8e; font-size: 13px; }
 .launcher-auth input {
-  box-sizing: border-box; width: 100%; padding: 13px 14px; color: #f8efd8;
+  box-sizing: border-box; width: 100%; padding: 11px 12px; color: #f8efd8;
   background: rgba(10, 10, 14, .78); border: 1px solid #4f4637; border-radius: 9px; outline: none;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
@@ -458,9 +537,21 @@ html, body, #root { height: 100%; }
 
 @media (max-height: 700px) {
   .launcher { justify-content: flex-start; padding: 24px 0; box-sizing: border-box; }
+  .launcher-shell { min-height: auto; }
   .launcher-logo { max-height: 30vh; }
-  .launcher-auth { margin-top: 10px; padding: 22px 24px; }
+  .launcher-auth { margin-top: 22px; padding: 22px 24px; }
 }
+@media (max-width: 820px) {
+  .launcher-shell { width: min(520px, 94vw); min-height: auto; padding: 22px 0; }
+  .launcher-core { width: 100%; }
+  .launcher-logo { width: min(470px, 90vw); }
+  .launcher-community {
+    position: static;
+    width: min(340px, 88vw);
+    margin-top: 20px;
+  }
+}
+
 
 /* ==================================================================
    미니맵 (좌상단, 메이플 프레임)

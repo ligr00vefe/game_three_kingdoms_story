@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { login, register } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
+import { LauncherCommunity } from './LauncherCommunity'
+import { LauncherLogo } from './LauncherLogo'
 
 export const GAME_WINDOW_NAME = 'threeKingdomsStory'
 export const GAME_WINDOW_WIDTH = 1280
@@ -31,10 +33,44 @@ export function Launcher() {
   const user = useAuthStore((state) => state.user)
   const loginIdInputRef = useRef<HTMLInputElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
+  const logoRef = useRef<HTMLCanvasElement>(null)
+  const communityRef = useRef<HTMLElement>(null)
+  const [communityHidden, setCommunityHidden] = useState(false)
 
   useEffect(() => {
     if (!loggedIn) loginIdInputRef.current?.focus()
   }, [loggedIn, mode])
+
+  useLayoutEffect(() => {
+    const updateCommunityVisibility = () => {
+      const logo = logoRef.current?.getBoundingClientRect()
+      let community = communityRef.current?.getBoundingClientRect()
+      if (!logo || !community || community.width === 0 || community.height === 0) return
+
+      // 기록 카드의 상단을 로고 상단에 맞춰 화면 크기별 여백을 일정하게 유지한다.
+      if (window.matchMedia('(min-width: 821px)').matches && communityRef.current) {
+        communityRef.current.style.top = `${Math.max(24, logo.top)}px`
+        community = communityRef.current.getBoundingClientRect()
+      }
+
+      const padding = 8
+      const overlaps = logo.left - padding < community.right
+        && logo.right + padding > community.left
+        && logo.top - padding < community.bottom
+        && logo.bottom + padding > community.top
+      setCommunityHidden(overlaps)
+    }
+
+    updateCommunityVisibility()
+    window.addEventListener('resize', updateCommunityVisibility)
+    const observer = new ResizeObserver(updateCommunityVisibility)
+    if (logoRef.current) observer.observe(logoRef.current)
+    if (communityRef.current) observer.observe(communityRef.current)
+    return () => {
+      window.removeEventListener('resize', updateCommunityVisibility)
+      observer.disconnect()
+    }
+  }, [])
 
   const submit = async () => {
     if (busy || !loginId || !password || (mode === 'register' && !displayName)) return
@@ -62,7 +98,8 @@ export function Launcher() {
 
   return (
     <main className="launcher">
-      <img className="launcher-logo" src="/assets/img/logo/main_logo.png" alt="삼국지 스토리" />
+      <div className="launcher-shell"><div className="launcher-core">
+      <LauncherLogo logoRef={logoRef} />
       {launched ? <p className="launcher-running">게임 실행 중…</p> : (
         <section className={'launcher-auth launcher-auth--' + mode}>
           <p className="launcher-kicker">THREE KINGDOMS STORY</p>
@@ -110,6 +147,7 @@ export function Launcher() {
           {message && <p className="launcher-message">{message}</p>}
         </section>
       )}
+      </div><LauncherCommunity communityRef={communityRef} hidden={communityHidden} /></div>
     </main>
   )
 }
