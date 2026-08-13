@@ -27,6 +27,8 @@ export interface MonsterDef {
   hitFrameRate?: number
   deathTextureKey?: string
   deathFrameRate?: number
+  /** Ground contact line inside death frames, measured from the frame top (0..1). */
+  deathSpriteFootYRatio?: number
   /** Optional aerial entrance and shield-charge presentation. */
   fallingTextureKey?: string
   fallingSpriteScale?: number
@@ -502,7 +504,16 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.anims.stop() // 쓰러지는 동안 달리기 사이클이 계속 돌지 않게
     const deathKey = this.def.deathTextureKey
     if (deathKey && this.scene.anims.exists(deathKey)) {
+      const spriteScale = Math.abs(this.scaleY)
+      const currentOriginY = this.originY
+      const currentFootY = this.def.spriteFootYRatio ?? 1
+      const groundY = this.y + this.height * (currentFootY - currentOriginY) * spriteScale
+      const deathFrame = this.scene.textures.get(deathKey).get(0)
+      const deathOriginY = 1
+      const deathFootY = this.def.deathSpriteFootYRatio ?? 1
       this.clearTint()
+      this.setOrigin(0.5, deathOriginY)
+      this.y = groundY - deathFrame.height * (deathFootY - deathOriginY) * spriteScale
       this.currentAnimKey = deathKey
       this.play(deathKey)
       this.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {

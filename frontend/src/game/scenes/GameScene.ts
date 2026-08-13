@@ -535,7 +535,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    if (this.mode === 'defense') this.spawnDefenseCrows(viewW)
+    if (this.mode === 'defense') {
+      this.spawnDefenseLightning(viewW)
+      this.spawnDefenseCrows(viewW)
+    }
 
     // ---- 지형 ----
     const solids = this.physics.add.staticGroup()
@@ -1596,6 +1599,92 @@ export class GameScene extends Phaser.Scene {
         flowRate: 0.00022 + s.at * 0.00005,
       })
     })
+  }
+
+  /** Defense-only ambient lightning, cropped from two irregular source strips. */
+  private spawnDefenseLightning(viewW: number) {
+    if (!this.art('fx_lightning_01') || !this.art('fx_lightning_02')) return
+
+    // Only the horizontal / shallow-U silhouettes suit cloud-to-cloud lightning.
+    // Vertical forks from strip 01 are intentionally left unused.
+    const horizontalFrames = [0, 2, 4, 7, 11]
+    const pairedHorizontalFrames = [0, 1, 5, 6]
+    let stripOneIndex = Phaser.Math.Between(0, horizontalFrames.length - 1)
+    let stripTwoIndex = Phaser.Math.Between(0, pairedHorizontalFrames.length - 1)
+
+    // bg_mountain_02 is rendered at about 71% of its source size. Its first
+    // mountain tips therefore enter near screen Y=70; keep every bolt inside
+    // the painted storm-cloud band above Y=62 so it cannot cross the ridge.
+    const cloudGaps = [
+      { x: 0.12, y: 37, width: 26 },
+      { x: 0.29, y: 53, width: 30 },
+      { x: 0.47, y: 34, width: 28 },
+      { x: 0.65, y: 50, width: 32 },
+      { x: 0.82, y: 39, width: 27 },
+      { x: 0.94, y: 55, width: 25 },
+    ]
+
+    const flash = (gapIndex: number, usePairedStrip: boolean) => {
+      if (this.mode !== 'defense' || !this.scene.isActive()) return
+      const gap = cloudGaps[gapIndex]
+      const key = usePairedStrip ? 'fx_lightning_02' : 'fx_lightning_01'
+      const firstFrame = usePairedStrip ? pairedHorizontalFrames[stripTwoIndex] : horizontalFrames[stripOneIndex]
+      const frame = this.textures.get(key).get(firstFrame)
+      const displayW = gap.width + Phaser.Math.Between(-3, 3)
+      const bolt = this.add.image(viewW * gap.x, gap.y + Phaser.Math.Between(-2, 2), key, firstFrame)
+        .setScrollFactor(MOUNTAIN_SCROLL, MOUNTAIN_SCROLL)
+        .setDepth(MOUNTAIN_DEPTH + 1)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDisplaySize(displayW, displayW * frame.height / frame.width)
+        .setAlpha(0)
+
+      this.tweens.add({
+        targets: bolt,
+        alpha: 0.78,
+        duration: 35,
+        yoyo: true,
+        hold: 45,
+        onComplete: () => {
+          if (!bolt.active) return
+          if (usePairedStrip) {
+            // The lower row is the matching follow-through pose for this column.
+            const secondFrame = firstFrame + 7
+            const next = this.textures.get(key).get(secondFrame)
+            bolt.setFrame(secondFrame)
+              .setDisplaySize(displayW, displayW * next.height / next.width)
+              .setAlpha(0.68)
+            this.tweens.add({ targets: bolt, alpha: 0, duration: 90, onComplete: () => bolt.destroy() })
+            stripTwoIndex = (stripTwoIndex + 1) % pairedHorizontalFrames.length
+          } else {
+            bolt.destroy()
+            stripOneIndex = (stripOneIndex + 1) % horizontalFrames.length
+          }
+        },
+      })
+    }
+
+    const scheduleBurst = () => {
+      if (this.mode !== 'defense' || !this.scene.isActive()) return
+      const order = Phaser.Utils.Array.Shuffle([...cloudGaps.keys()])
+      const strikeCount = Phaser.Math.Between(1, 2)
+      for (let i = 0; i < strikeCount; i++) {
+        const pulseCount = Phaser.Math.Between(2, 3)
+        const pulseGap = Phaser.Math.Between(105, 165)
+        const strikeDelay = i * Phaser.Math.Between(420, 620)
+        // Real lightning re-illuminates the same channel several times in a
+        // short burst. Keep those pulses in one cloud gap, then occasionally
+        // let a second strike answer from a different gap.
+        for (let pulse = 0; pulse < pulseCount; pulse++) {
+          this.time.delayedCall(
+            strikeDelay + pulse * pulseGap,
+            () => flash(order[i], (i + pulse) % 2 === 1),
+          )
+        }
+      }
+      this.time.delayedCall(Phaser.Math.Between(3200, 6000), scheduleBurst)
+    }
+
+    this.time.delayedCall(Phaser.Math.Between(700, 1700), scheduleBurst)
   }
 
   /** 디펜스 아레나 전용 하늘 연출: 까마귀 떼가 화면 왼쪽 밖에서 오른쪽 밖으로 천천히 지난다. */

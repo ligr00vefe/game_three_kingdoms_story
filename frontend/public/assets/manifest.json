@@ -63,8 +63,11 @@
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",
     "fx_dash": "assets/img/fx/effect_dash.png",
     "shield_zombie_falling": "assets/img/monster/shield_zombie_falling.png",
+    "shield_zombie_death": "assets/img/monster/shield_zombie_death.png",
     "fx_shield_zombie_drop": "assets/img/fx/effect_shield_zombie_drop.png",
-    "fx_shield_zombie_dash": "assets/img/fx/effect_shield_zombie_dash.png"
+    "fx_shield_zombie_dash": "assets/img/fx/effect_shield_zombie_dash.png",
+    "fx_lightning_01": "assets/img/fx/effect_lightning_01.png",
+    "fx_lightning_02": "assets/img/fx/effect_lightning_02.png"
   },
   "spritesheets": {
     "shield_zombie_walk": { "url": "assets/img/monster/shield_zombie_walk.png", "frameWidth": 527, "frameHeight": 500 },

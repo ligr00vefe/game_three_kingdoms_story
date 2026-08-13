@@ -37,7 +37,7 @@ export class PreloadScene extends Phaser.Scene {
     // manifest 등록 에셋 일괄 로드 (아직 비어 있음 — 이미지 도입 시 여기만 통과하면 됨)
     // Version the manifest request so a browser refresh cannot reuse an old
     // images/spritesheets classification after an asset-layout deployment.
-    this.load.json('asset_manifest', 'assets/manifest.json?v=20260812-6')
+    this.load.json('asset_manifest', 'assets/manifest.json?v=20260813-1')
   }
 
   create() {
@@ -92,6 +92,30 @@ export class PreloadScene extends Phaser.Scene {
       width: index === 7 ? 125 : 125,
       height: 250,
     })))
+    // 3162x627 shield-zombie death strip: preserve each pose's full logical
+    // canvas so the widening fall is not cropped or stretched between frames.
+    registerFrames('shield_zombie_death', [
+      { x: 0, y: 0, width: 790, height: 627 },
+      { x: 790, y: 0, width: 791, height: 627 },
+      { x: 1581, y: 0, width: 790, height: 627 },
+      { x: 2371, y: 0, width: 791, height: 627 },
+    ])
+    // Lightning sheets are irregular strips. Crop each isolated alpha island so
+    // transparent gaps never pull a neighbouring bolt into the same frame.
+    registerFrames('fx_lightning_01', [
+      [30, 81, 100, 59], [173, 17, 88, 139], [308, 61, 110, 78],
+      [469, 53, 107, 84], [618, 42, 123, 83], [791, 51, 80, 84],
+      [955, 25, 56, 131], [1066, 105, 76, 51], [1202, 63, 76, 90],
+      [1331, 41, 92, 100], [1458, 32, 123, 125], [1614, 85, 116, 39],
+      [1775, 40, 100, 113],
+    ].map(([x, y, width, height]) => ({ x, y, width, height })))
+    registerFrames('fx_lightning_02', [
+      [70, 134, 108, 31], [297, 125, 177, 38], [590, 111, 198, 74],
+      [901, 86, 211, 99], [1201, 99, 212, 87], [1516, 130, 153, 44],
+      [1776, 128, 85, 33], [68, 426, 109, 58], [296, 416, 178, 39],
+      [588, 385, 199, 129], [903, 389, 212, 109], [1208, 420, 202, 87],
+      [1517, 448, 144, 35], [1770, 451, 83, 23],
+    ].map(([x, y, width, height]) => ({ x, y, width, height })))
   }
 
   /**
