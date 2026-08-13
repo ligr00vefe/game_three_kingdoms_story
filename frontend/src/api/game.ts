@@ -7,6 +7,7 @@ import { useScreenStore } from '../stores/screenStore'
 import { useSkillStore } from '../stores/skillStore'
 import { QUICKSLOT_COUNT, useQuickslotStore } from '../stores/quickslotStore'
 import { useAuthStore } from '../stores/authStore'
+import { CHARACTERS } from '../data/characters'
 
 interface ServerItemDef {
   code: string
@@ -42,7 +43,9 @@ export async function loadGameState(): Promise<void> {
   const { data } = await api.get<GameStateResponse>('/game/state', { params: { characterCode } })
   const c = data.character
   useGameStore.getState().setStats({
-    characterName: c.name,
+    // The selected character definition is authoritative for UI identity. This
+    // also corrects legacy Zhao Yun rows that may still contain Guan Yu's name.
+    characterName: CHARACTERS[characterCode]?.name ?? c.name,
     level: c.level, exp: c.exp,
     maxHp: c.maxHp, hp: c.hp, maxMp: c.maxMp, mp: c.mp,
     attackPower: c.attackPower, gold: c.gold,
