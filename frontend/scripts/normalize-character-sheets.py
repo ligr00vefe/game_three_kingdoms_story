@@ -16,6 +16,7 @@ FRAME = 192
 ALPHA_THRESHOLD = 8
 INTERNAL_GAP = 35
 SOURCE_SCALE = 0.34
+ACTION_SCALE = {"slash_l": 0.29, "slash_r": 0.29}
 BOTTOM_MARGIN = 8
 
 EXPECTED_FRAMES = {
@@ -52,7 +53,7 @@ def occupied_runs(image: Image.Image) -> list[tuple[int, int]]:
     return runs
 
 
-def normalize(source: Path, destination: Path, expected: int) -> None:
+def normalize(source: Path, destination: Path, expected: int, scale: float) -> None:
     image = Image.open(source).convert("RGBA")
     runs = occupied_runs(image)
     if len(runs) != expected:
@@ -68,7 +69,7 @@ def normalize(source: Path, destination: Path, expected: int) -> None:
 
     scaled = [
         pose.resize(
-            (max(1, round(pose.width * SOURCE_SCALE)), max(1, round(pose.height * SOURCE_SCALE))),
+            (max(1, round(pose.width * scale)), max(1, round(pose.height * scale))),
             Image.Resampling.LANCZOS,
         )
         for pose in poses
@@ -88,7 +89,12 @@ def normalize(source: Path, destination: Path, expected: int) -> None:
 
 def main() -> None:
     for action, expected in EXPECTED_FRAMES.items():
-        normalize(SOURCE / f"guanwu_t2_{action}.png", OUTPUT / f"guanwu_t2_{action}.png", expected)
+        normalize(
+            SOURCE / f"guanwu_t2_{action}.png",
+            OUTPUT / f"guanwu_t2_{action}.png",
+            expected,
+            ACTION_SCALE.get(action, SOURCE_SCALE),
+        )
 
 
 if __name__ == "__main__":

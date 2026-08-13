@@ -892,10 +892,10 @@ export class GameScene extends Phaser.Scene {
         this.effects.lightningDescent(this.player.x, castGroundY)
       }
     }
-    this.player.onSkill = (hitbox, facing, skillCode, hitIndex) => {
+    this.player.onSkill = (hitbox, facing, skillCode, _hitIndex) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
-      const isGlaiveSlash = isGlaiveFlurry && hitIndex === 0
+      const isGlaiveSlash = false
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
       const isLightningDescent = skillCode === 'skill_lightning_descent'
@@ -916,9 +916,7 @@ export class GameScene extends Phaser.Scene {
           facing,
         )
       }
-      const damageMultiplier = isGlaiveSlash
-        ? COMBAT.GLAIVE_SLASH_DAMAGE_MULTIPLIER
-        : isGlaiveFlurry ? COMBAT.GLAIVE_SLAM_DAMAGE_MULTIPLIER : 1
+      const damageMultiplier = isGlaiveFlurry ? COMBAT.GLAIVE_SLAM_DAMAGE_MULTIPLIER : 1
       this.resolveAttack(
         attackArea,
         isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS,
@@ -935,7 +933,7 @@ export class GameScene extends Phaser.Scene {
     const self = this
     this.playerTarget = {
       get x() { return self.player.x },
-      get y() { return self.player.y },
+      get y() { return (self.player.body as Phaser.Physics.Arcade.Body).center.y },
       get alive() { return self.player.isHittable },
       receiveHit: (attack: number, fromX: number) => {
         self.player.receiveHit(attack, fromX)

@@ -116,8 +116,8 @@
     "guanwu_t2_climb":    { "url": "assets/img/char/guanwu_t2_climb.png?v=3",    "frameWidth": 192, "frameHeight": 192 },
     "guanwu_t2_attack_r": { "url": "assets/img/char/guanwu_t2_attack_r.png?v=3", "frameWidth": 192, "frameHeight": 192 },
     "guanwu_t2_attack_l": { "url": "assets/img/char/guanwu_t2_attack_l.png?v=3", "frameWidth": 192, "frameHeight": 192 },
-    "guanwu_t2_slash_r":  { "url": "assets/img/char/guanwu_t2_slash_r.png?v=3",  "frameWidth": 192, "frameHeight": 192 },
-    "guanwu_t2_slash_l":  { "url": "assets/img/char/guanwu_t2_slash_l.png?v=3",  "frameWidth": 192, "frameHeight": 192 }
+    "guanwu_t2_slash_r":  { "url": "assets/img/char/guanwu_t2_slash_r.png?v=4",  "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_slash_l":  { "url": "assets/img/char/guanwu_t2_slash_l.png?v=4",  "frameWidth": 192, "frameHeight": 192 }
   },
   "atlases": {}
 }

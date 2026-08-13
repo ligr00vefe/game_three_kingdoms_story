@@ -105,6 +105,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private actionHitIndex = 0
   /** 일격필살은 조준 표시가 끝난 뒤에만 캐릭터의 찌르기 모션을 재생한다. */
   private skillMotionReleased = true
+  private glaiveMotionPhase: 'ground-swing' | 'air-thrust' | 'landing' = 'landing'
+  private glaiveHasLeftGround = false
   /** 콤보: 지금 재생 중/직전에 낸 단계(0:찌르기 1:휘두르기 2:깊게 찌르기) */
   private comboStep = 0
   /** 콤보: 현재 모션 중 공격키가 눌려 다음 단계가 예약됨 (선입력 버퍼) */
@@ -224,6 +226,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'attack': return 'attack'
       case 'skill':
         if (!this.skillMotionReleased) return 'idle'
+        if (this.skillQueuedCode === 'skill_glaive_flurry') {
+          if (this.glaiveMotionPhase === 'air-thrust') return 'attack'
+          if (this.glaiveMotionPhase === 'landing') return 'idle'
+        }
         return this.hasAnim('skill') ? 'skill' : 'attack'
       case 'hit': return 'hit'
       case 'dead': return 'dead'
@@ -548,9 +554,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.actionHitDone = false
     this.actionHitIndex = 0
     this.actionHitTimes = this.skillQueuedCode === 'skill_glaive_flurry' && kind === 'skill'
-      ? [COMBAT.GLAIVE_SLASH_1_HIT_AT_MS, COMBAT.GLAIVE_HIT_AT_MS]
+      ? [COMBAT.GLAIVE_HIT_AT_MS]
       : [hitAt]
     this.skillMotionReleased = kind !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike'
+    if (kind === 'skill' && this.skillQueuedCode === 'skill_glaive_flurry') {
+      this.glaiveMotionPhase = 'ground-swing'
+      this.glaiveHasLeftGround = false
+    }
     if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
     // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
     const isDashLunge = kind === 'attack' && this.comboStep === 2
@@ -566,6 +576,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private updateAction(input: PlayerControl, now: number) {
+    if (this.state_ === 'skill' && this.skillQueuedCode === 'skill_glaive_flurry'
+      && this.glaiveMotionPhase === 'air-thrust') {
+      const grounded = this.body.blocked.down || this.body.touching.down
+      if (!grounded) this.glaiveHasLeftGround = true
+      else if (this.glaiveHasLeftGround) {
+        this.glaiveMotionPhase = 'landing'
+        this.currentAnimKey = null
+        this.anims.stop()
+      }
+    }
     // 대쉬찌르기 돌진 구간에는 전진 속도를 유지, 그 외에는 지상에서 정지
     if (this.body.blocked.down && now >= this.dashLungeUntil) this.setVelocityX(0)
 
@@ -636,6 +656,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   startGlaiveMotion() {
+    this.glaiveMotionPhase = 'air-thrust'
+    this.currentAnimKey = null
+    this.anims.stop()
     if (this.body.blocked.down) this.setVelocityY(-420)
   }
 

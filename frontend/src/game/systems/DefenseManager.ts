@@ -368,12 +368,21 @@ export class DefenseManager {
       if (!m.active) continue
       const structureTarget = this.structureTargetFor(m.x)
       let target = structureTarget
+      const dx = Math.abs(this.playerTarget.x - m.x)
+      const dy = Math.abs(this.playerTarget.y - m.y)
+      // Ranged bomb zombies must be able to recognize and throw at the player
+      // across their actual attack range. The shared 200px melee aggro gate
+      // made them lock onto structures forever.
+      if (m.def.rangedAttack && this.playerTarget.alive
+        && dx <= m.def.attackRange && dy < DEFENSE.PLAYER_AGGRO_Y) {
+        target = this.playerTarget
+        m.update(target, now)
+        continue
+      }
       // 좀비가 맨 앞 구조물 바로 오른쪽(막힌 위치)에 있으면 그 구조물을 우선 공격해 돌파한다.
       // 그래야 플레이어가 뒤에 서 있어도 바리케이트/기지 HP가 깎인다.
       const blockedByStruct = Math.abs(m.x - structureTarget.x) < DEFENSE.STRUCT_AGGRO_X
       if (!blockedByStruct && this.playerTarget.alive) {
-        const dx = Math.abs(this.playerTarget.x - m.x)
-        const dy = Math.abs(this.playerTarget.y - m.y)
         if (dx < DEFENSE.PLAYER_AGGRO_X && dy < DEFENSE.PLAYER_AGGRO_Y) target = this.playerTarget
       }
       m.update(target, now)

@@ -110,13 +110,11 @@ export const COMBAT = {
   // 스킬 전용 아트(8프레임)가 들어오면 그 시트 기준으로 다시 잡아야 한다.
   SKILL_HIT_AT_MS: 205,
   /** 언월난무 좌·우 베기 2회의 타격 시점 */
-  GLAIVE_SLASH_1_HIT_AT_MS: 180,
   GLAIVE_HIT_AT_MS: 720,
   DECISIVE_HIT_AT_MS: 680,
   DRAGON_HIT_AT_MS: 720,
   SKILL_HITSTOP_MS: 70,
   /** 언월난무 각 타격의 추가 피해 배율 */
-  GLAIVE_SLASH_DAMAGE_MULTIPLIER: 1.15,
   GLAIVE_SLAM_DAMAGE_MULTIPLIER: 1.35,
 
   /** 피격 (GAME_DESIGN 4.3) */
