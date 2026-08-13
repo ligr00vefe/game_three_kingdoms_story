@@ -471,7 +471,7 @@ export class GameScene extends Phaser.Scene {
       // depth를 하늘(-100)보다 살짝 앞(-96)으로 올려, 느린 구름(-98)이 산 뒤·하늘 앞에 낄 틈을 만든다.
       if (this.art('bg_mountain')) {
         // tileSprite 대신 낱개 이미지를 1px 겹쳐 깔아 반복 이음매를 없앤다
-        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 350, 110, 1)
+        addTiledLayer('bg_mountain', MOUNTAIN_SCROLL, MOUNTAIN_DEPTH, 350, 90, 1)
       }
       // 하늘에 흘러가는 구름 (감숙성 내부) — 개별 이미지 배치 후 update()에서 가로로 흘린다.
       // 느린 큰 구름은 산 뒤, 조금 빠른 작은 구름은 산 앞에 배치 (spawnClouds 내부 depth 지정).
@@ -873,6 +873,10 @@ export class GameScene extends Phaser.Scene {
         // the effect after it has appeared.
         this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
       }
+      if (skillCode === 'skill_lightning_descent') {
+        const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+        this.effects.lightningDescent(this.player.x, castGroundY)
+      }
     }
     this.player.onSkill = (hitbox, facing, skillCode, hitIndex) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
@@ -880,6 +884,7 @@ export class GameScene extends Phaser.Scene {
       const isGlaiveSlash = isGlaiveFlurry && hitIndex < 2
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
+      const isLightningDescent = skillCode === 'skill_lightning_descent'
       const attackArea = isDragonSlash
         ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.dragonSlashImpactY - 42, 125)
         : isGlaiveSlash
@@ -890,7 +895,7 @@ export class GameScene extends Phaser.Scene {
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
         ? new Phaser.Geom.Circle(this.player.x, this.glaiveImpactY - 42, 150)
         : hitbox
-      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash) {
+      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash && !isLightningDescent) {
         this.effects.skillCharge(
           this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET,
           this.player.y + 22,

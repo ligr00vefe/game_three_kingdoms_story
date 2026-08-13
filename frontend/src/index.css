@@ -960,7 +960,7 @@ html, body, #root { height: 100%; }
 }
 .command-help__header { display: flex; align-items: center; justify-content: space-between; font-size: 22px; }
 .command-help__header strong { font-size: 0; }
-.command-help__header strong::after { content: 'FULL GAME HELP'; font-size: 22px; }
+.command-help__header strong::after { content: '게임 도움말'; font-size: 22px; }
 .command-help__key { display: inline-block; margin-right: 10px; padding: 3px 8px; color: #1b1710; background: #e2b866; border-radius: 4px; font-size: 14px; }
 .command-help__tabs { display: flex; gap: 6px; margin-top: 16px; border-bottom: 1px solid #4c4f58; }
 .command-help__tab { padding: 8px 12px; color: #aeb4c0; background: #23262d; border: 1px solid #4c4f58; border-bottom: 0; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 11px; font-weight: 800; }
@@ -975,7 +975,10 @@ html, body, #root { height: 100%; }
 .command-help__row code { color: #fff3cd; font-family: inherit; font-weight: 700; }
 .command-help__row span { color: #b9bdc8; font-size: 12px; }
 .command-help__note { margin: 14px 0; color: #ffcc80; font-size: 12px; }
-.command-help__close { display: block; min-width: 180px; margin: 0 auto; padding: 9px 18px; color: #1b1710; background: #d6a84e; border: 1px solid #ffe0a0; border-radius: 5px; font-weight: 800; cursor: pointer; }
+.command-help__actions { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.command-help__key-settings, .command-help__close { min-width: 150px; padding: 9px 16px; border-radius: 5px; font-weight: 800; cursor: pointer; }
+.command-help__key-settings { color: #ffe0a0; background: #292d35; border: 1px solid #8d7340; }
+.command-help__close { min-width: 180px; color: #1b1710; background: #d6a84e; border: 1px solid #ffe0a0; }
 .command-help__close:hover { background: #e8bd69; }
 @media (max-width: 800px) { .command-help__groups { grid-template-columns: 1fr; } }
 
@@ -1406,7 +1409,7 @@ html, body, #root { height: 100%; }
   display: flex;
   flex-direction: column;
   gap: 7px;
-  padding: 16px 18px;
+  padding: 16px 18px 26px;
   background: url('/assets/img/standBy/parchment_page.png') center / 100% 100% no-repeat;
 }
 /* 종이와 글자는 뷰포트 클립으로 위→아래로 함께 드러난다(두루마리가 펴지듯). 내용 높이는
@@ -1415,18 +1418,20 @@ html, body, #root { height: 100%; }
   .scroll-viewport { transition: none; }
 }
 
-.lobby-card-lv { font-size: 15px; font-weight: 700; color: #8a5a2b; text-align: center; }
+.lobby-card-lv { margin-bottom: 8px; font-size: 15px; font-weight: 700; color: #8a5a2b; text-align: center; }
 .lobby-card-lv b { font-size: 26px; color: #5b3a17; }
 .lobby-card-name {
   padding: 6px 0;
+  margin-bottom: 9px;
   font-size: 17px; font-weight: 800; text-align: center;
   color: #2f1d0b;
   background: rgba(120, 78, 34, 0.16);
   border-radius: 9px;
 }
-.lobby-card-class { font-size: 12px; font-weight: 800; color: #a33b2c; text-align: center; }
-.lobby-card-desc { font-size: 11px; line-height: 1.55; color: #5e4526; }
+.lobby-card-class { margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #a33b2c; text-align: center; }
+.lobby-card-desc { margin: 0 0 13px; font-size: 11px; line-height: 1.65; color: #5e4526; }
 .lobby-card-stats {
+  margin-top: 4px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
@@ -2175,6 +2180,7 @@ html, body, #root { height: 100%; }
 .def-banner--victory { z-index: 35; pointer-events: auto; background: rgba(20, 40, 20, 0.92); border: 1px solid #66bb6a; }
 .def-banner-title { font-size: 26px; font-weight: 800; color: #a5d6a7; text-shadow: 0 2px 6px #000; }
 .def-banner-sub { font-size: 13px; color: #dcedc8; }
+.def-reward-countdown { margin-top: 5px; color: #ffd54f; font-size: 12px; font-weight: 700; }
 .def-upgrade-grid { display: grid; grid-template-columns: repeat(3, 150px); gap: 10px; margin-top: 12px; }
 .def-upgrade { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 8px; color: #fff; background: #263238; border: 1px solid #ffd54f; border-radius: 10px; cursor: pointer; }
 .def-upgrade:hover { transform: translateY(-2px); background: #37474f; box-shadow: 0 5px 14px #0008; }

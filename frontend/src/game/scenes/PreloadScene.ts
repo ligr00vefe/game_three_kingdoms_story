@@ -80,6 +80,18 @@ export class PreloadScene extends Phaser.Scene {
       { x: 706, y: 470, width: 537, height: 471 },
       { x: 1244, y: 470, width: 424, height: 471 },
     ])
+    registerFrames('fx_skill_lightning', Array.from({ length: 8 }, (_, index) => ({
+      x: index * 139,
+      y: 0,
+      width: index === 7 ? 145 : 139,
+      height: 223,
+    })))
+    registerFrames('fx_skill_lightning_small', Array.from({ length: 8 }, (_, index) => ({
+      x: index * 125,
+      y: 0,
+      width: index === 7 ? 125 : 125,
+      height: 250,
+    })))
   }
 
   /**

@@ -607,7 +607,7 @@ export class DefenseManager {
     const w = s.barW
     const h = 6
     const x = s.spr.x - w / 2 + (s.isBase ? DEFENSE.BASE_HP_BAR_OFFSET_X : 0)
-    const y = s.spr.y - s.spr.displayHeight / 2 - 5
+    const y = s.spr.y - s.spr.displayHeight / 2 + (s.isBase ? 12 : -5)
     g.fillStyle(0x000000, 0.6); g.fillRect(x - 1, y - 1, w + 2, h + 2)
     g.fillStyle(0x424242, 1); g.fillRect(x, y, w, h)
     const ratio = Phaser.Math.Clamp(s.hp / s.maxHp, 0, 1)

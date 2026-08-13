@@ -17,6 +17,8 @@ export class EffectManager {
   private glaivePool: Phaser.GameObjects.Group
   private decisivePool: Phaser.GameObjects.Group
   private dragonPool: Phaser.GameObjects.Group
+  private lightningPool: Phaser.GameObjects.Group
+  private lightningSmallPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
   private dashPool: Phaser.GameObjects.Group
   private jumpBurstPool: Phaser.GameObjects.Group
@@ -32,6 +34,8 @@ export class EffectManager {
     this.glaivePool = scene.add.group({ defaultKey: 'fx_skill_glaive', maxSize: 4 })
     this.decisivePool = scene.add.group({ defaultKey: 'fx_decisive_strike', maxSize: 3 })
     this.dragonPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 2 })
+    this.lightningPool = scene.add.group({ defaultKey: 'fx_skill_lightning', maxSize: 14 })
+    this.lightningSmallPool = scene.add.group({ defaultKey: 'fx_skill_lightning_small', maxSize: 6 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
     this.dashPool = scene.add.group({ defaultKey: 'fx_dash', maxSize: 8 })
     this.jumpBurstPool = scene.add.group({ defaultKey: 'fx_jump_effect', maxSize: 8 })
@@ -59,6 +63,7 @@ export class EffectManager {
     this.defineGlaiveFrames()
     this.defineDecisiveFrames()
     this.defineDragonFrames()
+    this.defineLightningFrames()
   }
 
   private defineGlaiveFrames() {
@@ -532,6 +537,54 @@ export class EffectManager {
     sprite.play('fx_skill_dragon_slam')
   }
 
+  private defineLightningFrames() {
+    if (!this.scene.textures.exists('fx_skill_lightning')) return
+    if (this.scene.anims.exists('fx_skill_lightning_anim')) this.scene.anims.remove('fx_skill_lightning_anim')
+    this.scene.anims.create({
+      key: 'fx_skill_lightning_anim',
+      frames: Array.from({ length: 8 }, (_, frame) => ({ key: 'fx_skill_lightning', frame })),
+      frameRate: 40,
+      repeat: 0,
+    })
+    if (!this.scene.textures.exists('fx_skill_lightning_small')) return
+    if (this.scene.anims.exists('fx_skill_lightning_small_anim')) this.scene.anims.remove('fx_skill_lightning_small_anim')
+    this.scene.anims.create({
+      key: 'fx_skill_lightning_small_anim',
+      frames: Array.from({ length: 8 }, (_, frame) => ({ key: 'fx_skill_lightning_small', frame })),
+      frameRate: 40,
+      repeat: 0,
+    })
+  }
+
+  lightningDescent(x: number, groundY: number) {
+    if (!this.scene.anims.exists('fx_skill_lightning_anim')) return
+    const offsets = [-120, -96, -72, -48, -24, 0, 24, 48, 72, 96, 120]
+    const order = Phaser.Utils.Array.Shuffle(Array.from({ length: 11 }, (_, index) => index + 1))
+    order.forEach((position, index) => {
+      // 작은 번개는 양끝이 아니라 중앙의 큰 낙뢰 사이에 배치해
+      // 한곳으로 몰아치는 듯한 원근감을 만든다.
+      const isSmall = position === 5 || position === 7
+      const jitter = Phaser.Math.Between(0, 14)
+      this.scene.time.delayedCall(index * 27 + jitter + (isSmall ? 14 : 0), () => {
+        const pool = isSmall ? this.lightningSmallPool : this.lightningPool
+        const animation = isSmall ? 'fx_skill_lightning_small_anim' : 'fx_skill_lightning_anim'
+        const sprite = pool.get(x + offsets[position - 1], groundY) as Phaser.GameObjects.Sprite | null
+        if (!sprite) return
+        const floorPadding = isSmall ? 23 : 46
+        sprite.setActive(true).setVisible(true).setPosition(x + offsets[position - 1], groundY + floorPadding)
+          .setOrigin(0.5, 1)
+          .setDisplaySize(isSmall ? 100 : 150, isSmall ? 230 : 340)
+          .setAlpha(isSmall ? 0.86 : 1)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setDepth(isSmall ? 35 : 40)
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+          sprite.setActive(false).setVisible(false)
+        })
+        sprite.play(animation)
+      })
+    })
+  }
+
   hitSpark(x: number, y: number) {
     const img = this.sparkPool.get(x, y) as Phaser.GameObjects.Image | null
     if (!img) return
@@ -596,7 +649,7 @@ export class EffectManager {
     if (!text) {
       if (this.textPool.getLength() >= 30) return
       text = this.scene.add.text(0, 0, '', {
-        fontSize: '18px', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
+        fontSize: '30px', fontStyle: 'bold', stroke: '#2a1600', strokeThickness: 6,
       }).setOrigin(0.5)
       this.textPool.add(text)
     }
@@ -616,6 +669,7 @@ export class EffectManager {
       s.lastAt = now
     }
 
+    this.scene.tweens.killTweensOf(text)
     text.setActive(true).setVisible(true)
     text.setPosition(
       stackKey ? x : x + Phaser.Math.Between(-8, 8), // 스택형은 같은 세로 열에 정렬
@@ -626,11 +680,14 @@ export class EffectManager {
     // 폰트는 매번 지정한다 — textPool을 pickupLabel과 공유해서 생성 시점 스타일이 남아 있다
     text.setFontFamily(EffectManager.DAMAGE_FONT)
     text.setFontStyle('800')
-    text.setFontSize(crit ? 26 : kind === 'taken' ? 16 : 18)
-    text.setAlpha(1).setScale(crit ? 1.15 : 1)
+    const targetScale = crit ? 1.2 : kind === 'taken' ? 1.02 : 1
+    text.setFontSize(crit ? 40 : kind === 'taken' ? 28 : 32)
+    text.setStroke('#2a1600', crit ? 8 : 6)
+    text.setShadow(0, 4, '#000000', 5, true, true)
+    text.setAlpha(1).setScale(targetScale * 0.7)
 
     this.scene.tweens.add({
-      targets: text, y: y - stackOffset - 44, alpha: 0, duration: 650, ease: 'Cubic.easeOut',
+      targets: text, y: y - stackOffset - 56, scale: targetScale, alpha: 0, duration: 720, ease: 'Back.easeOut',
       onComplete: () => { text!.setActive(false).setVisible(false) },
     })
   }

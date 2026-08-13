@@ -56,6 +56,8 @@
     "fx_attack": "assets/img/fx/effect_basic_attack.png",
     "fx_attack_hit": "assets/img/fx/effect_basic_attack_shot.png",
     "fx_skill_charge": "assets/img/fx/skill_wild_horse_charge.png",
+    "fx_skill_lightning": "assets/img/fx/skill_descent_of_the_thunder_god.png",
+    "fx_skill_lightning_small": "assets/img/fx/skill_descent_of_the_thunder_god_small.png",
     "fx_level_up": "assets/img/fx/effect_level_up.png",
     "icon_coin": "assets/img/items/coin.png",
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",

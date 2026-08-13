@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDefenseStore } from '../stores/defenseStore'
 import type { DefensePhase, DefeatReason, DefenseUpgrade, OffensiveBuildState } from '../stores/defenseStore'
 import { useGameStore } from '../stores/gameStore'
@@ -80,12 +80,37 @@ export function DefenseHud() {
   const rewardChoices = useDefenseStore((s) => s.rewardChoices)
   const supplyLevel = useDefenseStore((s) => s.supplyLevel)
   const builtOffensive = useDefenseStore((s) => s.builtOffensive)
+  const [rewardCountdown, setRewardCountdown] = useState(30)
+  const autoSelectingReward = useRef(false)
   const hp = useGameStore((s) => s.hp)
   const maxHp = useGameStore((s) => s.maxHp)
   const mp = useGameStore((s) => s.mp)
   const maxMp = useGameStore((s) => s.maxMp)
   const hpPotion = { cost: BASE_HP_POTION.cost + supplyLevel * 8, amount: BASE_HP_POTION.amount + supplyLevel * 20 }
   const mpPotion = { cost: BASE_MP_POTION.cost + supplyLevel * 6, amount: BASE_MP_POTION.amount + supplyLevel * 15 }
+
+  useEffect(() => {
+    if (phase !== 'victory' || rewardChoices.length === 0) {
+      setRewardCountdown(30)
+      autoSelectingReward.current = false
+      return
+    }
+
+    const startedAt = Date.now()
+    autoSelectingReward.current = false
+    setRewardCountdown(30)
+    const timer = window.setInterval(() => {
+      const remaining = Math.max(0, 30 - Math.floor((Date.now() - startedAt) / 1000))
+      setRewardCountdown(remaining)
+      if (remaining === 0 && !autoSelectingReward.current) {
+        autoSelectingReward.current = true
+        window.clearInterval(timer)
+        const randomIndex = Math.floor(Math.random() * rewardChoices.length)
+        EventBus.emit(GameEvents.DEFENSE_CHOOSE_UPGRADE, rewardChoices[randomIndex])
+      }
+    }, 250)
+    return () => window.clearInterval(timer)
+  }, [phase, rewardChoices])
 
   useEffect(() => {
     const onState = (p: DefenseStatePayload) => useDefenseStore.getState().setFromEvent(p)
@@ -282,10 +307,13 @@ export function DefenseHud() {
       )}
 
       {/* 승리 배너 */}
-      {phase === 'victory' && (
+      {phase === 'victory' && rewardChoices.length > 0 && (
         <div className="def-banner def-banner--victory">
           <div className="def-banner-title">STAGE {stage} 클리어!</div>
           <div className="def-banner-sub">다음 전투를 위한 강화 하나를 선택하세요</div>
+          <div className="def-reward-countdown">
+            {rewardCountdown}초 후 첫 번째 보상이 자동 선택됩니다.
+          </div>
           <div className="def-upgrade-grid">
             {rewardChoices.map((upgrade) => {
               const info = UPGRADE_INFO[upgrade]

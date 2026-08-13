@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
 
 const GAME_CONTROLS = [
-  { title: 'Movement', commands: [['Arrow keys / WASD', 'Move the character'], ['Space', 'Jump'], ['S', 'Sit or interact'], ['K', 'Open the skill window']] },
-  { title: 'Combat', commands: [['J', 'Basic attack'], ['1 - 7', 'Use the quick slot skill'], ['Auto', 'Nearest enemy attack and automatic skill use']] },
-  { title: 'Interface', commands: [['F1', 'Open the full game help'], ['A', 'Open AI command examples'], ['M', 'Toggle the minimap'], ['ESC', 'Close the current window or open settings']] },
+  { title: '이동', commands: [['방향키 / WASD', '캐릭터 이동'], ['Space', '점프'], ['S', '앉기 또는 상호작용'], ['K', '스킬 창 열기']] },
+  { title: '전투', commands: [['J', '기본 공격'], ['1 - 7', '퀵슬롯 스킬 사용'], ['자동 전투', '가까운 적 공격 및 스킬 자동 사용']] },
+  { title: '인터페이스', commands: [['F1', '전체 도움말 열기'], ['A', 'AI 명령어 예시 열기'], ['M', '미니맵 전환'], ['ESC', '현재 창 닫기 또는 설정 열기']] },
 ] as const
 
 const COMMAND_GROUPS = [
@@ -68,14 +68,14 @@ export function CommandHelpPanel() {
         <div className="command-help__header">
           <div>
             <span className="command-help__key">F1</span>
-            <strong>AI 명령어 예시</strong>
+            <strong>게임 도움말</strong>
           </div>
           <button className="ks-close" onClick={close}>×</button>
         </div>
 
         <div className="command-help__tabs">
-          <button className={activeTab === 'controls' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('controls')}>GAME CONTROLS</button>
-          <button className={activeTab === 'ai' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('ai')}>AI COMMANDS</button>
+          <button className={activeTab === 'controls' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('controls')}>게임 조작</button>
+          <button className={activeTab === 'ai' ? 'command-help__tab command-help__tab--active' : 'command-help__tab'} onClick={() => setActiveTab('ai')}>AI 명령어</button>
         </div>
         {activeTab === 'controls' && (
           <div className="command-help__groups command-help__controls">
@@ -114,7 +114,10 @@ export function CommandHelpPanel() {
           ↑키로 기존 NPC·포탈에 상호작용할 수 있습니다. 마을에는 적이 없어 “계속 싸워”는 대기할 수 있으니 이동 명령은 “돌진”으로 확인하십시오.
         </p>
         </div>
-        <button className="command-help__close" onClick={close}>확인 (A, F1 또는 ESC)</button>
+        <div className="command-help__actions">
+          <button className="command-help__key-settings" onClick={() => { close(); useUiStore.getState().setKeySettingsOpen(true) }}>단축키 설정</button>
+          <button className="command-help__close" onClick={close}>확인 (A, F1 또는 ESC)</button>
+        </div>
       </div>
     </div>
   )

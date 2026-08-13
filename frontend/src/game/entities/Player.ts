@@ -600,9 +600,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // 대쉬찌르기(2단계)는 돌진하며 찔러 리치가 더 길다
     const isChargeSlash = isSkill && this.skillQueuedCode === 'skill_charge_slash'
     const isDecisiveStrike = isSkill && this.skillQueuedCode === 'skill_decisive_strike'
+    const isGlaiveSlash = isSkill && this.skillQueuedCode === 'skill_glaive_flurry'
     const reach = isSkill
       ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH
         : isDecisiveStrike ? COMBAT.DECISIVE_SKILL_REACH
+          : isGlaiveSlash ? COMBAT.GLAIVE_SLASH_REACH
           : COMBAT.SKILL_REACH
       : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
     const h = isSkill

@@ -172,18 +172,15 @@ export function CharacterSelect() {
               <div className="scroll-content" ref={contentRef}>
                 <div className="lobby-card-lv">Lv. <b>{game.level}</b></div>
                 <div className="lobby-card-name">{game.characterName || char.name}</div>
-                <div className="lobby-card-class">⚔ {char.clazz}</div>
-                <p className="lobby-card-desc">{char.desc}</p>
+                <div className="lobby-card-class">⚔ 촉한의 용장</div>
+                <p className="lobby-card-desc">
+                  관우는 유비를 섬긴 촉한의 명장으로, 의리와 충절의 상징으로 널리 알려져 있습니다.
+                </p>
                 <div className="lobby-card-stats">
                   <div className="lobby-stat"><span>HP</span><b>{game.maxHp}</b></div>
                   <div className="lobby-stat"><span>MP</span><b>{game.maxMp}</b></div>
                   <div className="lobby-stat"><span>공격력</span><b>{game.attackPower}</b></div>
                   <div className="lobby-stat"><span>이동속도</span><b>{Math.round(game.moveSpeedMult * 100)}%</b></div>
-                </div>
-                <div className="lobby-card-skill">
-                  <span className="lobby-skill-tag">스킬</span>
-                  <b>{char.skill.name}</b>
-                  <small>{char.skill.desc}</small>
                 </div>
               </div>
             </div>

@@ -92,7 +92,8 @@ export const COMBAT = {
   } as Record<string, number>,
   SKILL_REACH: 200,
   /** 일격필살 전용 사거리 — 기존 300px보다 넓힌 360px */
-  DECISIVE_SKILL_REACH: 360,
+  DECISIVE_SKILL_REACH: 270,
+  GLAIVE_SLASH_REACH: 125,
   SKILL_HEIGHT: 110,
   CHARGE_SKILL_REACH: 140,
   CHARGE_SKILL_HEIGHT: 85,
