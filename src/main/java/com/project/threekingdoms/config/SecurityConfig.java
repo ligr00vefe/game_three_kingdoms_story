@@ -35,7 +35,7 @@ public class SecurityConfig {
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
 		// 외부 IP 및 로컬 프론트엔드 주소 허용
-		configuration.setAllowedOrigins(List.of("http://10.100.105.28:5173", "http://211.192.156.90:5173", "http://localhost:5173"));
+		configuration.setAllowedOrigins(List.of("http://10.100.105.28:5173", "http://211.54.147.198:5173", "http://localhost:5173"));
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("*"));
 		configuration.setAllowCredentials(true);
