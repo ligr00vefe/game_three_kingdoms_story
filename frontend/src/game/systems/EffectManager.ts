@@ -452,7 +452,9 @@ export class EffectManager {
       spr.setY(groundY + (420 - visibleBottom) * Math.abs(spr.scaleY) + impactOffset)
     }
     spr.on(Phaser.Animations.Events.ANIMATION_UPDATE, pinPaintedFrameToGround)
-    const sequence = ['fx_skill_glaive_slash_left', 'fx_skill_glaive_slash_right']
+    // One opening slash is enough; playing both left/right sequences made the
+    // character motion fight the effect before the jump-and-slam payoff.
+    const sequence = ['fx_skill_glaive_slash_left']
     let sequenceIndex = 0
     const playNext = (animation: string) => {
       spr.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)

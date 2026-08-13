@@ -27,6 +27,8 @@ const GUARD_RADIUS = 190
 const CASTLE_PATROL_RADIUS = 520
 /** “앞으로/뒤로 가” 한 번에 이동하는 기본 거리(px). */
 const BASIC_MOVE_DISTANCE = 420
+/** Let the shared jump gain height before an automated rush triggers air dash. */
+const RUSH_DASH_DELAY_MS = 170
 
 export class GuanYuController {
   state: GuanYuState = 'STANDBY'
@@ -38,6 +40,7 @@ export class GuanYuController {
   private jumpQueued = false
   private rushJumpStarted = false
   private rushDashTriggered = false
+  private rushJumpStartedAt = 0
   private counterTarget: Monster | null = null
   private counterUntil = 0
   private counterAttackQueued = false
@@ -84,6 +87,7 @@ export class GuanYuController {
         this.stateAfterArrival = 'HOLDING'
         this.rushJumpStarted = false
         this.rushDashTriggered = false
+        this.rushJumpStartedAt = 0
         this.state = 'RUSHING'
         return true
       }
@@ -181,8 +185,14 @@ export class GuanYuController {
       const dx = this.targetX - player.x
       if (player.body?.blocked.down && !this.rushJumpStarted) {
         this.rushJumpStarted = true
+        this.rushJumpStartedAt = player.scene.time.now
         this.control.jumpJustDown = true
-      } else if (!player.body?.blocked.down && this.rushJumpStarted && !this.rushDashTriggered) {
+      } else if (
+        !player.body?.blocked.down
+        && this.rushJumpStarted
+        && !this.rushDashTriggered
+        && player.scene.time.now - this.rushJumpStartedAt >= RUSH_DASH_DELAY_MS
+      ) {
         this.rushDashTriggered = true
         this.control.jumpJustDown = true
       }

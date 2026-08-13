@@ -6,6 +6,7 @@ import {
   createPlayerAnims, textureKey, PLAYER_FALLBACK_TEX,
   type AnimAction,
 } from '../systems/playerAnimations'
+import { getCharacterModel } from '../../data/characterModels'
 
 /** 캐릭터 상태 머신 (sidescroller-game-dev 컨벤션). attack/skill/hit/dead는 Phase 2에서 추가 */
 export type PlayerState =
@@ -34,7 +35,6 @@ const SIT_ENABLED = false
 const LADDER_ENTER_DROP = 10
 
 /** 스프라이트 프레임 크기 — 아트 규격(CHARACTER_ART_SPEC 3장). 바디 오프셋 계산의 기준. */
-const FRAME = 128
 
 /**
  * 스프라이트 y(=프레임 중심)에서 발바닥(body.bottom)까지의 거리(px, 월드).
@@ -42,7 +42,6 @@ const FRAME = 128
  * 바디 하단보다 FOOT_SINK만큼 아래다. **BODY_HEIGHT/2가 아니다**(그렇게 계산하면
  * 캐릭터가 발판 아래로 박힌다).
  */
-const FEET_FROM_Y = (FRAME * PLAYER.VISUAL_SCALE) / 2 - PLAYER.FOOT_SINK
 
 interface Ladder {
   zone: Phaser.GameObjects.Zone
@@ -82,7 +81,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   // ---- 애니메이션 (레벨 티어별 스프라이트시트, playerAnimations) ----
   /** 현재 외형 티어 — 레벨업 시 refreshTier로 갱신 */
-  private tier = 1
+  private modelCode: string
+  private modelFrameSize: number
+  private modelGroundLift: number
+  private modelVisualScale: number
   /** 이 티어에서 실제 아트가 로드돼 재생 가능한 animId("walk_r" 등) 집합 (없으면 idle→placeholder 폴백) */
   private availableAnims: Set<string> = new Set()
   private currentAnimKey: string | null = null
@@ -117,8 +119,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** 자연 회복 판정용 — 마지막 전투 행동 시각 (GAME_DESIGN 5.2) */
   lastCombatAt = -Infinity
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'guanwu_idle')
+  constructor(scene: Phaser.Scene, x: number, y: number, modelCode = 'guanwu_t1') {
+    const model = getCharacterModel(modelCode)
+    super(scene, x, y, model.fallbackTexture)
+    this.modelCode = model.code
+    this.modelFrameSize = model.frameSize
+    this.modelGroundLift = model.groundLift
+    this.modelVisualScale = model.visualScale
     scene.add.existing(this)
     scene.physics.add.existing(this)
     // 128px T1 아트 기준 (2026-07-12): 캐릭터 실체는 프레임 하단 정렬 ~68px로 구워져 있다.
@@ -127,12 +134,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // 줄여 최종 월드 크기가 그대로다. 몬스터 64/타일 32와의 충돌 비율을 유지하기 위함.
     // offsetY는 발끝이 바디 하단보다 FOOT_SINK만큼 아래(잔디 안쪽)에 오도록 잡는다 — 그래야
     // 지면(잔디 경계)에 서 있어 보인다. 오프셋은 항상 128 프레임 기준 고정(placeholder 64px 방어).
-    const S = PLAYER.VISUAL_SCALE
+    const S = PLAYER.VISUAL_SCALE * this.modelVisualScale
     this.setScale(S)
     this.body.setSize(PLAYER.BODY_WIDTH / S, PLAYER.BODY_HEIGHT / S)
     this.body.setOffset(
-      FRAME / 2 - (PLAYER.BODY_WIDTH / 2) / S,
-      FRAME - (PLAYER.BODY_HEIGHT + PLAYER.FOOT_SINK) / S,
+      this.modelFrameSize / 2 - (PLAYER.BODY_WIDTH / 2) / S,
+      this.modelFrameSize - (PLAYER.BODY_HEIGHT + PLAYER.FOOT_SINK) / S + this.modelGroundLift / S,
     )
     this.setCollideWorldBounds(true)
     this.refreshTier()
@@ -145,15 +152,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    * placeholder(큐빅)로 떨어지며 캐릭터가 보도 아래로 추락하던 버그를 막는다.
    */
   refreshTier() {
-    const desired = Math.max(1, useGameStore.getState().jobTier)
-    let anims = createPlayerAnims(this.scene, desired)
-    if (anims.size === 0 && desired !== 1) {
+    const anims = createPlayerAnims(this.scene, this.modelCode)
       // 아트 미준비 티어 — 외형은 1티어로 유지 (전직 데이터가 들어오면 자동으로 살아난다)
-      this.tier = 1
-      anims = createPlayerAnims(this.scene, 1)
-    } else {
-      this.tier = desired
-    }
     this.availableAnims = anims
     this.currentAnimKey = null // 다음 updateAnimation에서 새 티어 텍스처로 강제 갱신
   }
@@ -170,7 +170,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    * 바디까지 한 번에 맞추는 body.reset()이 정석이다.
    */
   private setFeetY(worldY: number) {
-    this.body.reset(this.x, worldY - FEET_FROM_Y)
+    const feetFromY = (this.modelFrameSize * PLAYER.VISUAL_SCALE * this.modelVisualScale) / 2
+      - PLAYER.FOOT_SINK + this.modelGroundLift
+    this.body.reset(this.x, worldY - feetFromY)
   }
 
   update(input: PlayerControl, now: number) {
@@ -253,10 +255,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return
     }
 
-    const key = textureKey(this.tier, animId)
+    const key = textureKey(this.modelCode, animId)
 
     // 점프: 2프레임을 속도로 선택 (상승=0 / 하강=1) — 반복 재생보다 반응성이 좋다
-    if (action === 'jump') {
+    if (action === 'jump' && (getCharacterModel(this.modelCode).animations.jump ?? 2) <= 2) {
       if (this.texture.key !== key) this.setTexture(key)
       this.anims.stop()
       this.setFrame(this.body.velocity.y < 0 ? 0 : 1)
@@ -393,7 +395,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.state_ = 'jumpdash'
     this.invincible = true // GAME_DESIGN 3.2: 대쉬 중 무적
     this.dashUntil = now + PLAYER.AIR_DASH_DURATION_MS
-    this.setVelocity(PLAYER.AIR_DASH_SPEED * dir, 0)
+    this.setVelocity(PLAYER.AIR_DASH_SPEED * dir, PLAYER.AIR_DASH_VERTICAL_VELOCITY)
     this.body.setAllowGravity(false) // 수평 돌진 (메이플 감성)
     this.onAirDash?.(this.x, this.y, dir)
   }
@@ -546,7 +548,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.actionHitDone = false
     this.actionHitIndex = 0
     this.actionHitTimes = this.skillQueuedCode === 'skill_glaive_flurry' && kind === 'skill'
-      ? [COMBAT.GLAIVE_SLASH_1_HIT_AT_MS, COMBAT.GLAIVE_SLASH_2_HIT_AT_MS, COMBAT.GLAIVE_HIT_AT_MS]
+      ? [COMBAT.GLAIVE_SLASH_1_HIT_AT_MS, COMBAT.GLAIVE_HIT_AT_MS]
       : [hitAt]
     this.skillMotionReleased = kind !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike'
     if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)

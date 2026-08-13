@@ -25,6 +25,8 @@ import { GuanYuController } from '../ai/GuanYuController'
 import { parseLocalCommand } from '../ai/localCommandParser'
 import type { GuanYuCommand } from '../ai/commands'
 import { chatWithLocalAi, interpretWithLocalAi } from '../../api/command'
+import { CHARACTERS } from '../../data/characters'
+import { useScreenStore } from '../../stores/screenStore'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -39,6 +41,8 @@ const CHAT_BUBBLE_X_OFFSET = 8
 const CHAT_BUBBLE_Y_OFFSET = 8
 /** 기존 키보드 포탈/NPC 상호작용 반경 (px) */
 const PORTAL_RANGE = 44
+/** T2 spear tip sits lower than the legacy 128px model on thrust combo steps. */
+const THRUST_FX_Y_OFFSET = 12
 
 interface PortalDef {
   x: number
@@ -784,12 +788,18 @@ export class GameScene extends Phaser.Scene {
 
     // ---- 플레이어 / 이펙트 ----
     const requestedSpawn = this.spawnOverride ?? map.playerSpawn
+    // A stale save can place the body inside/below the one-tile floor. Keep
+    // its X coordinate, but restore the map's safe Y before physics starts.
+    const safeSpawnY = requestedSpawn.y >= map.groundY - PLAYER.BODY_HEIGHT
+      ? map.playerSpawn.y
+      : requestedSpawn.y
     const spawn = {
       x: Phaser.Math.Clamp(requestedSpawn.x, 24, map.worldWidth - 24),
-      y: Phaser.Math.Clamp(requestedSpawn.y, 24, map.worldHeight - 24),
+      y: Phaser.Math.Clamp(safeSpawnY, 24, map.groundY - PLAYER.BODY_HEIGHT - 1),
     }
     this.effects = new EffectManager(this)
-    this.player = new Player(this, spawn.x, spawn.y)
+      const character = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
+      this.player = new Player(this, spawn.x, spawn.y, character.modelCode)
     useGameStore.getState().setStats({
       stageCode: this.mapKey,
       playerX: Math.round(spawn.x),
@@ -823,7 +833,8 @@ export class GameScene extends Phaser.Scene {
         ? Phaser.Math.Clamp((hits[0].x - this.player.x) * facing, 50, reach)
         : reach
       const fxX = this.player.x + facing * dist
-      const fxY = this.player.y + 22
+      const thrustYOffset = comboStep === 0 || comboStep === 2 ? THRUST_FX_Y_OFFSET : 0
+      const fxY = this.player.y + 22 + thrustYOffset
       const hit = hits.length > 0
       // 세 단계 모두 단일 이미지 이펙트(찌르기와 동일 방식). 전용 아트가 없으면 찌르기로 폴백한다.
       if (comboStep === 1) {
@@ -884,7 +895,7 @@ export class GameScene extends Phaser.Scene {
     this.player.onSkill = (hitbox, facing, skillCode, hitIndex) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
-      const isGlaiveSlash = isGlaiveFlurry && hitIndex < 2
+      const isGlaiveSlash = isGlaiveFlurry && hitIndex === 0
       const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
       const isLightningDescent = skillCode === 'skill_lightning_descent'
@@ -1885,7 +1896,8 @@ export class GameScene extends Phaser.Scene {
     // 드랍 아이템: 만료/자동획득/Z 줍기
     const pickupPressed = this.input_.pickupJustDown || this.pickupCommandQueued
     this.pickupCommandQueued = false
-    this.drops.update(this.player.x, this.player.y, pickupPressed, this.time.now, delta)
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body
+    this.drops.update(playerBody.center.x, playerBody.center.y, pickupPressed, this.time.now, delta)
 
     // 몬스터 AI — update() 안에서 할당/클로저 생성 최소화 (성능 규칙 3)
     const monsters = this.spawner.monsters

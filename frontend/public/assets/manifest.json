@@ -106,7 +106,18 @@
     "guanwu_t1_dead_r":   { "url": "assets/img/char/guanwu_t1_dead_r.png",   "frameWidth": 128, "frameHeight": 128 },
     "guanwu_t1_dead_l":   { "url": "assets/img/char/guanwu_t1_dead_l.png",   "frameWidth": 128, "frameHeight": 128 },
     "guanwu_t1_rally_r":  { "url": "assets/img/char/guanwu_t1_rally_r.png",  "frameWidth": 128, "frameHeight": 128 },
-    "guanwu_t1_rally_l":  { "url": "assets/img/char/guanwu_t1_rally_l.png",  "frameWidth": 128, "frameHeight": 128 }
+    "guanwu_t1_rally_l":  { "url": "assets/img/char/guanwu_t1_rally_l.png",  "frameWidth": 128, "frameHeight": 128 },
+    "guanwu_t2_idle_r":   { "url": "assets/img/char/guanwu_t2_idle_r.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_idle_l":   { "url": "assets/img/char/guanwu_t2_idle_l.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_walk_r":   { "url": "assets/img/char/guanwu_t2_walk_r.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_walk_l":   { "url": "assets/img/char/guanwu_t2_walk_l.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_jump_r":   { "url": "assets/img/char/guanwu_t2_jump_r.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_jump_l":   { "url": "assets/img/char/guanwu_t2_jump_l.png?v=3",   "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_climb":    { "url": "assets/img/char/guanwu_t2_climb.png?v=3",    "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_attack_r": { "url": "assets/img/char/guanwu_t2_attack_r.png?v=3", "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_attack_l": { "url": "assets/img/char/guanwu_t2_attack_l.png?v=3", "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_slash_r":  { "url": "assets/img/char/guanwu_t2_slash_r.png?v=3",  "frameWidth": 192, "frameHeight": 192 },
+    "guanwu_t2_slash_l":  { "url": "assets/img/char/guanwu_t2_slash_l.png?v=3",  "frameWidth": 192, "frameHeight": 192 }
   },
   "atlases": {}
 }

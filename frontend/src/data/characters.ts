@@ -5,6 +5,8 @@
  */
 export interface CharacterDef {
   code: string
+  /** Visual model is independent from this save-slot character code. */
+  modelCode: string
   name: string
   /** 병과 표기 (메이플의 직업명 위치) */
   clazz: string
@@ -16,6 +18,7 @@ export interface CharacterDef {
 export const CHARACTERS: Record<string, CharacterDef> = {
   guanwu: {
     code: 'guanwu',
+    modelCode: 'guanwu_t2',
     name: '관우',
     clazz: '언월도 무장',
     desc: '무명소졸에서 시작해 무신(武神)에 이르는 촉나라의 맹장. 직책이 오를 때마다 외형과 스킬이 성장한다.',

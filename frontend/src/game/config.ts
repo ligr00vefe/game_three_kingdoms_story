@@ -17,7 +17,7 @@ export const CAMERA = {
 export const PLAYER = {
   /** 좌우 이동: 가속 없는 일정 속도 (메이플 감성, GAME_DESIGN 3.1) */
   MOVE_SPEED: 240,
-  JUMP_VELOCITY: -620,
+  JUMP_VELOCITY: -680,
 
   /**
    * 공중 액션 (GAME_DESIGN 3.2 개정): 공중에서 점프키 재입력 시 1회
@@ -25,8 +25,10 @@ export const PLAYER = {
    * - 이단 점프: ↑ 유지 + 점프 → 점프 (아래로 바람 이펙트)
    */
   AIR_DASH_SPEED: 700,
+  /** Air dash holds the height reached by the jump and moves horizontally. */
+  AIR_DASH_VERTICAL_VELOCITY: 0,
   AIR_DASH_DURATION_MS: 220,
-  DOUBLE_JUMP_VELOCITY: -560,
+  DOUBLE_JUMP_VELOCITY: -620,
 
   /** 줄/사다리 (GAME_DESIGN 3.3) */
   CLIMB_SPEED: 150,
@@ -108,9 +110,8 @@ export const COMBAT = {
   // 스킬 전용 아트(8프레임)가 들어오면 그 시트 기준으로 다시 잡아야 한다.
   SKILL_HIT_AT_MS: 205,
   /** 언월난무 좌·우 베기 2회의 타격 시점 */
-  GLAIVE_SLASH_1_HIT_AT_MS: 140,
-  GLAIVE_SLASH_2_HIT_AT_MS: 340,
-  GLAIVE_HIT_AT_MS: 830,
+  GLAIVE_SLASH_1_HIT_AT_MS: 180,
+  GLAIVE_HIT_AT_MS: 720,
   DECISIVE_HIT_AT_MS: 680,
   DRAGON_HIT_AT_MS: 720,
   SKILL_HITSTOP_MS: 70,

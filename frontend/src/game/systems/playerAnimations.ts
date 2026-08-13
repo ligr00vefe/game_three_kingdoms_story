@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { getCharacterModel } from '../../data/characterModels'
 
 /**
  * 플레이어(관우) 애니메이션 정의 + 티어별 스프라이트시트 연결.
@@ -105,7 +106,14 @@ export function titleForLevel(level: number): string {
 }
 
 /** animId = "walk_r" 같은 방향 포함 식별자 (climb만 방향 없음) */
-export const textureKey = (tier: number, animId: string) => `guanwu_t${tier}_${animId}`
+export const textureKey = (modelCode: string, animId: string) => {
+  const model = getCharacterModel(modelCode)
+  const separator = animId.lastIndexOf('_')
+  const action = separator < 0 ? animId : animId.slice(0, separator)
+  const direction = separator < 0 ? '' : animId.slice(separator)
+  const assetAction = model.assetAction?.[action as AnimAction] ?? action
+  return `${model.assetPrefix}_${assetAction}${direction}`
+}
 
 /** 액션 → 이 액션이 가질 수 있는 animId 목록 (climb는 뒷모습 단일, 나머지는 좌/우) */
 function variantsOf(action: AnimAction): string[] {
@@ -117,23 +125,26 @@ function variantsOf(action: AnimAction): string[] {
  * 아트가 실제로 로드된(=프레임 수가 충분한 스프라이트시트) animId만 생성하고,
  * 그 집합을 반환한다. 단일 placeholder 텍스처는 프레임이 1개뿐이라 자동 제외된다.
  */
-export function createPlayerAnims(scene: Phaser.Scene, tier: number): Set<string> {
+export function createPlayerAnims(scene: Phaser.Scene, modelCode: string): Set<string> {
+  const model = getCharacterModel(modelCode)
   const available = new Set<string>()
   for (const spec of PLAYER_ANIM_SPECS) {
+    const frameCount = model.animations[spec.action]
+    if (!frameCount) continue
     for (const animId of variantsOf(spec.action)) {
-      const key = textureKey(tier, animId)
+      const key = textureKey(modelCode, animId)
       if (!scene.textures.exists(key)) continue
       // frameTotal은 __BASE 프레임을 포함하므로 실제 프레임 수 = frameTotal - 1
       const realFrames = scene.textures.get(key).frameTotal - 1
-      if (realFrames < spec.frames) continue // 단일 이미지/미완성 시트 방어
+      if (realFrames < frameCount) continue // 단일 이미지/미완성 시트 방어
 
       if (!scene.anims.exists(key)) {
         scene.anims.create({
           key,
           // durations를 준 액션(attack)만 프레임별 완급을 쓰고, 나머지는 균등 frameRate
-          frames: spec.durations
+          frames: spec.durations && frameCount === spec.durations.length
             ? spec.durations.map((duration, i) => ({ key, frame: i, duration }))
-            : scene.anims.generateFrameNumbers(key, { start: 0, end: spec.frames - 1 }),
+            : scene.anims.generateFrameNumbers(key, { start: 0, end: frameCount - 1 }),
           frameRate: spec.frameRate,
           repeat: spec.repeat,
         })
