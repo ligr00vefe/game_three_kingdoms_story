@@ -1,8 +1,8 @@
 """Build game sheets from independently spaced character poses.
 
 Frames are detected from transparent horizontal gaps, never by equal division.
-Every pose uses one fixed scale so Guan Yu remains the same apparent size even
-when a jump or slash has a much larger weapon envelope.
+Every pose uses one fixed scale per character so the apparent body size remains
+stable even when a jump or attack has a much larger weapon envelope.
 """
 
 from pathlib import Path
@@ -19,13 +19,23 @@ SOURCE_SCALE = 0.34
 ACTION_SCALE = {"slash_l": 0.29, "slash_r": 0.29}
 BOTTOM_MARGIN = 8
 
-EXPECTED_FRAMES = {
-    "idle_l": 6, "idle_r": 6,
-    "walk_l": 8, "walk_r": 8,
-    "jump_l": 6, "jump_r": 6,
-    "climb": 6,
-    "attack_l": 6, "attack_r": 6,
-    "slash_l": 6, "slash_r": 6,
+CHARACTERS = {
+    "guanwu_t2": {
+        "frames": {
+            "idle_l": 6, "idle_r": 6, "walk_l": 8, "walk_r": 8,
+            "jump_l": 6, "jump_r": 6, "climb": 6,
+            "attack_l": 6, "attack_r": 6, "slash_l": 6, "slash_r": 6,
+        },
+        "scale": SOURCE_SCALE,
+    },
+    "zhaoyun_t2": {
+        "frames": {
+            "idle_l": 6, "idle_r": 6, "walk_l": 8, "walk_r": 8,
+            "jump_l": 8, "jump_r": 8, "climb": 8,
+            "attack_l": 8, "attack_r": 8,
+        },
+        "scale": SOURCE_SCALE,
+    },
 }
 
 
@@ -88,14 +98,14 @@ def normalize(source: Path, destination: Path, expected: int, scale: float) -> N
 
 
 def main() -> None:
-    for action, expected in EXPECTED_FRAMES.items():
-        normalize(
-            SOURCE / f"guanwu_t2_{action}.png",
-            OUTPUT / f"guanwu_t2_{action}.png",
-            expected,
-            ACTION_SCALE.get(action, SOURCE_SCALE),
-        )
-
+    for character, config in CHARACTERS.items():
+        for action, expected in config["frames"].items():
+            normalize(
+                SOURCE / f"{character}_{action}.png",
+                OUTPUT / f"{character}_{action}.png",
+                expected,
+                ACTION_SCALE.get(action, config["scale"]),
+            )
 
 if __name__ == "__main__":
     main()

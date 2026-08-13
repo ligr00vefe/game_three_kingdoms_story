@@ -31,6 +31,12 @@ export const CHARACTER_MODELS: Record<string, CharacterModelDef> = {
     animations: { idle: 6, walk: 8, jump: 6, climb: 6, attack: 6, skill: 6 },
     assetAction: { skill: 'slash' },
   },
+  zhaoyun_t2: {
+    code: 'zhaoyun_t2', assetPrefix: 'zhaoyun_t2', fallbackTexture: 'guanwu_idle', frameSize: 192, groundLift: -10, visualScale: 1.15,
+    animations: { idle: 6, walk: 8, jump: 8, climb: 8, attack: 8, skill: 8 },
+    // Zhao Yun shares Guan Yu's skills for now, using his own attack motion.
+    assetAction: { skill: 'attack' },
+  },
 }
 
 export function getCharacterModel(modelCode: string): CharacterModelDef {

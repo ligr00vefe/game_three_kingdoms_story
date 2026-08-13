@@ -1,46 +1,40 @@
-/**
- * 대기실(캐릭터 선택) 캐릭터 정의.
- * 지금은 관우만 선택 가능 — 장비/조운/하후돈 등은 슬롯만 예약 (comingSoon).
- * 능력치는 gameStore/config.PROGRESSION 초기값과 일치해야 한다.
- */
+/** Save-slot character data. Visual models are selected independently by modelCode. */
 export interface CharacterDef {
   code: string
-  /** Visual model is independent from this save-slot character code. */
   modelCode: string
   name: string
-  /** 병과 표기 (메이플의 직업명 위치) */
   clazz: string
   desc: string
   stats: { hp: number; mp: number; attack: number; speedPct: number }
   skill: { name: string; desc: string }
 }
 
+const SHARED_STATS = { hp: 100, mp: 50, attack: 10, speedPct: 100 }
+const GUANWU_SKILL = {
+  name: '참마대격',
+  desc: '전방 돌진 베기 후 무쌍난무(Lv2)로 이어지는 첫 무장 스킬.',
+}
+
 export const CHARACTERS: Record<string, CharacterDef> = {
   guanwu: {
-    code: 'guanwu',
-    modelCode: 'guanwu_t2',
-    name: '관우',
-    clazz: '언월도 무장',
-    desc: '무명소졸에서 시작해 무신(武神)에 이르는 촉나라의 맹장. 직책이 오를 때마다 외형과 스킬이 성장한다.',
-    stats: { hp: 100, mp: 50, attack: 10, speedPct: 100 },
-    skill: { name: '참마돌격', desc: '전방 돌진 베기 — 무명소졸(Lv2)에 해금되는 첫 스킬. 이후 언월난무·일격필살·청룡참·뇌신강림이 직책을 따라 순차 해금.' },
+    code: 'guanwu', modelCode: 'guanwu_t2', name: '관우', clazz: '촉한의 용장',
+    desc: '청룡언월도를 휘두르는 촉한의 명장입니다.',
+    stats: SHARED_STATS, skill: GUANWU_SKILL,
+  },
+  zhaoyun: {
+    code: 'zhaoyun', modelCode: 'zhaoyun_t2', name: '조운', clazz: '촉한의 창장',
+    desc: '날렵한 창술로 전장을 누비는 촉한의 명장입니다.',
+    stats: SHARED_STATS,
+    // Character-specific skills can replace this later without changing selection code.
+    skill: GUANWU_SKILL,
   },
 }
 
-/**
- * 대기실 슬롯 정의.
- * - name: 좌석 이름표에 쓴다 (CHARACTERS에 정식 데이터가 없어도 이름은 표시).
- * - locked: 아직 플레이 불가한 예고 캐릭터(무채색·선택/게임시작 불가). 관우만 선택 가능.
- */
 export type LobbySlot = { type: 'char'; code: string; name: string; locked?: boolean } | null
 
-/**
- * 대기실 슬롯 배열: 슬롯 | null(빈 자리 — 추후 캐릭터가 들어갈 자리).
- * 순서는 군막사 배경의 의자 4개와 1:1로 대응한다 (CharacterSelect의 SEATS와 같은 순서).
- */
 export const LOBBY_SLOTS: LobbySlot[] = [
-  { type: 'char', code: 'guanwu', name: '관우' },              // 안쪽 왼쪽 의자
-  { type: 'char', code: 'zhaoyun', name: '조운', locked: true }, // 앞쪽 왼쪽 의자
-  { type: 'char', code: 'lubu', name: '여포', locked: true },    // 안쪽 오른쪽 의자
-  null,                                                          // 앞쪽 오른쪽 의자
+  { type: 'char', code: 'guanwu', name: '관우' },
+  { type: 'char', code: 'zhaoyun', name: '조운' },
+  { type: 'char', code: 'lubu', name: '여포', locked: true },
+  null,
 ]

@@ -57,7 +57,7 @@ public class GameStateService {
 	public GameStateResponse loadState(Long accountId, String characterCode) {
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
 			.orElseGet(() -> {
-				GameCharacter created = new GameCharacter("관우");
+				GameCharacter created = new GameCharacter(characterNameFor(characterCode));
 				created.setAccountId(accountId);
 				created.setCharacterCode(characterCode);
 				return characterRepository.save(created);
@@ -92,7 +92,7 @@ public class GameStateService {
 	public void saveState(Long accountId, String characterCode, SaveStateRequest request) {
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
 			.orElseGet(() -> {
-				GameCharacter created = new GameCharacter("관우");
+				GameCharacter created = new GameCharacter(characterNameFor(characterCode));
 				created.setAccountId(accountId);
 				created.setCharacterCode(characterCode);
 				return characterRepository.save(created);
@@ -139,5 +139,13 @@ public class GameStateService {
 			c.getMaxHp(), c.getHp(), c.getMaxMp(), c.getMp(),
 			c.getAttackPower(), c.getGold(), c.getStageCode(), c.getDefenseStage(),
 			c.getPositionX(), c.getPositionY());
+	}
+
+	private String characterNameFor(String characterCode) {
+		return switch (characterCode) {
+			case "zhaoyun" -> "조운";
+			case "lubu" -> "여포";
+			default -> "관우";
+		};
 	}
 }

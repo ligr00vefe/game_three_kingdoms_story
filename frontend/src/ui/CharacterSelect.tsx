@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { CHARACTERS, LOBBY_SLOTS } from '../data/characters'
 import { useScreenStore } from '../stores/screenStore'
 import { useGameStore } from '../stores/gameStore'
+import { useQuickslotStore } from '../stores/quickslotStore'
+import { loadGameState } from '../api/game'
 
 /**
  * 두루마리가 말리거나 펴지는 데 걸리는 시간(ms).
@@ -66,6 +68,7 @@ export function CharacterSelect() {
   /** 두루마리에 실제로 그려진 캐릭터 — selected와 갈라져 있어야 "다 말린 뒤 교체"가 가능하다 */
   const [shown, setShown] = useState<string | null>('guanwu')
   const [open, setOpen] = useState(false)
+  const [starting, setStarting] = useState(false)
   const char = shown ? CHARACTERS[shown] : null
   const game = useGameStore()
 
@@ -99,10 +102,25 @@ export function CharacterSelect() {
     return () => clearTimeout(t) // 말리는 중에 또 바꾸면 이전 예약을 버리고 다시 센다
   }, [selected, shown])
 
-  const startGame = () => {
-    if (!selected) return
+  const startGame = async () => {
+    if (!selected || starting) return
+    setStarting(true)
+
+    // Stop autosave before changing the code, otherwise the previous character's
+    // state/quickslots can be written into the newly selected save slot.
+    useGameStore.getState().setServerStatus('checking')
     useScreenStore.getState().selectCharacter(selected)
-    useScreenStore.getState().setScreen('loading')
+    useGameStore.getState().setStats({ characterName: CHARACTERS[selected].name })
+    useQuickslotStore.getState().hydrate([])
+
+    try {
+      await loadGameState()
+      useGameStore.getState().setServerStatus('ok')
+      useScreenStore.getState().setScreen('loading')
+    } catch {
+      useGameStore.getState().setServerStatus('down')
+      setStarting(false)
+    }
   }
 
   return (
@@ -157,7 +175,7 @@ export function CharacterSelect() {
       {/* 상단 서버/타이틀 장식 */}
       <div className="lobby-top">
         <span className="lobby-server">삼국 서버 · CH. 1</span>
-        <span className="lobby-slots-info">캐릭터 슬롯 1 / {LOBBY_SLOTS.length}</span>
+        <span className="lobby-slots-info">캐릭터 슬롯 {LOBBY_SLOTS.filter((slot) => slot?.type === 'char' && !slot.locked).length} / {LOBBY_SLOTS.length}</span>
       </div>
       <h1 className="lobby-title">캐릭터 선택</h1>
 
@@ -171,11 +189,9 @@ export function CharacterSelect() {
             <div className="scroll-viewport" style={{ height: open ? contentH : 0 }}>
               <div className="scroll-content" ref={contentRef}>
                 <div className="lobby-card-lv">Lv. <b>{game.level}</b></div>
-                <div className="lobby-card-name">{game.characterName || char.name}</div>
-                <div className="lobby-card-class">⚔ 촉한의 용장</div>
-                <p className="lobby-card-desc">
-                  관우는 유비를 섬긴 촉한의 명장으로, 의리와 충절의 상징으로 널리 알려져 있습니다.
-                </p>
+                <div className="lobby-card-name">{char.name}</div>
+                <div className="lobby-card-class">⚔ {char.clazz}</div>
+                <p className="lobby-card-desc">{char.desc}</p>
                 <div className="lobby-card-stats">
                   <div className="lobby-stat"><span>HP</span><b>{game.maxHp}</b></div>
                   <div className="lobby-stat"><span>MP</span><b>{game.maxMp}</b></div>
@@ -186,7 +202,9 @@ export function CharacterSelect() {
             </div>
             <span className="scroll-rod scroll-rod--bottom" />
           </div>
-          <button className="lobby-start" onClick={startGame}>게임 시작</button>
+          <button className="lobby-start" onClick={() => void startGame()} disabled={starting}>
+            {starting ? '불러오는 중…' : '게임 시작'}
+          </button>
         </aside>
       )}
     </div>
