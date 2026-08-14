@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { useInventoryStore } from './inventoryStore'
 import { useGameStore } from './gameStore'
+import { CHARACTERS } from '../data/characters'
+import { useScreenStore } from './screenStore'
 
 /**
  * 장비창 (메이플 EQUIPMENT INVENTORY).
@@ -54,7 +56,9 @@ interface EquipmentState {
 /** 장착 장비 효과 재계산 (이속 등 — GAME_DESIGN 8.3) */
 function recomputeEffects(equipped: Record<EquipSlotId, string | null>) {
   const defs = useInventoryStore.getState().defs
-  let moveSpeedMult = 1
+  const characterCode = useScreenStore.getState().selectedCharacter
+  const baseSpeed = (CHARACTERS[characterCode]?.stats.speedPct ?? 100) / 100
+  let moveSpeedMult = baseSpeed
   for (const code of Object.values(equipped)) {
     if (!code) continue
     const pct = defs[code]?.effect?.moveSpeedPct

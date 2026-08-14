@@ -798,12 +798,13 @@ export class GameScene extends Phaser.Scene {
       y: Phaser.Math.Clamp(safeSpawnY, 24, map.groundY - PLAYER.BODY_HEIGHT - 1),
     }
     this.effects = new EffectManager(this)
-      const character = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
-      this.player = new Player(this, spawn.x, spawn.y, character.modelCode)
+    const character = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
+    this.player = new Player(this, spawn.x, spawn.y, character.modelCode)
     useGameStore.getState().setStats({
       stageCode: this.mapKey,
       playerX: Math.round(spawn.x),
       playerY: Math.round(spawn.y),
+      attackPower: character.stats.attack,
     })
     EventBus.emit(GameEvents.MAP_CHANGED)
     // Keep the playable character in front of defense structures and scenery.
@@ -850,8 +851,47 @@ export class GameScene extends Phaser.Scene {
     // 점프 대시는 대쉬 먼지 하나만, 이단 점프는 상승 기류 하나만 재생해 서로 겹치지 않게 한다.
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
+    const isZhaoYun = useScreenStore.getState().selectedCharacter === 'zhaoyun'
     this.player.onSkillStart = (facing, skillCode) => {
+      if (skillCode === 'skill_charge_slash') {
+        if (isZhaoYun) {
+          this.effects.skillHorseCharge(this.player.x, this.player.y, facing)
+          this.player.startChargeMotion()
+        } else {
+          this.effects.skillCharge(this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET, this.player.y + 22, facing)
+        }
+        return
+      }
       if (skillCode === 'skill_glaive_flurry') {
+        if (!isZhaoYun) {
+          const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.glaiveY
+          this.glaiveImpactY = castGroundY
+          this.effects.skillGlaive(this.player.x + SKILL_EFFECT_OFFSET.glaiveX, facing, castGroundY,
+            () => this.player.startGlaiveMotion(),
+            () => this.player.body.blocked.down || this.player.body.touching.down,
+            SKILL_EFFECT_OFFSET.glaiveImpactY)
+          return
+        }
+        this.dragonSlashImpactX = this.player.x + facing * 72
+        this.dragonSlashImpactY = this.player.y + 20
+        this.effects.zhaoDragonSlash(this.dragonSlashImpactX, this.dragonSlashImpactY, facing)
+        return
+      }
+      if (skillCode === 'skill_decisive_strike') {
+        if (isZhaoYun) this.effects.spearFlurryZhao(this.player.x, this.player.y + 8, facing)
+        else this.effects.decisiveStrike(this.player.x, this.player.y + 10, facing, () => this.player.releaseDecisiveMotion())
+        return
+      }
+      if (skillCode === 'skill_dragon_slash') {
+        const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.dragonY
+        this.dragonSlashImpactX = this.player.x + facing * 72
+        this.dragonSlashImpactY = castGroundY
+        if (isZhaoYun) this.effects.flowerAttackOnly(this.player.x, castGroundY, facing)
+        else this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
+        this.player.startDragonSlashMotion()
+        return
+      }
+      if (skillCode === 'skill_glaive_flurry_legacy') {
         // Capture the surface under the player's feet before the skill jump.
         // map.groundY would place the impact in mid-air when cast on a platform.
         const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.glaiveY
@@ -869,37 +909,19 @@ export class GameScene extends Phaser.Scene {
         )
         return
       }
-      if (skillCode === 'skill_decisive_strike') {
-        this.effects.decisiveStrike(
-          this.player.x,
-          this.player.y + 10,
-          facing,
-          () => this.player.releaseDecisiveMotion(),
-        )
-        return
-      }
-      if (skillCode === 'skill_dragon_slash') {
-        const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.dragonY
-        this.dragonSlashImpactX = this.player.x + facing * 72
-        this.dragonSlashImpactY = castGroundY
-        this.player.startDragonSlashMotion()
-        // Capture the cast position once. The airborne player no longer drags
-        // the effect after it has appeared.
-        this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
-      }
       if (skillCode === 'skill_lightning_descent') {
         const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
-        this.effects.lightningDescent(this.player.x, castGroundY)
+        if (isZhaoYun) this.effects.tigerTears(this.player.x, castGroundY, facing)
+        else this.effects.lightningDescent(this.player.x, castGroundY)
       }
     }
-    this.player.onSkill = (hitbox, facing, skillCode, _hitIndex) => {
+    this.player.onSkill = (hitbox, _facing, skillCode, _hitIndex) => {
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
       const isGlaiveSlash = false
-      const isDecisiveStrike = skillCode === 'skill_decisive_strike'
       const isDragonSlash = skillCode === 'skill_dragon_slash'
-      const isLightningDescent = skillCode === 'skill_lightning_descent'
-      const attackArea = isDragonSlash
+      const isDragonFang = isZhaoYun && isGlaiveFlurry
+      const attackArea = isDragonSlash || isDragonFang
         ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.dragonSlashImpactY - 42, 125)
         : isGlaiveSlash
         // 좌·우 베기는 시전 중 현재 플레이어 전방에서 각각 판정한다.
@@ -909,13 +931,7 @@ export class GameScene extends Phaser.Scene {
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
         ? new Phaser.Geom.Circle(this.player.x, this.glaiveImpactY - 42, 150)
         : hitbox
-      if (!isGlaiveFlurry && !isDecisiveStrike && !isDragonSlash && !isLightningDescent) {
-        this.effects.skillCharge(
-          this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET,
-          this.player.y + 22,
-          facing,
-        )
-      }
+      // 각 스킬의 전용 이펙트는 onSkillStart에서 한 번만 시작한다.
       const damageMultiplier = isGlaiveFlurry ? COMBAT.GLAIVE_SLAM_DAMAGE_MULTIPLIER : 1
       this.resolveAttack(
         attackArea,

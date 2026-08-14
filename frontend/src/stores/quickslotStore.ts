@@ -18,6 +18,8 @@ export interface QSEntry {
 export const QUICKSLOT_COUNT = 7
 
 interface QuickslotState {
+  characterCode: string
+  savedSlots: Record<string, (QSEntry | null)[]>
   slots: (QSEntry | null)[]
   /** 마우스에 붙어 있는(교체로 밀려난) 항목 */
   held: QSEntry | null
@@ -28,6 +30,7 @@ interface QuickslotState {
   discardHeld: () => void
   clearSlot: (index: number) => void
   hydrate: (slots: (QSEntry | null)[]) => void
+  switchCharacter: (characterCode: string) => void
   /** 슬롯 간 이동(드래그) — 대상이 점유면 서로 교체 */
   moveSlot: (from: number, to: number) => void
   /** 숫자키/클릭 발동: 아이템 사용 또는 스킬 시전 */
@@ -37,6 +40,8 @@ interface QuickslotState {
 export const useQuickslotStore = create<QuickslotState>()(
   persist(
     (set, get) => ({
+      characterCode: 'guanwu',
+      savedSlots: {},
       slots: Array(QUICKSLOT_COUNT).fill(null),
       held: null,
 
@@ -44,7 +49,9 @@ export const useQuickslotStore = create<QuickslotState>()(
         const slots = get().slots.slice()
         const prev = slots[index]
         slots[index] = entry
-        set({ slots, held: prev ?? get().held })
+        const state = get()
+        set({ slots, held: prev ?? state.held, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
+        EventBus.emit(GameEvents.MAP_CHANGED)
       },
 
       placeHeld: (index) => {
@@ -53,7 +60,9 @@ export const useQuickslotStore = create<QuickslotState>()(
         const slots = get().slots.slice()
         const prev = slots[index]
         slots[index] = held
-        set({ slots, held: prev ?? null }) // 점유 칸이면 교체 — 기존 항목이 다시 held로
+        const state = get()
+        set({ slots, held: prev ?? null, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
+        EventBus.emit(GameEvents.MAP_CHANGED)
       },
 
       discardHeld: () => set({ held: null }),
@@ -61,13 +70,22 @@ export const useQuickslotStore = create<QuickslotState>()(
       clearSlot: (index) => {
         const slots = get().slots.slice()
         slots[index] = null
-        set({ slots })
+        const state = get()
+        set({ slots, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
+        EventBus.emit(GameEvents.MAP_CHANGED)
       },
 
-      hydrate: (saved) => set({
-        slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null),
-        held: null,
-      }),
+      hydrate: (saved) => {
+        const slots = Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null)
+        const state = get()
+        set({ slots, held: null, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
+      },
+
+      switchCharacter: (characterCode) => {
+        const state = get()
+        const slots = state.savedSlots[characterCode] ?? Array(QUICKSLOT_COUNT).fill(null)
+        set({ characterCode, slots: slots.slice(), held: null })
+      },
 
       moveSlot: (from, to) => {
         if (from === to) return
@@ -75,7 +93,9 @@ export const useQuickslotStore = create<QuickslotState>()(
         const tmp = slots[to]
         slots[to] = slots[from]
         slots[from] = tmp // 대상 점유 시 교체
-        set({ slots })
+        const state = get()
+        set({ slots, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
+        EventBus.emit(GameEvents.MAP_CHANGED)
       },
 
       trigger: (index) => {
@@ -89,11 +109,17 @@ export const useQuickslotStore = create<QuickslotState>()(
       },
     }),
     {
-      name: 'tks-quickslots-v1',
-      partialize: (s) => ({ slots: s.slots }), // held는 저장하지 않음
+      name: 'tks-quickslots-v2',
+      partialize: (s) => ({ characterCode: s.characterCode, savedSlots: s.savedSlots }),
       merge: (persisted, current) => {
-        const saved = (persisted as Partial<QuickslotState> | undefined)?.slots ?? []
-        return { ...current, slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null) }
+        const saved = (persisted as Partial<QuickslotState> | undefined)?.savedSlots ?? {}
+        const characterCode = (persisted as Partial<QuickslotState> | undefined)?.characterCode ?? 'guanwu'
+        return {
+          ...current,
+          characterCode,
+          savedSlots: saved,
+          slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[characterCode]?.[i] ?? null),
+        }
       },
     },
   ),

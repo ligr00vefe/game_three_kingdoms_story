@@ -92,6 +92,20 @@ export class PreloadScene extends Phaser.Scene {
       width: index === 7 ? 125 : 125,
       height: 250,
     })))
+    registerFrames('fx_skill_zhao_flower', Array.from({ length: 9 }, (_, index) => ({
+      x: 0, y: index === 8 ? 312 : index * 39, width: 707, height: index === 8 ? 41 : 39,
+    })))
+    // 비호관천은 컷마다 투명 여백과 실제 호랑이 크기가 다르다. 실제 alpha 영역만
+    // 프레임으로 등록해 고정 셀에 의해 머리/상체가 잘리지 않도록 한다.
+    const tigerBounds = [
+      [12, 96, 86, 108], [7, 67, 88, 137], [0, 44, 102, 135],
+      [0, 16, 102, 162], [0, 16, 102, 163], [0, 7, 99, 172],
+      [3, 0, 99, 169], [0, 0, 102, 169], [0, 1, 97, 168],
+      [4, 13, 91, 156], [4, 16, 82, 153], [4, 105, 80, 63],
+    ] as const
+    registerFrames('fx_skill_zhao_tiger', tigerBounds.map(([x, y, width, height], index) => ({
+      x: (index % 6) * 102 + x, y: (index < 6 ? 0 : 204) + y, width, height,
+    })))
     // 3162x627 shield-zombie death strip: preserve each pose's full logical
     // canvas so the widening fall is not cropped or stretched between frames.
     registerFrames('shield_zombie_death', [

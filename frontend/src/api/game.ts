@@ -48,7 +48,7 @@ export async function loadGameState(): Promise<void> {
     characterName: CHARACTERS[characterCode]?.name ?? c.name,
     level: c.level, exp: c.exp,
     maxHp: c.maxHp, hp: c.hp, maxMp: c.maxMp, mp: c.mp,
-    attackPower: c.attackPower, gold: c.gold,
+    attackPower: CHARACTERS[characterCode]?.stats.attack ?? c.attackPower, gold: c.gold,
     stageCode: c.stageCode, defenseStage: c.defenseStage,
     playerX: c.positionX, playerY: c.positionY,
   })

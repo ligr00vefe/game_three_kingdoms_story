@@ -5,17 +5,11 @@ import type { QSEntry } from '../stores/quickslotStore'
 import { useInventoryStore } from '../stores/inventoryStore'
 import { useUiStore } from '../stores/uiStore'
 import { EventBus, GameEvents } from '../game/EventBus'
+import { getSkillsForCharacter } from '../stores/skillStore'
+import { useScreenStore } from '../stores/screenStore'
 
 const QUICKSLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'] as const
 const QUICKSLOT_LABELS = ['1', '2', '3', '4', '5', '6', '7'] as const
-
-const SKILL_INFO: Record<string, { name: string; icon: string }> = {
-  skill_charge_slash: { name: '참마돌격', icon: '⚔️' },
-  skill_glaive_flurry: { name: '언월난무', icon: '🌙' },
-  skill_decisive_strike: { name: '일격필살', icon: '💀' },
-  skill_dragon_slash: { name: '청룡참', icon: '🐉' },
-  skill_lightning_descent: { name: '뇌신강림', icon: '🌩️' },
-}
 
 type SkillStatus = { cooldownLeftMs: number; cooldownMs: number; mp: number; mpCost: number; available: boolean }
 
@@ -34,6 +28,7 @@ export function ActionBar() {
   const [flash, setFlash] = useState<number | null>(null)
   const heldRef = useRef<HTMLDivElement>(null)
   const [skillStatuses, setSkillStatuses] = useState<Record<string, SkillStatus>>({})
+  const selectedCharacter = useScreenStore((s) => s.selectedCharacter)
 
   useEffect(() => {
     const onSkillStatus = (status: { skills?: Record<string, SkillStatus> }) => setSkillStatuses(status.skills ?? {})
@@ -83,12 +78,12 @@ export function ActionBar() {
 
   const entryView = (entry: QSEntry) => {
     if (entry.kind === 'skill') {
-      const info = SKILL_INFO[entry.code]
-      return { label: info?.name ?? entry.code, icon: info?.icon ?? '✦', color: '#66bb6a', count: null as number | null }
+      const info = getSkillsForCharacter(selectedCharacter).find((skill) => skill.code === entry.code)
+      return { label: info?.name ?? entry.code, icon: info?.icon ?? '✦', iconImage: info?.iconImage, rotated: selectedCharacter === 'zhaoyun' && entry.code === 'skill_decisive_strike', color: '#66bb6a', count: null as number | null }
     }
     const def = defs[entry.code]
     const count = invSlots.reduce((n, s) => (s?.code === entry.code ? n + s.quantity : n), 0)
-    return { label: def?.name ?? entry.code, icon: def?.name.charAt(0) ?? '?', color: '#ef5350', count }
+    return { label: def?.name ?? entry.code, icon: def?.name.charAt(0) ?? '?', iconImage: undefined, rotated: false, color: '#ef5350', count }
   }
 
   const onDrop = (e: React.DragEvent, index: number) => {
@@ -141,8 +136,8 @@ export function ActionBar() {
             >
               <span className="aqs-num">{QUICKSLOT_LABELS[i]}</span>
               {v && (
-                <span className="aqs-icon" style={{ background: v.color }}>
-                  {v.icon.startsWith('/') ? <img src={v.icon} alt="" /> : v.icon}
+                <span className={`aqs-icon ${v.rotated ? 'aqs-icon--rotated-spear' : ''}`} style={{ background: v.color }}>
+                  {v.iconImage ? <img src={v.iconImage} alt="" /> : v.icon.startsWith('/') ? <img src={v.icon} alt="" /> : v.icon}
                   {v.count !== null && <em className="aqs-count">{v.count}</em>}
                   {entry?.kind === 'skill' && skillBlocked && (
                     <span
@@ -162,7 +157,9 @@ export function ActionBar() {
           받지 않도록 body에 직접 포탈링 (그 안에 있으면 fixed 좌표 기준이 뒤틀림) */}
       {held && createPortal(
         <div ref={heldRef} className="aqs-held">
-          <span className="aqs-icon" style={{ background: entryView(held).color }}>{entryView(held).icon}</span>
+          <span className={`aqs-icon ${entryView(held).rotated ? 'aqs-icon--rotated-spear' : ''}`} style={{ background: entryView(held).color }}>
+            {entryView(held).iconImage ? <img src={entryView(held).iconImage} alt="" /> : entryView(held).icon}
+          </span>
         </div>,
         document.body,
       )}

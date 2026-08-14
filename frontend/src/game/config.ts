@@ -73,6 +73,8 @@ export const COMBAT = {
   COMBO_DASH_MS: 150,           // 전진 유지 시간 — 이후 그 자리에 멈춰 마무리
   DECISIVE_DASH_VX: 520,        // 일격필살: 깊게 찌르기보다 빠른 전방 돌진
   DECISIVE_DASH_MS: 220,        // 약 114px 전진해 찌르기 관통감을 강화
+  CHARGE_DASH_VX: 360,
+  CHARGE_DASH_MS: 320,
   /** 3단계(깊게 찌르기) 타격 리치. 기존 115px의 2/3 수준으로 축소했다. */
   COMBO_DASH_REACH: 77,
 

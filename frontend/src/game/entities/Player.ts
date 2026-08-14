@@ -666,6 +666,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.body.blocked.down) this.setVelocityY(-390)
   }
 
+  startChargeMotion() {
+    if (this.body.blocked.down || this.body.touching.down) {
+      this.dashLungeUntil = this.scene.time.now + COMBAT.CHARGE_DASH_MS
+      this.setVelocityX(this.facing * COMBAT.CHARGE_DASH_VX)
+    }
+  }
+
   /** 조준 단계가 끝난 프레임부터 일격필살의 찌르기 모션을 처음부터 재생한다. */
   releaseDecisiveMotion() {
     if (this.state_ !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike') return

@@ -14,9 +14,15 @@ export class EffectManager {
   private attackPool: Phaser.GameObjects.Group
   private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
+  private zhaoChargePool: Phaser.GameObjects.Group
+  private spearPool: Phaser.GameObjects.Group
+  private flowerPool: Phaser.GameObjects.Group
+  private flowerAttackPool: Phaser.GameObjects.Group
+  private tigerPool: Phaser.GameObjects.Group
   private glaivePool: Phaser.GameObjects.Group
   private decisivePool: Phaser.GameObjects.Group
   private dragonPool: Phaser.GameObjects.Group
+  private zhaoDragonPool: Phaser.GameObjects.Group
   private lightningPool: Phaser.GameObjects.Group
   private lightningSmallPool: Phaser.GameObjects.Group
   private sparkPool: Phaser.GameObjects.Group
@@ -31,9 +37,15 @@ export class EffectManager {
     this.attackPool = scene.add.group({ defaultKey: 'fx_attack', maxSize: 12 })
     this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
+    this.zhaoChargePool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_charge', maxSize: 2 })
+    this.spearPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_spear', maxSize: 8 })
+    this.flowerPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower', maxSize: 2 })
+    this.flowerAttackPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower_attack', maxSize: 2 })
+    this.tigerPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_tiger', maxSize: 2 })
     this.glaivePool = scene.add.group({ defaultKey: 'fx_skill_glaive', maxSize: 4 })
     this.decisivePool = scene.add.group({ defaultKey: 'fx_decisive_strike', maxSize: 3 })
     this.dragonPool = scene.add.group({ defaultKey: 'fx_skill_dragon', maxSize: 2 })
+    this.zhaoDragonPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_dragon', maxSize: 2 })
     this.lightningPool = scene.add.group({ defaultKey: 'fx_skill_lightning', maxSize: 14 })
     this.lightningSmallPool = scene.add.group({ defaultKey: 'fx_skill_lightning_small', maxSize: 6 })
     this.sparkPool = scene.add.group({ defaultKey: 'fx_hit_spark', maxSize: 20 })
@@ -63,6 +75,8 @@ export class EffectManager {
     this.defineGlaiveFrames()
     this.defineDecisiveFrames()
     this.defineDragonFrames()
+    this.defineZhaoYunFrames()
+    this.defineZhaoDragonFrames()
     this.defineLightningFrames()
   }
 
@@ -111,6 +125,32 @@ export class EffectManager {
       key: 'fx_skill_dragon_slam',
       frames: Array.from({ length: 10 }, (_, frame) => ({ key: 'fx_skill_dragon', frame })),
       frameRate: 12,
+      repeat: 0,
+    })
+  }
+
+  private defineZhaoYunFrames() {
+    const definitions = [
+      ['fx_skill_horse_charge_anim', 'fx_skill_zhao_charge', 7, 18],
+      ['fx_skill_spear_flurry_anim', 'fx_skill_zhao_spear', 10, 42],
+      ['fx_skill_flower_anim', 'fx_skill_zhao_flower', 9, 10],
+      ['fx_skill_flower_attack_anim', 'fx_skill_zhao_flower_attack', 3, 12],
+      ['fx_skill_tiger_anim', 'fx_skill_zhao_tiger', 12, 10],
+    ] as const
+    for (const [key, texture, length, frameRate] of definitions) {
+      if (!this.scene.textures.exists(texture)) continue
+      if (this.scene.anims.exists(key)) this.scene.anims.remove(key)
+      this.scene.anims.create({ key, frames: Array.from({ length }, (_, frame) => ({ key: texture, frame })), frameRate, repeat: 0 })
+    }
+  }
+
+  private defineZhaoDragonFrames() {
+    if (!this.scene.textures.exists('fx_skill_zhao_dragon')) return
+    if (this.scene.anims.exists('fx_skill_zhao_dragon_anim')) this.scene.anims.remove('fx_skill_zhao_dragon_anim')
+    this.scene.anims.create({
+      key: 'fx_skill_zhao_dragon_anim',
+      frames: Array.from({ length: 8 }, (_, frame) => ({ key: 'fx_skill_zhao_dragon', frame })),
+      frameRate: 14,
       repeat: 0,
     })
   }
@@ -430,6 +470,95 @@ export class EffectManager {
     })
   }
 
+  skillHorseCharge(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.zhaoChargePool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_horse_charge_anim')) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(0.98).setScale(1.2).setDepth(EffectManager.COMBAT_FX_DEPTH)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_horse_charge_anim')
+  }
+
+  spearFlurry(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.spearPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_spear_flurry_anim')) return
+    let thrust = 0
+    const playNext = () => {
+      if (!sprite.active) return
+      sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      sprite.setActive(true).setVisible(true).setPosition(
+        x + facing * 72,
+        y + Phaser.Math.Between(-10, 10),
+      ).setOrigin(0.5, 0.5).setFlipX(facing === -1).setAlpha(1)
+        .setDisplaySize(190, 64).setDepth(EffectManager.COMBAT_FX_DEPTH)
+      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+        thrust += 1
+        if (thrust < 7) this.scene.time.delayedCall(32, playNext)
+        else sprite.setActive(false).setVisible(false)
+      })
+      sprite.play('fx_skill_spear_flurry_anim')
+    }
+    playNext()
+  }
+
+  flowerBloom(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.flowerPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_flower_anim')) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x, y - 88).setOrigin(0.5, 0.5)
+      .setAlpha(0.92).setDisplaySize(920, 74).setDepth(EffectManager.COMBAT_FX_DEPTH - 1)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_flower_anim')
+
+    // 꽃잎 배경이 먼저 퍼진 뒤 공격 궤적이 전경을 가르도록 짧게 시차를 둔다.
+    this.scene.time.delayedCall(220, () => {
+      const attack = this.flowerAttackPool.get(x, y) as Phaser.GameObjects.Sprite | null
+      if (!attack || !this.scene.anims.exists('fx_skill_flower_attack_anim')) return
+      attack.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      attack.setActive(true).setVisible(true).setPosition(x + facing * 72, y - 82).setOrigin(0.5, 0.5)
+        .setFlipX(facing === -1).setAlpha(1).setDisplaySize(520, 210).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+      attack.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => attack.setActive(false).setVisible(false))
+      attack.play('fx_skill_flower_attack_anim')
+    })
+  }
+
+  spearFlurryZhao(x: number, y: number, facing: -1 | 1) {
+    if (!this.scene.anims.exists('fx_skill_spear_flurry_anim')) return
+    const verticalOffsets = Phaser.Utils.Array.Shuffle([-92, -62, -30, 4, 38, 72, 106])
+    verticalOffsets.forEach((offset, index) => this.scene.time.delayedCall(index * 42, () => {
+      const sprite = this.spearPool.get(x, y) as Phaser.GameObjects.Sprite | null
+      if (!sprite) return
+      sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      sprite.setActive(true).setVisible(true).setPosition(
+        x + facing * 72, y + offset,
+      ).setOrigin(facing === 1 ? 0.08 : 0.92, 0.5).setFlipX(facing === -1).setAlpha(1)
+        .setDisplaySize(120, 72).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+      sprite.play('fx_skill_spear_flurry_anim')
+    }))
+  }
+
+  flowerAttackOnly(x: number, y: number, facing: -1 | 1) {
+    const attack = this.flowerAttackPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!attack || !this.scene.anims.exists('fx_skill_flower_attack_anim')) return
+    attack.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    attack.setActive(true).setVisible(true).setPosition(x + facing * 72, y - 82).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(1).setDisplaySize(520, 210).setDepth(EffectManager.COMBAT_FX_DEPTH)
+    attack.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => attack.setActive(false).setVisible(false))
+    attack.play('fx_skill_flower_attack_anim')
+  }
+
+  tigerTears(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.tigerPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_tiger_anim')) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 48, y + 4).setOrigin(0.5, 1)
+      .setFlipX(facing === -1).setAlpha(1).setScale(2.2).setDepth(EffectManager.COMBAT_FX_DEPTH)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_tiger_anim')
+  }
+
   skillGlaive(
     x: number,
     facing: -1 | 1,
@@ -539,13 +668,25 @@ export class EffectManager {
     sprite.play('fx_skill_dragon_slam')
   }
 
+  zhaoDragonSlash(x: number, groundY: number, facing: -1 | 1) {
+    const sprite = this.zhaoDragonPool.get(x, groundY) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_zhao_dragon_anim')) return
+    this.scene.tweens.killTweensOf(sprite)
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x, groundY).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(0.98).setDisplaySize(470, 760)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_zhao_dragon_anim')
+  }
+
   private defineLightningFrames() {
     if (!this.scene.textures.exists('fx_skill_lightning')) return
     if (this.scene.anims.exists('fx_skill_lightning_anim')) this.scene.anims.remove('fx_skill_lightning_anim')
     this.scene.anims.create({
       key: 'fx_skill_lightning_anim',
       frames: Array.from({ length: 8 }, (_, frame) => ({ key: 'fx_skill_lightning', frame })),
-      frameRate: 40,
+      frameRate: 30,
       repeat: 0,
     })
     if (!this.scene.textures.exists('fx_skill_lightning_small')) return
@@ -553,7 +694,7 @@ export class EffectManager {
     this.scene.anims.create({
       key: 'fx_skill_lightning_small_anim',
       frames: Array.from({ length: 8 }, (_, frame) => ({ key: 'fx_skill_lightning_small', frame })),
-      frameRate: 40,
+      frameRate: 30,
       repeat: 0,
     })
   }
@@ -566,8 +707,8 @@ export class EffectManager {
       // 작은 번개는 양끝이 아니라 중앙의 큰 낙뢰 사이에 배치해
       // 한곳으로 몰아치는 듯한 원근감을 만든다.
       const isSmall = position === 5 || position === 7
-      const jitter = Phaser.Math.Between(0, 14)
-      this.scene.time.delayedCall(index * 27 + jitter + (isSmall ? 14 : 0), () => {
+      const jitter = Phaser.Math.Between(0, 8)
+      this.scene.time.delayedCall(index * 78 + jitter + (isSmall ? 16 : 0), () => {
         const pool = isSmall ? this.lightningSmallPool : this.lightningPool
         const animation = isSmall ? 'fx_skill_lightning_small_anim' : 'fx_skill_lightning_anim'
         const sprite = pool.get(x + offsets[position - 1], groundY) as Phaser.GameObjects.Sprite | null

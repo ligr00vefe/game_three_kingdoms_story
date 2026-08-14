@@ -110,8 +110,12 @@ export function CharacterSelect() {
     // state/quickslots can be written into the newly selected save slot.
     useGameStore.getState().setServerStatus('checking')
     useScreenStore.getState().selectCharacter(selected)
-    useGameStore.getState().setStats({ characterName: CHARACTERS[selected].name })
-    useQuickslotStore.getState().hydrate([])
+    useGameStore.getState().setStats({
+      characterName: CHARACTERS[selected].name,
+      attackPower: CHARACTERS[selected].stats.attack,
+      moveSpeedMult: CHARACTERS[selected].stats.speedPct / 100,
+    })
+    useQuickslotStore.getState().switchCharacter(selected)
 
     try {
       await loadGameState()
@@ -165,7 +169,9 @@ export function CharacterSelect() {
               <span className={`lobby-char lobby-char--${slot.code}`} />
               <span className="lobby-slot-name">
                 <b className="lobby-slot-title">{slot.name}</b>
-                <small className="lobby-slot-lv">{slot.locked ? 'Coming Soon' : 'Lv.1'}</small>
+                <small className="lobby-slot-lv">
+                  {slot.code === 'guanwu' ? '운장' : slot.code === 'zhaoyun' ? '자룡' : slot.code === 'lubu' ? '봉선' : ''}
+                </small>
               </span>
             </button>
           )
@@ -196,7 +202,7 @@ export function CharacterSelect() {
                   <div className="lobby-stat"><span>HP</span><b>{game.maxHp}</b></div>
                   <div className="lobby-stat"><span>MP</span><b>{game.maxMp}</b></div>
                   <div className="lobby-stat"><span>공격력</span><b>{game.attackPower}</b></div>
-                  <div className="lobby-stat"><span>이동속도</span><b>{Math.round(game.moveSpeedMult * 100)}%</b></div>
+                  <div className="lobby-stat"><span>이동속도</span><b>{char.stats.speedPct}%</b></div>
                 </div>
               </div>
             </div>

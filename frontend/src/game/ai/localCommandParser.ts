@@ -34,11 +34,11 @@ export function parseLocalCommand(input: string): GuanYuCommand {
     })
   }
   const skillNames: Array<[string, string]> = [
-    ['참마돌격', 'skill_charge_slash'],
-    ['언월난무', 'skill_glaive_flurry'],
-    ['일격필살', 'skill_decisive_strike'],
-    ['청룡참', 'skill_dragon_slash'],
-    ['뇌신강림', 'skill_lightning_descent'],
+    ['돌격무쌍', 'skill_charge_slash'],
+    ['용아일섬', 'skill_glaive_flurry'],
+    ['창영난무', 'skill_decisive_strike'],
+    ['백화연창', 'skill_dragon_slash'],
+    ['비호관천', 'skill_lightning_descent'],
   ]
   const requestedSkill = skillNames.find(([name]) => text.includes(name))
   if (requestedSkill) {

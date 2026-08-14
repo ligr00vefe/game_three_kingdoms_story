@@ -1,18 +1,21 @@
-import { useSkillStore, SKILLS } from '../stores/skillStore'
+import { useSkillStore, getSkillsForCharacter } from '../stores/skillStore'
+import { useScreenStore } from '../stores/screenStore'
 import { useUiStore } from '../stores/uiStore'
 import { useGameStore } from '../stores/gameStore'
 import { titleForLevel } from '../game/systems/playerAnimations'
 import { useDraggableWindow } from './useDraggableWindow'
 
 /**
- * 스킬창 (SKILL) — 직책 스케줄에 따라 자동 해금되는 5개 액티브 스킬.
- * 미해금 스킬은 잠금 표시, 해금된 스킬은 +/-로 포인트 배분해 강화한다.
+ * 스킬창 (SKILL) — 처음부터 사용할 수 있는 5개 액티브 스킬.
+ * 모든 스킬은 +/-로 포인트를 배분해 강화한다.
  */
 export function SkillPanel() {
   const open = useUiStore((s) => s.skillbookOpen)
   const levels = useSkillStore((s) => s.levels)
   const points = useSkillStore((s) => s.points)
   const charLevel = useGameStore((s) => s.level)
+  const selectedCharacter = useScreenStore((s) => s.selectedCharacter)
+  const skills = getSkillsForCharacter(selectedCharacter)
   const windowDrag = useDraggableWindow('skillbook')
 
   if (!open) return null
@@ -30,7 +33,7 @@ export function SkillPanel() {
       </div>
 
       <div className="sk-grid">
-        {SKILLS.map((def) => {
+        {skills.map((def) => {
           const lv = levels[def.code] ?? 0
           const locked = lv <= 0
           const maxed = lv >= def.maxLevel
@@ -53,7 +56,7 @@ export function SkillPanel() {
               }}
               title={locked ? `Lv ${def.unlockLevel}에 해금` : `${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
             >
-              <span className="sk-icon" data-type={def.type}>
+              <span className={`sk-icon ${selectedCharacter === 'zhaoyun' && def.code === 'skill_decisive_strike' ? 'sk-icon--rotated-spear' : ''}`} data-type={def.type}>
                 {locked ? '🔒' : def.iconImage ? <img src={def.iconImage} alt="" /> : def.icon}
               </span>
               <div className="sk-info">
