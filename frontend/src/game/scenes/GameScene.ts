@@ -26,7 +26,9 @@ import { parseLocalCommand } from '../ai/localCommandParser'
 import type { GuanYuCommand } from '../ai/commands'
 import { chatWithLocalAi, interpretWithLocalAi } from '../../api/command'
 import { CHARACTERS } from '../../data/characters'
+import { getCharacterModel } from '../../data/characterModels'
 import { useScreenStore } from '../../stores/screenStore'
+import { getSkillsForCharacter } from '../../stores/skillStore'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -43,6 +45,8 @@ const CHAT_BUBBLE_Y_OFFSET = 8
 const PORTAL_RANGE = 44
 /** T2 spear tip sits lower than the legacy 128px model on thrust combo steps. */
 const THRUST_FX_Y_OFFSET = 12
+/** Lu Bu crouches lower on combo thrusts; keep his effect aligned to the spear only. */
+const LUBU_THRUST_FX_Y_OFFSET = 16
 
 interface PortalDef {
   x: number
@@ -312,6 +316,8 @@ export class GameScene extends Phaser.Scene {
   private commandRequestId = 0
   private pickupCommandQueued = false
   private lastSkillStatusAt = -Infinity
+  /** 현재 캐릭터에 실제 등록된 스킬만 허용한다. 씬 수명 동안 캐릭터는 바뀌지 않는다. */
+  private activeSkillCodes: string[] = []
 
   /** AI 생성 아트가 로드됐는지 — 없으면 placeholder 폴백 (Phase 7) */
   private art(key: string) {
@@ -799,6 +805,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.effects = new EffectManager(this)
     const character = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
+    this.activeSkillCodes = getSkillsForCharacter(character.code).map((skill) => skill.code)
     this.player = new Player(this, spawn.x, spawn.y, character.modelCode)
     useGameStore.getState().setStats({
       stageCode: this.mapKey,
@@ -834,7 +841,10 @@ export class GameScene extends Phaser.Scene {
         ? Phaser.Math.Clamp((hits[0].x - this.player.x) * facing, 50, reach)
         : reach
       const fxX = this.player.x + facing * dist
-      const thrustYOffset = comboStep === 0 || comboStep === 2 ? THRUST_FX_Y_OFFSET : 0
+      const isThrustStep = comboStep === 0 || comboStep === 2
+      const thrustYOffset = isThrustStep
+        ? THRUST_FX_Y_OFFSET + (character.code === 'lubu' ? LUBU_THRUST_FX_Y_OFFSET : 0)
+        : 0
       const fxY = this.player.y + 22 + thrustYOffset
       const hit = hits.length > 0
       // 세 단계 모두 단일 이미지 이펙트(찌르기와 동일 방식). 전용 아트가 없으면 찌르기로 폴백한다.
@@ -849,9 +859,10 @@ export class GameScene extends Phaser.Scene {
     }
     // 공중 액션 이펙트 (점프 대쉬 잔상 / 이단 점프 하강풍)
     // 점프 대시는 대쉬 먼지 하나만, 이단 점프는 상승 기류 하나만 재생해 서로 겹치지 않게 한다.
-    this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y, facing)
+    const airDashEffectYOffset = getCharacterModel(character.modelCode).airDashEffectYOffset
+    this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y + airDashEffectYOffset, facing)
     this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
-    const isZhaoYun = useScreenStore.getState().selectedCharacter === 'zhaoyun'
+    const isZhaoYun = character.skillStyle === 'zhaoyun'
     this.player.onSkillStart = (facing, skillCode) => {
       if (skillCode === 'skill_charge_slash') {
         if (isZhaoYun) {
@@ -859,6 +870,7 @@ export class GameScene extends Phaser.Scene {
           this.player.startChargeMotion()
         } else {
           this.effects.skillCharge(this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET, this.player.y + 22, facing)
+          if (character.code === 'guanwu') this.player.startChargeMotion()
         }
         return
       }
@@ -878,8 +890,14 @@ export class GameScene extends Phaser.Scene {
         return
       }
       if (skillCode === 'skill_decisive_strike') {
-        if (isZhaoYun) this.effects.spearFlurryZhao(this.player.x, this.player.y + 8, facing)
-        else this.effects.decisiveStrike(this.player.x, this.player.y + 10, facing, () => this.player.releaseDecisiveMotion())
+        this.effects.decisiveStrike(this.player.x, this.player.y + 10, facing, () => this.player.releaseDecisiveMotion())
+        return
+      }
+      if (skillCode === 'skill_meteor_spear') {
+        if (isZhaoYun) {
+          this.effects.meteorSpear(this.player.x, this.player.y + 8, facing)
+          this.player.startChargeMotion()
+        }
         return
       }
       if (skillCode === 'skill_dragon_slash') {
@@ -1522,6 +1540,7 @@ export class GameScene extends Phaser.Scene {
 
   /** 퀵슬롯 스킬 발동 요청 (숫자키) — 실제 시전 가능 여부는 Player가 판정 */
   private handleCastSkill = (skillCode?: string) => {
+    if (!skillCode || !this.activeSkillCodes.includes(skillCode)) return
     this.player.queueSkill(skillCode)
   }
 
@@ -1835,17 +1854,18 @@ export class GameScene extends Phaser.Scene {
       }
       const enoughMp = gameStats.maxMp > 0 && gameStats.mp / gameStats.maxMp >= auto.minMpPercent / 100
       if (enoughMp && nearbyCount >= auto.minEnemyCount && (!auto.reserveSkillForBoss || bossPresent)) {
-        this.player.queueSkill()
+        const firstSkill = this.activeSkillCodes[0]
+        if (firstSkill) this.player.queueSkill(firstSkill)
       }
     }
     const arrivedCommandTarget = this.guanYu.consumeArrival()
     if (arrivedCommandTarget) this.handleCommandArrival(arrivedCommandTarget)
     this.updateHybridControl()
     this.player.update(this.hybridControl, this.time.now)
+    this.player.ensureAboveGround(this.map.groundY)
     if (this.time.now - this.lastSkillStatusAt >= 80) {
       this.lastSkillStatusAt = this.time.now
-      const skillCodes = Object.keys(COMBAT.SKILL_COOLDOWN_MS_BY_CODE)
-      const skills = Object.fromEntries(skillCodes.map((code) => {
+      const skills = Object.fromEntries(this.activeSkillCodes.map((code) => {
         const cooldownMs = this.player.skillCooldownMs(code)
         const cooldownLeftMs = this.player.skillCooldownLeftFor(code, this.time.now)
         return [code, {

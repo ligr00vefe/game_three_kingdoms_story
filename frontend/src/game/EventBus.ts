@@ -56,6 +56,8 @@ export const GameEvents = {
   SCENE_READY: 'game:scene-ready',
   /** 맵 전환과 새 스폰 좌표를 서버에 즉시 저장한다. */
   MAP_CHANGED: 'game:map-changed',
+  /** 퀵슬롯 등록/이동/해제 직후 현재 캐릭터 상태를 서버에 저장한다. */
+  QUICKSLOTS_CHANGED: 'game:quickslots-changed',
   PLAYER_DIED: 'game:player-died',
   TOGGLE_INVENTORY: 'game:toggle-inventory',
   TOGGLE_QUEST: 'game:toggle-quest',

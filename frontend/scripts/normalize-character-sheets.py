@@ -16,7 +16,7 @@ FRAME = 192
 ALPHA_THRESHOLD = 8
 INTERNAL_GAP = 35
 SOURCE_SCALE = 0.34
-ACTION_SCALE = {"slash_l": 0.29, "slash_r": 0.29}
+ACTION_SCALE = {"slash_l": SOURCE_SCALE, "slash_r": SOURCE_SCALE}
 BOTTOM_MARGIN = 8
 
 CHARACTERS = {
@@ -35,6 +35,18 @@ CHARACTERS = {
             "attack_l": 8, "attack_r": 8,
         },
         "scale": SOURCE_SCALE,
+    },
+    "lubu_t2": {
+        "frames": {
+            "idle_l": 8, "idle_r": 8, "walk_l": 8, "walk_r": 8,
+            "jump_l": 8, "jump_r": 8, "climb": 8,
+            "attack_l": 8, "attack_r": 8,
+        },
+        "scale": SOURCE_SCALE,
+        # Keep Lu Bu's apparent width stable across the independently drawn idle poses.
+        "normalizeWidths": {"idle_l", "idle_r"},
+        # walk_l만 다른 원본보다 약 1/2.8 해상도로 제공되어 같은 체격이 되도록 보정한다.
+        "actionScale": {"walk_l": 0.94},
     },
 }
 
@@ -63,7 +75,13 @@ def occupied_runs(image: Image.Image) -> list[tuple[int, int]]:
     return runs
 
 
-def normalize(source: Path, destination: Path, expected: int, scale: float) -> None:
+def normalize(
+    source: Path,
+    destination: Path,
+    expected: int,
+    scale: float,
+    normalize_width: bool = False,
+) -> None:
     image = Image.open(source).convert("RGBA")
     runs = occupied_runs(image)
     if len(runs) != expected:
@@ -84,6 +102,13 @@ def normalize(source: Path, destination: Path, expected: int, scale: float) -> N
         )
         for pose in poses
     ]
+    if normalize_width:
+        target_width = max(pose.width for pose in scaled)
+        scaled = [
+            pose.resize((target_width, pose.height), Image.Resampling.LANCZOS)
+            if pose.width != target_width else pose
+            for pose in scaled
+        ]
     if any(pose.width > FRAME or pose.height > FRAME - BOTTOM_MARGIN for pose in scaled):
         sizes = [pose.size for pose in scaled]
         raise ValueError(f"{source.name}: pose exceeds {FRAME}px canvas at fixed scale: {sizes}")
@@ -104,7 +129,8 @@ def main() -> None:
                 SOURCE / f"{character}_{action}.png",
                 OUTPUT / f"{character}_{action}.png",
                 expected,
-                ACTION_SCALE.get(action, config["scale"]),
+                config.get("actionScale", {}).get(action, ACTION_SCALE.get(action, config["scale"])),
+                action in config.get("normalizeWidths", set()),
             )
 
 if __name__ == "__main__":

@@ -43,12 +43,16 @@ export function LoadingScreen() {
     let sceneReady = false
     let minElapsed = false
     let done = false
+    let fadeTimer: ReturnType<typeof setTimeout> | null = null
 
     const tryFinish = () => {
       if (done || !sceneReady || !minElapsed) return
       done = true
       setFading(true)
-      setTimeout(() => useScreenStore.getState().setScreen('game'), FADE_MS)
+      fadeTimer = setTimeout(() => {
+        const screenStore = useScreenStore.getState()
+        if (screenStore.screen === 'loading') screenStore.setScreen('game')
+      }, FADE_MS)
     }
 
     const onReady = () => { sceneReady = true; tryFinish() }
@@ -58,6 +62,7 @@ export function LoadingScreen() {
     return () => {
       EventBus.off(GameEvents.SCENE_READY, onReady)
       clearTimeout(timer)
+      if (fadeTimer !== null) clearTimeout(fadeTimer)
     }
   }, [])
 

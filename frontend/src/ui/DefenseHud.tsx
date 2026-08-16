@@ -52,10 +52,6 @@ const UPGRADE_INFO: Record<DefenseUpgrade, { icon: string; name: string; desc: s
   supplies: { icon: '📦', name: '보급품 개선', desc: '물약의 효과 상승' },
 }
 
-/** Wave 임박 경고를 띄우기 시작하는 남은 대기시간(ms).
- *  DefenseManager의 DEFENSE.WAIT_MS와 같은 값이면 대기 단계 내내 경고가 울린다. */
-const WAVE_WARNING_MS = 10_000
-
 /**
  * 디펜스 게임 HUD: 상단중앙 카운트다운/스테이지/기지HP, 하단 구매하기,
  * 구매 창(바리케이트), 승리 배너, 패배 오버레이.
@@ -188,7 +184,6 @@ export function DefenseHud() {
   // ESC 일시정지 메뉴
   const resumeGame = () => useDefenseStore.getState().setPauseOpen(false)
   const returnToLobby = () => {
-    if (!window.confirm('대기실로 돌아가시겠습니까? 진행 중인 방어전은 사라집니다.')) return
     useDefenseStore.getState().setPauseOpen(false) // 씬 재개 후 언마운트 (pause 잔류 방지)
     useDefenseStore.getState().reset()
     useScreenStore.getState().setScreen('lobby')
@@ -204,15 +199,10 @@ export function DefenseHud() {
 
   return (
     <>
-      {/* 상단중앙: 카운트다운 + 스테이지 정보 */}
+      {/* 상단중앙: 스테이지 정보 */}
       <div className="def-top">
         <div className="def-stage">STAGE {stage}</div>
         {eventName && <div className="def-event">{eventName}</div>}
-        {phase === 'wait' && (
-          <div className="def-timer def-timer--wait">
-            대기 <span className="def-timer-num">{Math.ceil(timeLeftMs / 1000)}</span>
-          </div>
-        )}
         {(phase === 'combat' || phase === 'wait') && (
           <div className="def-info">
             <span className="def-zombies">🧟 남은 {zombiesLeft}</span>
@@ -227,8 +217,8 @@ export function DefenseHud() {
         )}
       </div>
 
-      {/* Wave 임박 경고 — 깜빡이며 임박을 알린다 (대기 10초 내내) */}
-      {phase === 'wait' && timeLeftMs > 0 && timeLeftMs <= WAVE_WARNING_MS && (
+      {/* 짧은 대기 동안 숫자 카운트 없이 Wave 임박만 알린다. */}
+      {phase === 'wait' && timeLeftMs > 0 && (
         <div className="def-wave-warning" role="alert">
           ⚠ 곧 Wave가 시작됩니다. Warning...!
         </div>
@@ -309,10 +299,20 @@ export function DefenseHud() {
       {/* 승리 배너 */}
       {phase === 'victory' && rewardChoices.length > 0 && (
         <div className="def-banner def-banner--victory">
+          <div
+            className="def-reward-timer"
+            role="timer"
+            aria-live="polite"
+            aria-label={`보상 자동 선택까지 ${rewardCountdown}초`}
+          >
+            <span className="def-reward-timer-label">자동 선택</span>
+            <strong>{rewardCountdown}</strong>
+            <span className="def-reward-timer-unit">초</span>
+          </div>
           <div className="def-banner-title">STAGE {stage} 클리어!</div>
           <div className="def-banner-sub">다음 전투를 위한 강화 하나를 선택하세요</div>
           <div className="def-reward-countdown">
-            {rewardCountdown}초 후 첫 번째 보상이 자동 선택됩니다.
+            시간이 끝나면 첫 번째 보상이 자동 선택됩니다.
           </div>
           <div className="def-upgrade-grid">
             {rewardChoices.map((upgrade) => {

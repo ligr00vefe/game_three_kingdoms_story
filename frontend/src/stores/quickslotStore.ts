@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useInventoryStore } from './inventoryStore'
 import { EventBus, GameEvents } from '../game/EventBus'
+import { getSkillsForCharacter } from './skillStore'
 
 /**
  * 퀵슬롯 (체력바 오른쪽 7칸, 숫자키 1~7).
@@ -16,6 +17,15 @@ export interface QSEntry {
 }
 
 export const QUICKSLOT_COUNT = 7
+
+const normalizeSlots = (characterCode: string, source: readonly (QSEntry | null)[]) =>
+  Array.from({ length: QUICKSLOT_COUNT }, (_, index) => {
+    const entry = source[index] ?? null
+    if (characterCode === 'zhaoyun' && entry?.kind === 'skill' && entry.code === 'skill_decisive_strike') {
+      return { ...entry, code: 'skill_meteor_spear' }
+    }
+    return entry
+  })
 
 interface QuickslotState {
   characterCode: string
@@ -51,7 +61,7 @@ export const useQuickslotStore = create<QuickslotState>()(
         slots[index] = entry
         const state = get()
         set({ slots, held: prev ?? state.held, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
-        EventBus.emit(GameEvents.MAP_CHANGED)
+        EventBus.emit(GameEvents.QUICKSLOTS_CHANGED)
       },
 
       placeHeld: (index) => {
@@ -62,7 +72,7 @@ export const useQuickslotStore = create<QuickslotState>()(
         slots[index] = held
         const state = get()
         set({ slots, held: prev ?? null, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
-        EventBus.emit(GameEvents.MAP_CHANGED)
+        EventBus.emit(GameEvents.QUICKSLOTS_CHANGED)
       },
 
       discardHeld: () => set({ held: null }),
@@ -72,19 +82,19 @@ export const useQuickslotStore = create<QuickslotState>()(
         slots[index] = null
         const state = get()
         set({ slots, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
-        EventBus.emit(GameEvents.MAP_CHANGED)
+        EventBus.emit(GameEvents.QUICKSLOTS_CHANGED)
       },
 
       hydrate: (saved) => {
-        const slots = Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[i] ?? null)
         const state = get()
+        const slots = normalizeSlots(state.characterCode, saved)
         set({ slots, held: null, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
       },
 
       switchCharacter: (characterCode) => {
         const state = get()
-        const slots = state.savedSlots[characterCode] ?? Array(QUICKSLOT_COUNT).fill(null)
-        set({ characterCode, slots: slots.slice(), held: null })
+        const slots = normalizeSlots(characterCode, state.savedSlots[characterCode] ?? [])
+        set({ characterCode, slots, held: null, savedSlots: { ...state.savedSlots, [characterCode]: slots } })
       },
 
       moveSlot: (from, to) => {
@@ -95,13 +105,15 @@ export const useQuickslotStore = create<QuickslotState>()(
         slots[from] = tmp // 대상 점유 시 교체
         const state = get()
         set({ slots, savedSlots: { ...state.savedSlots, [state.characterCode]: slots } })
-        EventBus.emit(GameEvents.MAP_CHANGED)
+        EventBus.emit(GameEvents.QUICKSLOTS_CHANGED)
       },
 
       trigger: (index) => {
-        const entry = get().slots[index]
+        const state = get()
+        const entry = state.slots[index]
         if (!entry) return
         if (entry.kind === 'skill') {
+          if (!getSkillsForCharacter(state.characterCode).some((skill) => skill.code === entry.code)) return
           EventBus.emit(GameEvents.CAST_SKILL, entry.code)
         } else {
           useInventoryStore.getState().useConsumableByCode(entry.code)
@@ -114,11 +126,12 @@ export const useQuickslotStore = create<QuickslotState>()(
       merge: (persisted, current) => {
         const saved = (persisted as Partial<QuickslotState> | undefined)?.savedSlots ?? {}
         const characterCode = (persisted as Partial<QuickslotState> | undefined)?.characterCode ?? 'guanwu'
+        const slots = normalizeSlots(characterCode, saved[characterCode] ?? [])
         return {
           ...current,
           characterCode,
-          savedSlots: saved,
-          slots: Array.from({ length: QUICKSLOT_COUNT }, (_, i) => saved[characterCode]?.[i] ?? null),
+          savedSlots: { ...saved, [characterCode]: slots },
+          slots,
         }
       },
     },

@@ -56,12 +56,7 @@ public class GameStateService {
 	@Transactional
 	public GameStateResponse loadState(Long accountId, String characterCode) {
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
-			.orElseGet(() -> {
-				GameCharacter created = new GameCharacter(characterNameFor(characterCode));
-				created.setAccountId(accountId);
-				created.setCharacterCode(characterCode);
-				return characterRepository.save(created);
-			});
+			.orElseGet(() -> characterRepository.save(createCharacter(accountId, characterCode)));
 		List<InventoryItemDto> inventory = inventoryRepository.findByCharacterId(character.getId()).stream()
 			.map(i -> new InventoryItemDto(i.getItemCode(), i.getQuantity(), i.getSlotIndex(), i.isEquipped())).toList();
 		List<ItemDefinitionDto> defs = itemDefinitionRepository.findAll().stream()
@@ -91,12 +86,7 @@ public class GameStateService {
 	@Transactional
 	public void saveState(Long accountId, String characterCode, SaveStateRequest request) {
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
-			.orElseGet(() -> {
-				GameCharacter created = new GameCharacter(characterNameFor(characterCode));
-				created.setAccountId(accountId);
-				created.setCharacterCode(characterCode);
-				return characterRepository.save(created);
-			});
+			.orElseGet(() -> characterRepository.save(createCharacter(accountId, characterCode)));
 		applyState(character, request);
 		inventoryRepository.deleteByCharacterId(character.getId());
 		List<InventoryItem> items = request.inventory().stream()
@@ -112,6 +102,9 @@ public class GameStateService {
 
 	private void saveQuickslots(GameCharacter character, List<QuickslotDto> slots) {
 		quickslotRepository.deleteByCharacterId(character.getId());
+		// Hibernate may execute inserts before queued deletes. Flush first so the
+		// unique (character_id, slot_index) key cannot reject a slot replacement.
+		quickslotRepository.flush();
 		var valid = slots.stream()
 			.filter(q -> "item".equals(q.kind()) || "skill".equals(q.kind()))
 			.map(q -> new CharacterQuickslot(character, q.slotIndex(), q.kind(), q.code())).toList();
@@ -147,5 +140,30 @@ public class GameStateService {
 			case "lubu" -> "여포";
 			default -> "관우";
 		};
+	}
+
+	/** 신규 세이브 슬롯의 기본 능력치는 프런트 캐릭터 정의와 같은 값으로 시작한다. */
+	private GameCharacter createCharacter(Long accountId, String characterCode) {
+		GameCharacter character = new GameCharacter(characterNameFor(characterCode));
+		character.setAccountId(accountId);
+		character.setCharacterCode(characterCode);
+		switch (characterCode) {
+			case "zhaoyun" -> {
+				character.setMaxHp(100); character.setHp(100);
+				character.setMaxMp(50); character.setMp(50);
+				character.setAttackPower(90);
+			}
+			case "lubu" -> {
+				character.setMaxHp(120); character.setHp(120);
+				character.setMaxMp(40); character.setMp(40);
+				character.setAttackPower(100);
+			}
+			default -> {
+				character.setMaxHp(100); character.setHp(100);
+				character.setMaxMp(50); character.setMp(50);
+				character.setAttackPower(95);
+			}
+		}
+		return character;
 	}
 }

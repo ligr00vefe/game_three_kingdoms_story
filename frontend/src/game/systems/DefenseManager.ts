@@ -32,9 +32,8 @@ export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>
 
 /** 디펜스 페이싱 상수 — 조작감 튜닝은 여기서만 (config.ts 규약과 동일 정신) */
 const DEFENSE = {
-  /** 대기 단계(바리케이트 설치) 시간. DefenseHud의 WAVE_WARNING_MS와 맞물린다 —
-   *  이 값을 늘리면 경고가 대기 후반에만 뜨고, 줄이면 대기 내내 떠 있는다. */
-  WAIT_MS: 10_000,
+  /** 다음 Wave 경고를 표시하는 대기 시간 */
+  WAIT_MS: 5_000,
   /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 10, stage2 = 11 …) */
   BASE_ZOMBIES: 9,
   /** 좀비 순차 스폰 간격 */
@@ -71,8 +70,8 @@ const DEFENSE = {
    *  캐릭터가 성문 앞에 서 있는 것처럼 보인다. 바리케이트는 플레이어가 뒤에 숨는 엄폐물이라
    *  액터와 같은 깊이(0)로 그대로 둔다. */
   BASE_DEPTH: -10,
-  /** 승리 후 다음 스테이지 대기까지의 연출 여유 */
-  VICTORY_DELAY_MS: 2_500,
+  /** 보상 선택 후 다음 Wave 경고가 나타나기까지의 짧은 연출 여유 */
+  VICTORY_DELAY_MS: 1_000,
 } as const
 
 interface Structure {

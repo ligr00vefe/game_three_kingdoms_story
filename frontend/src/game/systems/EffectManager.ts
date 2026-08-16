@@ -15,6 +15,7 @@ export class EffectManager {
   private attackHitPool: Phaser.GameObjects.Group
   private skillPool: Phaser.GameObjects.Group
   private zhaoChargePool: Phaser.GameObjects.Group
+  private meteorPool: Phaser.GameObjects.Group
   private spearPool: Phaser.GameObjects.Group
   private flowerPool: Phaser.GameObjects.Group
   private flowerAttackPool: Phaser.GameObjects.Group
@@ -38,6 +39,7 @@ export class EffectManager {
     this.attackHitPool = scene.add.group({ defaultKey: 'fx_attack_hit', maxSize: 12 })
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
     this.zhaoChargePool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_charge', maxSize: 2 })
+    this.meteorPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_meteor', maxSize: 2 })
     this.spearPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_spear', maxSize: 8 })
     this.flowerPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower', maxSize: 2 })
     this.flowerAttackPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower_attack', maxSize: 2 })
@@ -132,10 +134,11 @@ export class EffectManager {
   private defineZhaoYunFrames() {
     const definitions = [
       ['fx_skill_horse_charge_anim', 'fx_skill_zhao_charge', 7, 18],
-      ['fx_skill_spear_flurry_anim', 'fx_skill_zhao_spear', 10, 42],
+      ['fx_skill_meteor_anim', 'fx_skill_zhao_meteor', 7, 18],
+      ['fx_skill_spear_flurry_anim', 'fx_skill_zhao_spear', 10, 60],
       ['fx_skill_flower_anim', 'fx_skill_zhao_flower', 9, 10],
       ['fx_skill_flower_attack_anim', 'fx_skill_zhao_flower_attack', 3, 12],
-      ['fx_skill_tiger_anim', 'fx_skill_zhao_tiger', 12, 10],
+      ['fx_skill_tiger_anim', 'fx_skill_zhao_tiger', 9, 60],
     ] as const
     for (const [key, texture, length, frameRate] of definitions) {
       if (!this.scene.textures.exists(texture)) continue
@@ -473,11 +476,40 @@ export class EffectManager {
   skillHorseCharge(x: number, y: number, facing: -1 | 1) {
     const sprite = this.zhaoChargePool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!sprite || !this.scene.anims.exists('fx_skill_horse_charge_anim')) return
+    this.scene.tweens.killTweensOf(sprite)
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    sprite.setActive(true).setVisible(true).setPosition(x, y).setOrigin(0.5, 0.5)
-      .setFlipX(facing === -1).setAlpha(0.98).setScale(1.2).setDepth(EffectManager.COMBAT_FX_DEPTH)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 20, y + 14).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(0.98).setScale(1.44).setDepth(EffectManager.COMBAT_FX_DEPTH)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
     sprite.play('fx_skill_horse_charge_anim')
+    // Move the complete effect object; animation frames and their timing stay untouched.
+    this.scene.tweens.add({
+      targets: sprite,
+      x: x + facing * 140,
+      duration: 390,
+      ease: 'Linear',
+    })
+  }
+
+  meteorSpear(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.meteorPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_meteor_anim')) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_UPDATE)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 120, y + 8)
+      .setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(1).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+    const normalizeSize = () => {
+      const scale = 120 / (sprite.frame.realHeight || 1)
+      sprite.setScale(scale).setFlipX(facing === -1)
+    }
+    sprite.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeSize)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_UPDATE)
+      sprite.setActive(false).setVisible(false)
+    })
+    sprite.play('fx_skill_meteor_anim')
+    normalizeSize()
   }
 
   spearFlurry(x: number, y: number, facing: -1 | 1) {
@@ -525,18 +557,18 @@ export class EffectManager {
 
   spearFlurryZhao(x: number, y: number, facing: -1 | 1) {
     if (!this.scene.anims.exists('fx_skill_spear_flurry_anim')) return
-    const verticalOffsets = Phaser.Utils.Array.Shuffle([-92, -62, -30, 4, 38, 72, 106])
-    verticalOffsets.forEach((offset, index) => this.scene.time.delayedCall(index * 42, () => {
-      const sprite = this.spearPool.get(x, y) as Phaser.GameObjects.Sprite | null
-      if (!sprite) return
-      sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-      sprite.setActive(true).setVisible(true).setPosition(
-        x + facing * 72, y + offset,
-      ).setOrigin(facing === 1 ? 0.08 : 0.92, 0.5).setFlipX(facing === -1).setAlpha(1)
-        .setDisplaySize(120, 72).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
-      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
-      sprite.play('fx_skill_spear_flurry_anim')
-    }))
+    const sprite = this.spearPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite) return
+    this.scene.tweens.killTweensOf(sprite)
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 52, y)
+      .setOrigin(facing === 1 ? 0.08 : 0.92, 0.5)
+      .setFlipX(facing === -1).setAlpha(1).setScale(1)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      sprite.setActive(false).setVisible(false)
+    })
+    sprite.play('fx_skill_spear_flurry_anim')
   }
 
   flowerAttackOnly(x: number, y: number, facing: -1 | 1) {
@@ -552,9 +584,11 @@ export class EffectManager {
   tigerTears(x: number, y: number, facing: -1 | 1) {
     const sprite = this.tigerPool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!sprite || !this.scene.anims.exists('fx_skill_tiger_anim')) return
+    this.scene.tweens.killTweensOf(sprite)
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
     sprite.setActive(true).setVisible(true).setPosition(x + facing * 48, y + 4).setOrigin(0.5, 1)
-      .setFlipX(facing === -1).setAlpha(1).setScale(2.2).setDepth(EffectManager.COMBAT_FX_DEPTH)
+      .setFlipX(facing === -1).setAlpha(1).setAngle(0).setScale(2.2)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
     sprite.play('fx_skill_tiger_anim')
   }

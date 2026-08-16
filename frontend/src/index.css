@@ -1402,7 +1402,7 @@ html, body, #root { height: 100%; }
 .scroll-viewport {
   overflow: hidden; /* 뷰포트 높이 밖으로 나가는 종이를 잘라 "펼쳐지며 드러나는" 연출 */
   margin: 0 var(--paper-inset); /* 종이를 롤의 양피지 폭에 맞춘다 */
-  transition: height var(--roll-ms) ease; /* 축 이동과 픽셀 단위로 정확히 같은 속도 */
+  transition: height var(--roll-ms) cubic-bezier(0.22, 1, 0.36, 1); /* 빠르게 반응하고 끝에서 부드럽게 정착 */
 }
 /* 양피지 본문 — parchment_page.png(1254×1254). 높이가 캐릭터마다 달라 100% 100%로 채운다
    (paper 텍스처라 약간의 세로 신축은 티가 안 난다). 좌우 가장자리 음영이 두루마리 곡면 그림자로 읽힌다. */
@@ -1806,6 +1806,7 @@ html, body, #root { height: 100%; }
 .sk-cell--learned { border-color: #9cccff; box-shadow: 0 0 0 1px #cfe6ff inset; cursor: grab; }
 .sk-cell--learned:active { cursor: grabbing; }
 .sk-cell--locked { opacity: 0.5; filter: grayscale(0.6); }
+.sk-empty { grid-column: 1 / -1; padding: 28px 12px; color: #8d8171; text-align: center; }
 .sk-icon {
   width: 34px; height: 34px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -2006,9 +2007,6 @@ html, body, #root { height: 100%; }
 .def-stage { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #e8b64c; }
 .def-event { padding: 3px 10px; color: #ffe0a0; background: #281f12cc; border: 1px solid #8d6e3b; border-radius: 10px; font-size: 11px; }
 .def-combo { color: #ffab40; font-weight: 900; text-shadow: 0 1px 3px #000; }
-.def-timer { font-weight: 800; line-height: 1; }
-.def-timer--wait { font-size: 15px; color: #90caf9; }
-.def-timer-num { font-size: 22px; color: #fff; }
 .def-info { display: flex; align-items: center; gap: 14px; margin-top: 2px; }
 .def-zombies { font-size: 12px; font-weight: 700; color: #cddc39; }
 .def-basehp { display: flex; align-items: center; gap: 6px; }
@@ -2022,9 +2020,7 @@ html, body, #root { height: 100%; }
 }
 .def-basehp-fill { height: 100%; background: linear-gradient(#64b5f6, #1e88e5); transition: width 0.2s; }
 
-/* Wave 임박 경고 — 대기 단계 내내 깜빡이는 붉은 경고 배너.
-   top은 위 .def-top 상태창(top 8px + 높이 82px = 아래변 90px)보다 30px 아래로 잡은 값이다.
-   상태창 내용이 늘어나면 이 값도 같이 키워야 한다. */
+/* Wave 임박 경고 — 짧은 대기 시간 동안 숫자 카운트 없이 표시한다. */
 .def-wave-warning {
   position: absolute;
   top: 178px;
@@ -2184,6 +2180,49 @@ html, body, #root { height: 100%; }
 .def-banner-title { font-size: 26px; font-weight: 800; color: #a5d6a7; text-shadow: 0 2px 6px #000; }
 .def-banner-sub { font-size: 13px; color: #dcedc8; }
 .def-reward-countdown { margin-top: 5px; color: #ffd54f; font-size: 12px; font-weight: 700; }
+.def-reward-timer {
+  position: absolute;
+  top: -24px;
+  right: -24px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr;
+  align-items: center;
+  width: 92px;
+  height: 92px;
+  box-sizing: border-box;
+  padding: 13px 14px 11px;
+  color: #fff;
+  background: radial-gradient(circle at 35% 28%, #ef5350 0%, #c62828 48%, #7f0000 100%);
+  border: 3px solid #ff8a80;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(65, 10, 10, 0.8), 0 8px 20px rgba(0, 0, 0, 0.65), 0 0 18px rgba(239, 83, 80, 0.45);
+  text-align: center;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+.def-reward-timer-label {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.def-reward-timer strong {
+  justify-self: end;
+  font-size: 38px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.08em;
+}
+.def-reward-timer-unit {
+  align-self: end;
+  margin: 0 0 4px 3px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
 .def-upgrade-grid { display: grid; grid-template-columns: repeat(3, 150px); gap: 10px; margin-top: 12px; }
 .def-upgrade { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 8px; color: #fff; background: #263238; border: 1px solid #ffd54f; border-radius: 10px; cursor: pointer; }
 .def-upgrade:hover { transform: translateY(-2px); background: #37474f; box-shadow: 0 5px 14px #0008; }

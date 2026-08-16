@@ -10,7 +10,7 @@ import { loadGameState } from '../api/game'
  * CSS에 --roll-ms로 내려보내 transition 시간으로 쓰므로 **여기 한 곳만 고치면 된다**
  * (CSS에 숫자를 따로 적으면 둘이 어긋나 내용이 덜 펴진 채로 바뀐다).
  */
-const ROLL_MS = 420
+const ROLL_MS = 240
 
 /**
  * 군막사 배경(bg_barracks.jpg, 1536×1024)의 의자 좌석 위치 — **배경 이미지 기준 백분율**.
@@ -64,9 +64,11 @@ const TORCHES = [
  * 캐릭터 일러스트는 AI 아트 도입 전 CSS placeholder (AI_UI_PROMPTS.md 참조).
  */
 export function CharacterSelect() {
-  const [selected, setSelected] = useState<string | null>('guanwu')
+  const recentCharacter = useScreenStore.getState().selectedCharacter
+  const initialCharacter = CHARACTERS[recentCharacter] ? recentCharacter : 'guanwu'
+  const [selected, setSelected] = useState<string | null>(initialCharacter)
   /** 두루마리에 실제로 그려진 캐릭터 — selected와 갈라져 있어야 "다 말린 뒤 교체"가 가능하다 */
-  const [shown, setShown] = useState<string | null>('guanwu')
+  const [shown, setShown] = useState<string | null>(initialCharacter)
   const [open, setOpen] = useState(false)
   const [starting, setStarting] = useState(false)
   const char = shown ? CHARACTERS[shown] : null
@@ -199,9 +201,9 @@ export function CharacterSelect() {
                 <div className="lobby-card-class">⚔ {char.clazz}</div>
                 <p className="lobby-card-desc">{char.desc}</p>
                 <div className="lobby-card-stats">
-                  <div className="lobby-stat"><span>HP</span><b>{game.maxHp}</b></div>
-                  <div className="lobby-stat"><span>MP</span><b>{game.maxMp}</b></div>
-                  <div className="lobby-stat"><span>공격력</span><b>{game.attackPower}</b></div>
+                  <div className="lobby-stat"><span>HP</span><b>{char.stats.hp}</b></div>
+                  <div className="lobby-stat"><span>MP</span><b>{char.stats.mp}</b></div>
+                  <div className="lobby-stat"><span>공격력</span><b>{char.stats.attack}</b></div>
                   <div className="lobby-stat"><span>이동속도</span><b>{char.stats.speedPct}%</b></div>
                 </div>
               </div>

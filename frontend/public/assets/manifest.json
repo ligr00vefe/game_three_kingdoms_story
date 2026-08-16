@@ -67,18 +67,19 @@
     "fx_shield_zombie_drop": "assets/img/fx/effect_shield_zombie_drop.png",
     "fx_shield_zombie_dash": "assets/img/fx/effect_shield_zombie_dash.png",
     "fx_lightning_01": "assets/img/fx/effect_lightning_01.png",
-    "fx_lightning_02": "assets/img/fx/effect_lightning_02.png"
+    "fx_lightning_02": "assets/img/fx/effect_lightning_02.png",
+    "fx_skill_zhao_meteor": "assets/img/fx/skill_meteor_spear.png?v=20260816-1",
+    "fx_skill_zhao_tiger": "assets/img/fx/skill_a_tiger_tears_the_sky.png?v=20260815-2"
   },
   "spritesheets": {
     "shield_zombie_walk": { "url": "assets/img/monster/shield_zombie_walk.png", "frameWidth": 527, "frameHeight": 500 },
+    "fx_skill_zhao_charge": { "url": "assets/img/fx/skill_horse_charge.png?v=20260816-full-cuts-3", "frameWidth": 109, "frameHeight": 327 },
     "fx_skill_glaive": { "url": "assets/img/fx/skill_crescent_moon_dance_fixed_v5.png", "frameWidth": 896, "frameHeight": 420 },
-    "fx_skill_zhao_charge": { "url": "assets/img/fx/skill_horse_charge.png", "frameWidth": 109, "frameHeight": 327 },
     "fx_skill_dragon": { "url": "assets/img/fx/skill_blue_dragon_slash_fixed_v3.png", "frameWidth": 320, "frameHeight": 648 },
     "fx_skill_zhao_dragon": { "url": "assets/img/fx/skill_dragons_fang_flash.png", "frameWidth": 438, "frameHeight": 724 },
     "fx_skill_zhao_spear": { "url": "assets/img/fx/skill_spear_flurry.png", "frameWidth": 86, "frameHeight": 288 },
     "fx_skill_zhao_flower": { "url": "assets/img/fx/effect_one_hundred_flower_blooming_in_succession.png", "frameWidth": 707, "frameHeight": 39 },
     "fx_skill_zhao_flower_attack": { "url": "assets/img/fx/skill_one_hundred_flower_blooming_in_succession.png", "frameWidth": 262, "frameHeight": 316 },
-    "fx_skill_zhao_tiger": { "url": "assets/img/fx/skill_a_tiger_tears_the_sky.png", "frameWidth": 102, "frameHeight": 204 },
     "fx_defense_crows_v4": { "url": "assets/img/bg/a_flock_of_crows_fixed_v4.png", "frameWidth": 320, "frameHeight": 256 },
     "fx_decisive_strike": { "url": "assets/img/fx/effect_a_single_decisive_blow_fixed_v2.png", "frameWidth": 384, "frameHeight": 360 },
     "fx_swing":       { "url": "assets/img/fx/effect_smash.png",       "frameWidth": 370, "frameHeight": 537 },
@@ -132,7 +133,16 @@
     "zhaoyun_t2_jump_l":   { "url": "assets/img/char/zhaoyun_t2_jump_l.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
     "zhaoyun_t2_climb":    { "url": "assets/img/char/zhaoyun_t2_climb.png?v=1",    "frameWidth": 192, "frameHeight": 192 },
     "zhaoyun_t2_attack_r": { "url": "assets/img/char/zhaoyun_t2_attack_r.png?v=1", "frameWidth": 192, "frameHeight": 192 },
-    "zhaoyun_t2_attack_l": { "url": "assets/img/char/zhaoyun_t2_attack_l.png?v=1", "frameWidth": 192, "frameHeight": 192 }
+    "zhaoyun_t2_attack_l": { "url": "assets/img/char/zhaoyun_t2_attack_l.png?v=1", "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_idle_r":   { "url": "assets/img/char/lubu_t2_idle_r.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_idle_l":   { "url": "assets/img/char/lubu_t2_idle_l.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_walk_r":   { "url": "assets/img/char/lubu_t2_walk_r.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_walk_l":   { "url": "assets/img/char/lubu_t2_walk_l.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_jump_r":   { "url": "assets/img/char/lubu_t2_jump_r.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_jump_l":   { "url": "assets/img/char/lubu_t2_jump_l.png?v=1",   "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_climb":    { "url": "assets/img/char/lubu_t2_climb.png?v=1",    "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_attack_r": { "url": "assets/img/char/lubu_t2_attack_r.png?v=1", "frameWidth": 192, "frameHeight": 192 },
+    "lubu_t2_attack_l": { "url": "assets/img/char/lubu_t2_attack_l.png?v=1", "frameWidth": 192, "frameHeight": 192 }
   },
   "atlases": {}
 }

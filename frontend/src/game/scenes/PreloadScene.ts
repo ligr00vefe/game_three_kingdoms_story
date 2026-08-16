@@ -37,7 +37,7 @@ export class PreloadScene extends Phaser.Scene {
     // manifest 등록 에셋 일괄 로드 (아직 비어 있음 — 이미지 도입 시 여기만 통과하면 됨)
     // Version the manifest request so a browser refresh cannot reuse an old
     // images/spritesheets classification after an asset-layout deployment.
-    this.load.json('asset_manifest', 'assets/manifest.json?v=20260814-1')
+    this.load.json('asset_manifest', 'assets/manifest.json?v=20260816-4')
   }
 
   create() {
@@ -57,6 +57,9 @@ export class PreloadScene extends Phaser.Scene {
       if (!this.textures.exists(key)) return
       const texture = this.textures.get(key)
       frames.forEach((frame, index) => {
+        // A manifest spritesheet may already have generated numeric frames.
+        // Replace them explicitly; Texture.add silently ignores duplicate names.
+        if (texture.has(String(index))) texture.remove(String(index))
         texture.add(index, 0, frame.x, frame.y, frame.width, frame.height)
       })
     }
@@ -92,20 +95,35 @@ export class PreloadScene extends Phaser.Scene {
       width: index === 7 ? 125 : 125,
       height: 250,
     })))
+    // The seven horse poses are packed at different widths. Replace the loader's
+    // provisional 109px cells with the complete boundary of each original cut.
+    registerFrames('fx_skill_zhao_charge', [
+      { x: 0, y: 0, width: 81, height: 327 },
+      { x: 81, y: 0, width: 85, height: 327 },
+      { x: 166, y: 0, width: 91, height: 327 },
+      { x: 257, y: 0, width: 111, height: 327 },
+      { x: 368, y: 0, width: 125, height: 327 },
+      { x: 493, y: 0, width: 138, height: 327 },
+      { x: 631, y: 0, width: 132, height: 327 },
+    ])
     registerFrames('fx_skill_zhao_flower', Array.from({ length: 9 }, (_, index) => ({
       x: 0, y: index === 8 ? 312 : index * 39, width: 707, height: index === 8 ? 41 : 39,
     })))
-    // 비호관천은 컷마다 투명 여백과 실제 호랑이 크기가 다르다. 실제 alpha 영역만
-    // 프레임으로 등록해 고정 셀에 의해 머리/상체가 잘리지 않도록 한다.
-    const tigerBounds = [
-      [12, 96, 86, 108], [7, 67, 88, 137], [0, 44, 102, 135],
-      [0, 16, 102, 162], [0, 16, 102, 163], [0, 7, 99, 172],
-      [3, 0, 99, 169], [0, 0, 102, 169], [0, 1, 97, 168],
-      [4, 13, 91, 156], [4, 16, 82, 153], [4, 105, 80, 63],
-    ] as const
-    registerFrames('fx_skill_zhao_tiger', tigerBounds.map(([x, y, width, height], index) => ({
-      x: (index % 6) * 102 + x, y: (index < 6 ? 0 : 204) + y, width, height,
-    })))
+    // 유성창 7컷: 각 동작의 실제 alpha 영역만 잘라 인접 컷이 섞이지 않게 한다.
+    registerFrames('fx_skill_zhao_meteor', [
+      [169, 254, 170, 129], [563, 250, 251, 140], [1056, 243, 299, 157],
+      [1649, 181, 338, 266], [2287, 110, 487, 421], [3094, 203, 324, 227],
+      [3726, 235, 264, 152],
+    ].map(([x, y, width, height]) => ({ x, y, width, height })))
+    // 비호관천 새 시트(1306x191)는 한 줄의 9컷이다. 실제 alpha 최하단은 y=164이므로
+    // 공통 세로 범위를 0..164로 잡아 상승/하강 위치는 보존하면서 아래 26px 투명 여백은
+    // 제거한다. origin bottom 배치 시 확대해도 호랑이의 시작점이 지면에서 뜨지 않는다.
+    // 가로는 실제 alpha 영역에 4px만 더하고 x=983의 작은 노이즈는 7번에 포함한다.
+    registerFrames('fx_skill_zhao_tiger', [
+      [37, 0, 72, 165], [161, 0, 88, 165], [307, 0, 90, 165],
+      [457, 0, 84, 165], [604, 0, 89, 165], [748, 0, 90, 165],
+      [900, 0, 88, 165], [1038, 0, 74, 165], [1188, 0, 62, 165],
+    ].map(([x, y, width, height]) => ({ x, y, width, height })))
     // 3162x627 shield-zombie death strip: preserve each pose's full logical
     // canvas so the widening fall is not cropped or stretched between frames.
     registerFrames('shield_zombie_death', [

@@ -79,7 +79,7 @@ export function ActionBar() {
   const entryView = (entry: QSEntry) => {
     if (entry.kind === 'skill') {
       const info = getSkillsForCharacter(selectedCharacter).find((skill) => skill.code === entry.code)
-      return { label: info?.name ?? entry.code, icon: info?.icon ?? '✦', iconImage: info?.iconImage, rotated: selectedCharacter === 'zhaoyun' && entry.code === 'skill_decisive_strike', color: '#66bb6a', count: null as number | null }
+      return { label: info?.name ?? entry.code, icon: info?.icon ?? '✦', iconImage: info?.iconImage, rotated: false, color: '#66bb6a', count: null as number | null }
     }
     const def = defs[entry.code]
     const count = invSlots.reduce((n, s) => (s?.code === entry.code ? n + s.quantity : n), 0)

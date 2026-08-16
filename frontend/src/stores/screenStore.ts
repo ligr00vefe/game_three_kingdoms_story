@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 /**
  * 앱 화면 전환 상태: 대기실(캐릭터 선택) → 로딩 → 게임.
@@ -16,9 +17,17 @@ interface ScreenState {
   selectCharacter: (code: string) => void
 }
 
-export const useScreenStore = create<ScreenState>((set) => ({
-  screen: 'lobby',
-  selectedCharacter: 'guanwu',
-  setScreen: (screen) => set({ screen }),
-  selectCharacter: (selectedCharacter) => set({ selectedCharacter }),
-}))
+export const useScreenStore = create<ScreenState>()(
+  persist(
+    (set) => ({
+      screen: 'lobby',
+      selectedCharacter: 'guanwu',
+      setScreen: (screen) => set({ screen }),
+      selectCharacter: (selectedCharacter) => set({ selectedCharacter }),
+    }),
+    {
+      name: 'tks-recent-character',
+      partialize: (state) => ({ selectedCharacter: state.selectedCharacter }),
+    },
+  ),
+)

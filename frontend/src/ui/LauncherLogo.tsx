@@ -1,94 +1,112 @@
 import { useEffect, type RefObject } from 'react'
 
-type Point = [number, number]
+const LOGO_WIDTH = 1390
+const LOGO_HEIGHT = 1009
+const INITIAL_DELAY = 1000
+const CHARACTER_DELAY = 350
+const CHARACTER_DURATION = 390
+const CLOUD_X = 253
+const CLOUD_Y = 743
 
-const LOGO_WIDTH = 1408
-const LOGO_HEIGHT = 1024
-const characterMasks: Point[][] = [
-  [[22, 505], [320, 505], [350, 832], [90, 850]],
-  [[1088, 505], [1388, 505], [1370, 850], [1090, 832]],
-  [[500, 700], [950, 700], [950, 875], [500, 875]],
+const characterLayers = [
+  { src: '/assets/img/logo/logo_char_01.png', x: 30, y: 525, startX: 140, startY: 300, coverBottom: 844 },
+  { src: '/assets/img/logo/logo_char_02.png', x: 1036, y: 547, startX: -140, startY: 285, coverBottom: 844 },
+  { src: '/assets/img/logo/logo_char_03.png', x: 543, y: 708, startX: 0, startY: 190, coverBottom: 865 },
 ]
 
-function drawMask(context: CanvasRenderingContext2D, points: Point[]) {
-  context.beginPath()
-  context.moveTo(points[0][0], points[0][1])
-  points.slice(1).forEach(([x, y]) => context.lineTo(x, y))
-  context.closePath()
+function popProgress(progress: number) {
+  const segment = (from: number, to: number, start: number, end: number) => {
+    const t = Math.min(1, Math.max(0, (progress - start) / (end - start)))
+    const snap = 1 - (1 - t) ** 3
+    return from + (to - from) * snap
+  }
+
+  if (progress < 0.12) return 0
+  if (progress < 0.38) return segment(0, 1.2, 0.12, 0.38)
+  if (progress < 0.56) return segment(1.2, 0.88, 0.38, 0.56)
+  if (progress < 0.72) return segment(0.88, 1.09, 0.56, 0.72)
+  if (progress < 0.86) return segment(1.09, 0.97, 0.72, 0.86)
+  return segment(0.97, 1, 0.86, 1)
 }
 
-function popScale(progress: number) {
-  if (progress <= 0.18) return 0.34 + progress / 0.18 * 0.84
-  if (progress <= 0.32) return 1.18 - (progress - 0.18) / 0.14 * 0.26
-  if (progress <= 0.47) return 0.92 + (progress - 0.32) / 0.15 * 0.14
-  return 1
+function loadImage(src: string) {
+  const image = new Image()
+  image.src = src
+  return image
 }
 
 export function LauncherLogo({ logoRef }: { logoRef: RefObject<HTMLCanvasElement | null> }) {
   useEffect(() => {
     const canvas = logoRef.current
-    if (!canvas) return
-    const context = canvas.getContext('2d')
-    if (!context) return
+    const context = canvas?.getContext('2d')
+    if (!canvas || !context) return
 
-    const image = new Image()
-    image.src = '/assets/img/logo/main_logo.png'
+    const background = loadImage('/assets/img/logo/main_logo_02.png')
+    const cloud = loadImage('/assets/img/logo/logo_cloud.png')
+    const characters = characterLayers.map((layer) => ({ ...layer, image: loadImage(layer.src) }))
+    const images = [background, cloud, ...characters.map(({ image }) => image)]
     let frame = 0
-    let startedAt = 0
-    const duration = 460
+    let disposed = false
 
-    const render = (now: number) => {
-      if (!startedAt) startedAt = now
+    canvas.width = LOGO_WIDTH
+    canvas.height = LOGO_HEIGHT
+
+    const draw = (startedAt: number, now: number) => {
       const elapsed = now - startedAt
       context.clearRect(0, 0, LOGO_WIDTH, LOGO_HEIGHT)
-      context.drawImage(image, 0, 0, LOGO_WIDTH, LOGO_HEIGHT)
+      context.drawImage(background, 0, 0)
 
-      // 정적 레이어에서는 캐릭터 영역을 비워 글자와 배경만 고정한다.
-      context.save()
-      context.globalCompositeOperation = 'destination-out'
-      characterMasks.forEach((mask) => {
-        drawMask(context, mask)
-        context.fill()
-      })
-      context.restore()
+      characters.forEach(({ image, x, y, startX, startY, coverBottom }, index) => {
+        const progress = Math.min(1, Math.max(0, (elapsed - INITIAL_DELAY - index * CHARACTER_DELAY) / CHARACTER_DURATION))
+        if (progress <= 0) return
 
-      characterMasks.forEach((mask, index) => {
-        const progress = Math.max(0, Math.min(1, (elapsed - index * 105) / duration))
-        if (progress === 0) return
-        const scale = popScale(progress)
-        const bounds = mask.reduce((result, [x, y]) => ({
-          left: Math.min(result.left, x), right: Math.max(result.right, x),
-          top: Math.min(result.top, y), bottom: Math.max(result.bottom, y),
-        }), { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity })
-        const centerX = (bounds.left + bounds.right) / 2
-        const centerY = (bounds.top + bounds.bottom) / 2
+        const movement = popProgress(progress)
+        const drawX = x + startX * (1 - movement)
+        const drawY = y + startY * (1 - movement)
+        const impact = Math.max(0, Math.min(1, movement))
+        const scaleX = 0.96 + impact * 0.04
+        const scaleY = 0.9 + impact * 0.1
+        const centerX = drawX + image.width / 2
+        const centerY = drawY + image.height / 2
 
         context.save()
-        drawMask(context, mask)
-        context.clip()
+        // Keep the character hidden below its foreground prop while it springs out.
+        if (progress < 1) {
+          context.beginPath()
+          context.rect(0, 0, LOGO_WIDTH, coverBottom)
+          context.clip()
+        }
         context.translate(centerX, centerY)
-        context.scale(scale, scale)
-        context.translate(-centerX, -centerY)
-        context.drawImage(image, 0, 0, LOGO_WIDTH, LOGO_HEIGHT)
+        context.scale(scaleX, scaleY)
+        context.drawImage(image, -image.width / 2, -image.height / 2)
         context.restore()
       })
 
-      if (elapsed < duration + 260) frame = requestAnimationFrame(render)
+      // The cloud is a true foreground layer, so characters 01 and 02 pass behind it.
+      context.drawImage(cloud, CLOUD_X, CLOUD_Y)
+
+      const totalDuration = INITIAL_DELAY + CHARACTER_DURATION + CHARACTER_DELAY * (characters.length - 1)
+      if (!disposed && elapsed < totalDuration) {
+        frame = requestAnimationFrame((nextNow) => draw(startedAt, nextNow))
+      }
     }
 
     const start = () => {
-      canvas.width = LOGO_WIDTH
-      canvas.height = LOGO_HEIGHT
-      startedAt = 0
-      frame = requestAnimationFrame(render)
+      if (disposed) return
+      const startedAt = performance.now()
+      frame = requestAnimationFrame((now) => draw(startedAt, now))
     }
-    if (image.complete) start()
-    else image.addEventListener('load', start, { once: true })
+
+    Promise.all(images.map((image) => image.complete
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => image.addEventListener('load', () => resolve(), { once: true }))))
+      .then(start)
+
     return () => {
+      disposed = true
       cancelAnimationFrame(frame)
-      image.removeEventListener('load', start)
     }
   }, [logoRef])
 
-  return <canvas ref={logoRef} className="launcher-logo" aria-label="삼국지 스토리" role="img" />
+  return <canvas ref={logoRef} className="launcher-logo" aria-label="Three Kingdoms Story logo" role="img" />
 }

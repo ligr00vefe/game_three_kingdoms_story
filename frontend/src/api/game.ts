@@ -4,7 +4,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useInventoryStore, INVENTORY_SIZE } from '../stores/inventoryStore'
 import type { ItemDef, ItemType } from '../stores/inventoryStore'
 import { useScreenStore } from '../stores/screenStore'
-import { useSkillStore } from '../stores/skillStore'
+import { getSkillsForCharacter, useSkillStore } from '../stores/skillStore'
 import { QUICKSLOT_COUNT, useQuickslotStore } from '../stores/quickslotStore'
 import { useAuthStore } from '../stores/authStore'
 import { CHARACTERS } from '../data/characters'
@@ -48,7 +48,8 @@ export async function loadGameState(): Promise<void> {
     characterName: CHARACTERS[characterCode]?.name ?? c.name,
     level: c.level, exp: c.exp,
     maxHp: c.maxHp, hp: c.hp, maxMp: c.maxMp, mp: c.mp,
-    attackPower: CHARACTERS[characterCode]?.stats.attack ?? c.attackPower, gold: c.gold,
+    // 서버 값에는 레벨업·보상 강화가 누적되어 있으므로 기본 스탯으로 덮어쓰지 않는다.
+    attackPower: c.attackPower, gold: c.gold,
     stageCode: c.stageCode, defenseStage: c.defenseStage,
     playerX: c.positionX, playerY: c.positionY,
   })
@@ -66,8 +67,10 @@ export async function loadGameState(): Promise<void> {
   }))
   useInventoryStore.getState().hydrate(data.inventory, defs)
   const quickslots = Array(QUICKSLOT_COUNT).fill(null)
+  const allowedSkillCodes = new Set(getSkillsForCharacter(characterCode).map((skill) => skill.code))
   for (const slot of data.quickslots ?? []) {
     if (slot.slotIndex >= 0 && slot.slotIndex < QUICKSLOT_COUNT) {
+      if (slot.kind === 'skill' && !allowedSkillCodes.has(slot.code)) continue
       quickslots[slot.slotIndex] = { kind: slot.kind, code: slot.code }
     }
   }
@@ -138,6 +141,7 @@ export function startAutosave(intervalMs = 10_000): () => void {
   EventBus.on(GameEvents.PLAYER_DIED, saveSoon)
   EventBus.on(GameEvents.DEFENSE_STATE, saveSoon)
   EventBus.on(GameEvents.MAP_CHANGED, saveMapChange)
+  EventBus.on(GameEvents.QUICKSLOTS_CHANGED, saveMapChange)
 
   return () => {
     clearInterval(timer)
@@ -148,5 +152,6 @@ export function startAutosave(intervalMs = 10_000): () => void {
     EventBus.off(GameEvents.PLAYER_DIED, saveSoon)
     EventBus.off(GameEvents.DEFENSE_STATE, saveSoon)
     EventBus.off(GameEvents.MAP_CHANGED, saveMapChange)
+    EventBus.off(GameEvents.QUICKSLOTS_CHANGED, saveMapChange)
   }
 }

@@ -71,6 +71,8 @@ export const COMBAT = {
   COMBO_WINDOW_MS: 2000,        // 이 시간 안에 다시 공격하면 콤보 유지, 넘기면 찌르기부터 재시작
   COMBO_DASH_VX: 320,           // 2단계(깊게 찌르기) 전진 속도(px/s)
   COMBO_DASH_MS: 150,           // 전진 유지 시간 — 이후 그 자리에 멈춰 마무리
+  LIGHT_THRUST_DASH_VX: 180,    // 관우 1타 찌르기: 뒤로 뻗는 다리를 상쇄하는 짧은 전진
+  LIGHT_THRUST_DASH_MS: 140,
   DECISIVE_DASH_VX: 520,        // 일격필살: 깊게 찌르기보다 빠른 전방 돌진
   DECISIVE_DASH_MS: 220,        // 약 114px 전진해 찌르기 관통감을 강화
   CHARGE_DASH_VX: 360,
@@ -91,10 +93,13 @@ export const COMBAT = {
     skill_charge_slash: 4000,
     skill_glaive_flurry: 6500,
     skill_decisive_strike: 8000,
+    skill_meteor_spear: 8000,
     skill_dragon_slash: 5500,
     skill_lightning_descent: 7000,
   } as Record<string, number>,
   SKILL_REACH: 200,
+  /** 유성창은 시전 중 전진한 위치에서 판정하므로 이펙트 끝을 넘지 않게 별도 제한한다. */
+  METEOR_SKILL_REACH: 145,
   /** 일격필살 전용 사거리 — 기존 300px보다 넓힌 360px */
   DECISIVE_SKILL_REACH: 270,
   GLAIVE_SLASH_REACH: 125,

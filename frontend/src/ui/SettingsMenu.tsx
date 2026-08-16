@@ -19,7 +19,6 @@ export function SettingsMenu() {
 
   // 대기실 복귀: 설정 닫고 화면을 lobby로 → PhaserGame 언마운트되며 게임 인스턴스 정리
   const returnToLobby = () => {
-    if (!window.confirm('대기실로 돌아가시겠습니까?')) return
     useUiStore.getState().setSettingsOpen(false)
     useUiStore.getState().setKeySettingsOpen(false)
     useScreenStore.getState().setScreen('lobby')

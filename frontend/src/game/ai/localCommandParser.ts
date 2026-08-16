@@ -36,6 +36,7 @@ export function parseLocalCommand(input: string): GuanYuCommand {
   const skillNames: Array<[string, string]> = [
     ['돌격무쌍', 'skill_charge_slash'],
     ['용아일섬', 'skill_glaive_flurry'],
+    ['유성창', 'skill_meteor_spear'],
     ['창영난무', 'skill_decisive_strike'],
     ['백화연창', 'skill_dragon_slash'],
     ['비호관천', 'skill_lightning_descent'],

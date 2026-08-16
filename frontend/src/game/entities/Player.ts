@@ -85,6 +85,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private modelFrameSize: number
   private modelGroundLift: number
   private modelVisualScale: number
+  private modelAttackSpeed: number
+  private modelForwardThrustMotion: boolean
   /** 이 티어에서 실제 아트가 로드돼 재생 가능한 animId("walk_r" 등) 집합 (없으면 idle→placeholder 폴백) */
   private availableAnims: Set<string> = new Set()
   private currentAnimKey: string | null = null
@@ -128,6 +130,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.modelFrameSize = model.frameSize
     this.modelGroundLift = model.groundLift
     this.modelVisualScale = model.visualScale
+    this.modelAttackSpeed = model.attackSpeed ?? 1
+    this.modelForwardThrustMotion = model.forwardThrustMotion ?? false
     scene.add.existing(this)
     scene.physics.add.existing(this)
     // 128px T1 아트 기준 (2026-07-12): 캐릭터 실체는 프레임 하단 정렬 ~68px로 구워져 있다.
@@ -226,6 +230,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'attack': return 'attack'
       case 'skill':
         if (!this.skillMotionReleased) return 'idle'
+        if (this.skillQueuedCode === 'skill_charge_slash' && this.modelForwardThrustMotion) return 'attack'
         if (this.skillQueuedCode === 'skill_glaive_flurry') {
           if (this.glaiveMotionPhase === 'air-thrust') return 'attack'
           if (this.glaiveMotionPhase === 'landing') return 'idle'
@@ -280,7 +285,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.anims.timeScale =
       this.state_ === 'skill' && action === 'attack'
         ? COMBAT.ATTACK_DURATION_MS / COMBAT.SKILL_DURATION_MS
-        : 1
+        : this.state_ === 'attack'
+          ? this.modelAttackSpeed
+          : 1
 
     // 사다리: 오르내리는 중에만 프레임 진행, 멈추면 정지
     if (action === 'climb') {
@@ -526,13 +533,34 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.state_ === 'climb'
   }
 
+  /**
+   * Recover from tunnelling below the map-wide ground collider.
+   * Arcade Physics cannot separate the body once a disabled/late collision
+   * step has moved it completely through the one-tile floor.
+   */
+  ensureAboveGround(groundY: number) {
+    if (this.body.bottom <= groundY + 1) return
+
+    const correctedY = this.y - (this.body.bottom - groundY)
+    this.currentLadder = null
+    this.body.setAllowGravity(true)
+    this.body.reset(this.x, correctedY)
+    this.setVelocityY(0)
+
+    if (this.state_ === 'climb' || this.state_ === 'jump' || this.state_ === 'jumpdash') {
+      this.state_ = 'idle'
+      this.dashUntil = 0
+      this.invincible = false
+    }
+  }
+
   // ---------- 공격/스킬 ----------
   private startAction(kind: 'attack' | 'skill', now: number) {
     this.state_ = kind
     this.lastCombatAt = now
     this.comboQueued = false // 새 모션 시작 — 이전 예약은 소비됐거나 무효
     const duration = kind === 'attack'
-      ? COMBAT.ATTACK_DURATION_MS
+      ? COMBAT.ATTACK_DURATION_MS / this.modelAttackSpeed
       : this.skillQueuedCode === 'skill_glaive_flurry'
         ? COMBAT.GLAIVE_DURATION_MS
       : this.skillQueuedCode === 'skill_decisive_strike'
@@ -541,7 +569,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             ? COMBAT.DRAGON_DURATION_MS
           : COMBAT.SKILL_DURATION_MS
     const hitAt = kind === 'attack'
-      ? COMBAT.ATTACK_HIT_AT_MS
+      ? COMBAT.ATTACK_HIT_AT_MS / this.modelAttackSpeed
       : this.skillQueuedCode === 'skill_glaive_flurry'
         ? COMBAT.GLAIVE_HIT_AT_MS
       : this.skillQueuedCode === 'skill_decisive_strike'
@@ -561,18 +589,23 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.glaiveMotionPhase = 'ground-swing'
       this.glaiveHasLeftGround = false
     }
-    if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
     // 대쉬찌르기(콤보 2단계)는 지상에서 앞으로 짧게 돌진한다. 그 외 지상 공격은 제자리 정지.
-    const isDashLunge = kind === 'attack' && this.comboStep === 2
+    const isLightThrustLunge = kind === 'attack' && this.comboStep === 0 && this.modelForwardThrustMotion
+    const isDashLunge = kind === 'attack' && (this.comboStep === 2 || isLightThrustLunge)
     if (this.body.blocked.down) {
       if (isDashLunge) {
-        this.dashLungeUntil = now + COMBAT.COMBO_DASH_MS
-        this.setVelocityX(this.facing * COMBAT.COMBO_DASH_VX)
+        const dashMs = isLightThrustLunge ? COMBAT.LIGHT_THRUST_DASH_MS : COMBAT.COMBO_DASH_MS
+        const dashVx = isLightThrustLunge ? COMBAT.LIGHT_THRUST_DASH_VX : COMBAT.COMBO_DASH_VX
+        this.dashLungeUntil = now + dashMs
+        this.setVelocityX(this.facing * dashVx)
       } else {
         this.dashLungeUntil = 0
         this.setVelocityX(0) // 공격 중 이동 불가 (지상)
       }
     }
+    // Run skill-specific movement after the generic ground-stop setup. Charge
+    // skills can then set dashLungeUntil/velocity without being reset to zero.
+    if (kind === 'skill') this.onSkillStart?.(this.facing, this.skillQueuedCode)
   }
 
   private updateAction(input: PlayerControl, now: number) {
@@ -623,10 +656,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const isChargeSlash = isSkill && this.skillQueuedCode === 'skill_charge_slash'
     const isDecisiveStrike = isSkill && this.skillQueuedCode === 'skill_decisive_strike'
     const isGlaiveSlash = isSkill && this.skillQueuedCode === 'skill_glaive_flurry'
+    const isMeteorSpear = isSkill && this.skillQueuedCode === 'skill_meteor_spear'
     const reach = isSkill
       ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH
         : isDecisiveStrike ? COMBAT.DECISIVE_SKILL_REACH
           : isGlaiveSlash ? COMBAT.GLAIVE_SLASH_REACH
+          : isMeteorSpear ? COMBAT.METEOR_SKILL_REACH
           : COMBAT.SKILL_REACH
       : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
     const h = isSkill

@@ -33,6 +33,9 @@ export function SkillPanel() {
       </div>
 
       <div className="sk-grid">
+        {skills.length === 0 && (
+          <p className="sk-empty">아직 사용할 수 있는 스킬이 없습니다.</p>
+        )}
         {skills.map((def) => {
           const lv = levels[def.code] ?? 0
           const locked = lv <= 0
@@ -56,7 +59,7 @@ export function SkillPanel() {
               }}
               title={locked ? `Lv ${def.unlockLevel}에 해금` : `${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
             >
-              <span className={`sk-icon ${selectedCharacter === 'zhaoyun' && def.code === 'skill_decisive_strike' ? 'sk-icon--rotated-spear' : ''}`} data-type={def.type}>
+              <span className="sk-icon" data-type={def.type}>
                 {locked ? '🔒' : def.iconImage ? <img src={def.iconImage} alt="" /> : def.icon}
               </span>
               <div className="sk-info">
@@ -81,7 +84,7 @@ export function SkillPanel() {
           )
         })}
       </div>
-      <p className="inv-hint">직책이 오르면 자동으로 새 스킬이 해금됩니다 · ＋/− 로 포인트를 배분해 강화 · 스킬 칸을 퀵슬롯으로 드래그해 등록 후 숫자키(1~7)로 발동</p>
+      {skills.length > 0 && <p className="inv-hint">직책이 오르면 자동으로 새 스킬이 해금됩니다 · ＋/− 로 포인트를 배분해 강화 · 스킬 칸을 퀵슬롯으로 드래그해 등록 후 숫자키(1~7)로 발동</p>}
     </div>
   )
 }
