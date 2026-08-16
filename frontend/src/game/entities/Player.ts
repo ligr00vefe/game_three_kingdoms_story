@@ -86,6 +86,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private modelGroundLift: number
   private modelVisualScale: number
   private modelAttackSpeed: number
+  private modelBasicAttackReach: number
   private modelForwardThrustMotion: boolean
   /** 이 티어에서 실제 아트가 로드돼 재생 가능한 animId("walk_r" 등) 집합 (없으면 idle→placeholder 폴백) */
   private availableAnims: Set<string> = new Set()
@@ -131,6 +132,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.modelGroundLift = model.groundLift
     this.modelVisualScale = model.visualScale
     this.modelAttackSpeed = model.attackSpeed ?? 1
+    this.modelBasicAttackReach = model.basicAttackReach ?? COMBAT.ATTACK_REACH
     this.modelForwardThrustMotion = model.forwardThrustMotion ?? false
     scene.add.existing(this)
     scene.physics.add.existing(this)
@@ -657,18 +659,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const isDecisiveStrike = isSkill && this.skillQueuedCode === 'skill_decisive_strike'
     const isGlaiveSlash = isSkill && this.skillQueuedCode === 'skill_glaive_flurry'
     const isMeteorSpear = isSkill && this.skillQueuedCode === 'skill_meteor_spear'
+    const isCrushingMoonSlash = isSkill && this.skillQueuedCode === 'skill_crushing_moon_slash'
     const reach = isSkill
       ? isChargeSlash ? COMBAT.CHARGE_SKILL_REACH
         : isDecisiveStrike ? COMBAT.DECISIVE_SKILL_REACH
           : isGlaiveSlash ? COMBAT.GLAIVE_SLASH_REACH
           : isMeteorSpear ? COMBAT.METEOR_SKILL_REACH
+          : isCrushingMoonSlash ? COMBAT.CRUSHING_MOON_SKILL_REACH
           : COMBAT.SKILL_REACH
-      : this.comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
+      : this.comboStep === 2 ? Math.max(COMBAT.COMBO_DASH_REACH, this.modelBasicAttackReach) : this.modelBasicAttackReach
     const h = isSkill
       ? isChargeSlash ? COMBAT.CHARGE_SKILL_HEIGHT : COMBAT.SKILL_HEIGHT
       : COMBAT.ATTACK_HEIGHT
     const x = this.facing === 1 ? this.x : this.x - reach
-    return new Phaser.Geom.Rectangle(x, this.y - h / 2, reach, h)
+    // 기본 공격은 스프라이트 중심이 아니라 발을 기준으로 잡는다. 여포처럼 프레임의
+    // 투명 여백/중심이 높은 캐릭터도 판정이 지상의 몬스터 위로 뜨지 않게 한다.
+    const y = isSkill
+      ? this.y - h / 2
+      : (this.body as Phaser.Physics.Arcade.Body).bottom - h
+    return new Phaser.Geom.Rectangle(x, y, reach, h)
   }
 
   /** 스킬 쿨타임 잔여 (HUD 표시용, Phase 3+) */

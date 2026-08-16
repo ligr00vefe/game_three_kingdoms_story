@@ -98,6 +98,8 @@ export const GameEvents = {
   PROMOTED: 'ui:promoted',
   /** 채팅 입력/설정 패널이 열린 동안 게임 키 입력 차단 (boolean) */
   INPUT_BLOCK: 'ui:input-block',
+  /** ESC 설정창이 열려 있는 동안 게임 장면 자체를 일시정지한다 (boolean). */
+  GAME_PAUSE: 'ui:game-pause',
   /** 포탈 메뉴에서 "성밖으로" 선택 — 보관된 타깃으로 이동 */
   PORTAL_GO_OUTSIDE: 'ui:portal-go-outside',
   /** 포탈 메뉴에서 "탐험하기" 선택 — 디펜스 게임 진입 */

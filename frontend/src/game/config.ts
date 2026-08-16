@@ -94,12 +94,19 @@ export const COMBAT = {
     skill_glaive_flurry: 6500,
     skill_decisive_strike: 8000,
     skill_meteor_spear: 8000,
+    skill_crushing_moon_slash: 8000,
+    skill_severing_spirits: 8000,
+    skill_lubu_heaven_shatter: 8000,
+    skill_lubu_world_annihilation: 8000,
+    skill_lubu_demon_gate_chain: 8000,
     skill_dragon_slash: 5500,
     skill_lightning_descent: 7000,
   } as Record<string, number>,
   SKILL_REACH: 200,
   /** 유성창은 시전 중 전진한 위치에서 판정하므로 이펙트 끝을 넘지 않게 별도 제한한다. */
   METEOR_SKILL_REACH: 145,
+  /** 쇄월참 전용 판정. 유성창과 별도 조정한다. */
+  CRUSHING_MOON_SKILL_REACH: 165,
   /** 일격필살 전용 사거리 — 기존 300px보다 넓힌 360px */
   DECISIVE_SKILL_REACH: 270,
   GLAIVE_SLASH_REACH: 125,
@@ -120,7 +127,6 @@ export const COMBAT = {
   GLAIVE_HIT_AT_MS: 720,
   DECISIVE_HIT_AT_MS: 680,
   DRAGON_HIT_AT_MS: 720,
-  SKILL_HITSTOP_MS: 70,
   /** 언월난무 각 타격의 추가 피해 배율 */
   GLAIVE_SLAM_DAMAGE_MULTIPLIER: 1.35,
 

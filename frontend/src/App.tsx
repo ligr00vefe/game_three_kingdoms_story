@@ -93,7 +93,7 @@ function GameApp() {
       ui.setSettingsOpen(false)
       if (e.code === 'KeyA') {
         ui.setCommandHelpOpen(false)
-        useAutoCombatStore.getState().setQuickHelpVisible(true)
+        useAutoCombatStore.getState().toggleQuickHelp()
       } else {
         ui.setCommandHelpOpen(!ui.commandHelpOpen)
       }

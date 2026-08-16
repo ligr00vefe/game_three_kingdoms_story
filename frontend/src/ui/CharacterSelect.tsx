@@ -3,7 +3,8 @@ import { CHARACTERS, LOBBY_SLOTS } from '../data/characters'
 import { useScreenStore } from '../stores/screenStore'
 import { useGameStore } from '../stores/gameStore'
 import { useQuickslotStore } from '../stores/quickslotStore'
-import { loadGameState } from '../api/game'
+import { loadCharacterSummary, loadGameState } from '../api/game'
+import { useAutoCombatStore } from '../stores/autoCombatStore'
 
 /**
  * 두루마리가 말리거나 펴지는 데 걸리는 시간(ms).
@@ -71,6 +72,9 @@ export function CharacterSelect() {
   const [shown, setShown] = useState<string | null>(initialCharacter)
   const [open, setOpen] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [characterLevels, setCharacterLevels] = useState<Record<string, number>>({
+    [initialCharacter]: useGameStore.getState().level,
+  })
   const char = shown ? CHARACTERS[shown] : null
   const game = useGameStore()
 
@@ -90,6 +94,17 @@ export function CharacterSelect() {
   useEffect(() => {
     const t = setTimeout(() => setOpen(true), 30)
     return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(Object.keys(CHARACTERS).map(async (code) => {
+      const state = await loadCharacterSummary(code)
+      return [code, state.level] as const
+    })).then((entries) => {
+      if (!cancelled) setCharacterLevels(Object.fromEntries(entries))
+    }).catch(() => {})
+    return () => { cancelled = true }
   }, [])
 
   // 캐릭터 변경: 말고(open=false) → 다 말리면 내용 교체 → 다시 편다.
@@ -118,6 +133,9 @@ export function CharacterSelect() {
       moveSpeedMult: CHARACTERS[selected].stats.speedPct / 100,
     })
     useQuickslotStore.getState().switchCharacter(selected)
+    // Auto-combat is a live control mode, not character save data. Never carry
+    // the previous character's active AI control into a newly entered game.
+    useAutoCombatStore.getState().setEnabled(false)
 
     try {
       await loadGameState()
@@ -196,7 +214,7 @@ export function CharacterSelect() {
             <span className="scroll-rod scroll-rod--top" />
             <div className="scroll-viewport" style={{ height: open ? contentH : 0 }}>
               <div className="scroll-content" ref={contentRef}>
-                <div className="lobby-card-lv">Lv. <b>{game.level}</b></div>
+                <div className="lobby-card-lv">Lv. <b>{characterLevels[char.code] ?? 1}</b></div>
                 <div className="lobby-card-name">{char.name}</div>
                 <div className="lobby-card-class">⚔ {char.clazz}</div>
                 <p className="lobby-card-desc">{char.desc}</p>

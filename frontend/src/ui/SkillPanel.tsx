@@ -1,8 +1,7 @@
 import { useSkillStore, getSkillsForCharacter } from '../stores/skillStore'
 import { useScreenStore } from '../stores/screenStore'
 import { useUiStore } from '../stores/uiStore'
-import { useGameStore } from '../stores/gameStore'
-import { titleForLevel } from '../game/systems/playerAnimations'
+import { CHARACTERS } from '../data/characters'
 import { useDraggableWindow } from './useDraggableWindow'
 
 /**
@@ -13,7 +12,6 @@ export function SkillPanel() {
   const open = useUiStore((s) => s.skillbookOpen)
   const levels = useSkillStore((s) => s.levels)
   const points = useSkillStore((s) => s.points)
-  const charLevel = useGameStore((s) => s.level)
   const selectedCharacter = useScreenStore((s) => s.selectedCharacter)
   const skills = getSkillsForCharacter(selectedCharacter)
   const windowDrag = useDraggableWindow('skillbook')
@@ -28,7 +26,7 @@ export function SkillPanel() {
       </div>
 
       <div className="sk-header">
-        <span className="sk-tree">📖 {titleForLevel(charLevel)}의 무예</span>
+        <span className="sk-tree">📖 {(CHARACTERS[selectedCharacter] ?? CHARACTERS.guanwu).name}의 무예</span>
         <span className="sk-points">SKILL POINT <b>{points}</b></span>
       </div>
 

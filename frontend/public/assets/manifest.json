@@ -58,7 +58,7 @@
     "fx_skill_charge": "assets/img/fx/skill_wild_horse_charge.png",
     "fx_skill_lightning": "assets/img/fx/skill_descent_of_the_thunder_god.png",
     "fx_skill_lightning_small": "assets/img/fx/skill_descent_of_the_thunder_god_small.png",
-    "fx_level_up": "assets/img/fx/effect_level_up.png",
+    "fx_level_up": "assets/img/fx/effect_level_up.png?v=20260817-2",
     "icon_coin": "assets/img/items/coin.png",
     "fx_dash_thrust": "assets/img/fx/effect_deep_thrust.png",
     "fx_dash": "assets/img/fx/effect_dash.png",
@@ -74,6 +74,8 @@
   "spritesheets": {
     "shield_zombie_walk": { "url": "assets/img/monster/shield_zombie_walk.png", "frameWidth": 527, "frameHeight": 500 },
     "fx_skill_zhao_charge": { "url": "assets/img/fx/skill_horse_charge.png?v=20260816-full-cuts-3", "frameWidth": 109, "frameHeight": 327 },
+    "fx_skill_lubu_crushing_moon": { "url": "assets/img/fx/skill_crushing_moon_slash.png?v=20260816-1", "frameWidth": 512, "frameHeight": 553 },
+    "fx_skill_lubu_severing_spirits": { "url": "assets/img/fx/skill_severing_spirits.png?v=20260817-1", "frameWidth": 512, "frameHeight": 553 },
     "fx_skill_glaive": { "url": "assets/img/fx/skill_crescent_moon_dance_fixed_v5.png", "frameWidth": 896, "frameHeight": 420 },
     "fx_skill_dragon": { "url": "assets/img/fx/skill_blue_dragon_slash_fixed_v3.png", "frameWidth": 320, "frameHeight": 648 },
     "fx_skill_zhao_dragon": { "url": "assets/img/fx/skill_dragons_fang_flash.png", "frameWidth": 438, "frameHeight": 724 },

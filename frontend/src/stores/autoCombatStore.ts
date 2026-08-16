@@ -18,6 +18,7 @@ interface AutoCombatState {
   setMinEnemyCount: (value: number) => void
   setReserveSkillForBoss: (enabled: boolean) => void
   setQuickHelpVisible: (visible: boolean) => void
+  toggleQuickHelp: () => void
 }
 
 export const useAutoCombatStore = create<AutoCombatState>()(
@@ -37,6 +38,7 @@ export const useAutoCombatStore = create<AutoCombatState>()(
       setMinEnemyCount: (minEnemyCount) => set({ minEnemyCount }),
       setReserveSkillForBoss: (reserveSkillForBoss) => set({ reserveSkillForBoss }),
       setQuickHelpVisible: (quickHelpVisible) => set({ quickHelpVisible }),
+      toggleQuickHelp: () => set((state) => ({ quickHelpVisible: !state.quickHelpVisible })),
     }),
     { name: 'tks-auto-combat-v1' },
   ),

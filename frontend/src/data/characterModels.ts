@@ -10,6 +10,8 @@ export interface CharacterModelDef {
   visualScale: number
   /** Basic-attack playback and state timing multiplier. */
   attackSpeed?: number
+  /** Character-specific basic attack reach in world pixels. */
+  basicAttackReach?: number
   /** Use the thrust sheet for charge skills and add a light lunge to opening thrusts. */
   forwardThrustMotion?: boolean
   /** World-space Y offset that places the air-dash trail below the character's hips. */
@@ -48,9 +50,10 @@ export const CHARACTER_MODELS: Record<string, CharacterModelDef> = {
     assetAction: { skill: 'attack' },
   },
   lubu_t2: {
-    code: 'lubu_t2', assetPrefix: 'lubu_t2', fallbackTexture: 'guanwu_idle', frameSize: 192, groundLift: -10, visualScale: 1.4,
+    code: 'lubu_t2', assetPrefix: 'lubu_t2', fallbackTexture: 'guanwu_idle', frameSize: 192, groundLift: -10, visualScale: 1.587,
     airDashEffectYOffset: 36,
     attackSpeed: 1.25,
+    basicAttackReach: 155,
     animations: { idle: 8, walk: 8, jump: 8, climb: 8, attack: 8 },
   },
 }

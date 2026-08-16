@@ -42,7 +42,7 @@ export class InputManager {
     // 1~7은 React 퀵슬롯에서 처리한다.
     if (/^Digit[1-7]$/.test(event.code)) return
     // 바인딩된 키는 브라우저 기본 동작(스크롤/메뉴 포커스 등)을 막는다
-    if (useKeybindingStore.getState().bindings[event.code]) event.preventDefault()
+    if (event.code.startsWith('Arrow') || useKeybindingStore.getState().bindings[event.code]) event.preventDefault()
     if (event.repeat || this.pressed.has(event.code)) return
     this.pressed.add(event.code)
     this.pending.add(event.code)
@@ -81,11 +81,13 @@ export class InputManager {
     return false
   }
 
-  get left() { return this.cursors.left!.isDown }
-  get right() { return this.cursors.right!.isDown }
-  get up() { return this.cursors.up!.isDown }
+  // Direction keys use the same state source as every other gameplay key.
+  // Phaser CursorKey can lose isDown across keyboard disable/enable on ESC.
+  get left() { return this.pressed.has('ArrowLeft') }
+  get right() { return this.pressed.has('ArrowRight') }
+  get up() { return this.pressed.has('ArrowUp') }
   get upJustDown() { return Phaser.Input.Keyboard.JustDown(this.cursors.up!) }
-  get down() { return this.cursors.down!.isDown }
+  get down() { return this.pressed.has('ArrowDown') }
   get jumpDown() { return this.actionDown('jump') }
   get jumpJustDown() { return this.actionJustDown('jump') }
   get attackJustDown() { return this.actionJustDown('attack') }

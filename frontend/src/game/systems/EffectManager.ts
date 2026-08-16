@@ -16,6 +16,8 @@ export class EffectManager {
   private skillPool: Phaser.GameObjects.Group
   private zhaoChargePool: Phaser.GameObjects.Group
   private meteorPool: Phaser.GameObjects.Group
+  private crushingMoonPool: Phaser.GameObjects.Group
+  private severingSpiritsPool: Phaser.GameObjects.Group
   private spearPool: Phaser.GameObjects.Group
   private flowerPool: Phaser.GameObjects.Group
   private flowerAttackPool: Phaser.GameObjects.Group
@@ -40,6 +42,8 @@ export class EffectManager {
     this.skillPool = scene.add.group({ defaultKey: 'fx_skill_charge', maxSize: 4 })
     this.zhaoChargePool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_charge', maxSize: 2 })
     this.meteorPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_meteor', maxSize: 2 })
+    this.crushingMoonPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_crushing_moon', maxSize: 2 })
+    this.severingSpiritsPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_severing_spirits', maxSize: 2 })
     this.spearPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_spear', maxSize: 8 })
     this.flowerPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower', maxSize: 2 })
     this.flowerAttackPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower_attack', maxSize: 2 })
@@ -135,6 +139,8 @@ export class EffectManager {
     const definitions = [
       ['fx_skill_horse_charge_anim', 'fx_skill_zhao_charge', 7, 18],
       ['fx_skill_meteor_anim', 'fx_skill_zhao_meteor', 7, 18],
+      ['fx_skill_lubu_crushing_moon_anim', 'fx_skill_lubu_crushing_moon', 8, 18],
+      ['fx_skill_lubu_severing_spirits_anim', 'fx_skill_lubu_severing_spirits', 8, 18],
       ['fx_skill_spear_flurry_anim', 'fx_skill_zhao_spear', 10, 60],
       ['fx_skill_flower_anim', 'fx_skill_zhao_flower', 9, 10],
       ['fx_skill_flower_attack_anim', 'fx_skill_zhao_flower_attack', 3, 12],
@@ -172,22 +178,20 @@ export class EffectManager {
   private defineLevelUpFrames() {
     if (!this.scene.textures.exists('fx_level_up')) return
     const texture = this.scene.textures.get('fx_level_up')
-    const beamFrames: Phaser.Types.Animations.AnimationFrame[] = []
-    const labelFrames: Phaser.Types.Animations.AnimationFrame[] = []
-    for (let i = 0; i < 12; i++) {
-      const beamName = `level_beam_${i}`
-      const labelName = `level_label_${i}`
-      if (texture.has(beamName)) texture.remove(beamName)
-      if (texture.has(labelName)) texture.remove(labelName)
-      texture.add(beamName, 0, i * 128, 80, 128, 460)
-      texture.add(labelName, 0, i * 128, 630, 128, 190)
-      beamFrames.push({ key: 'fx_level_up', frame: beamName })
-      labelFrames.push({ key: 'fx_level_up', frame: labelName })
-    }
-    if (this.scene.anims.exists('fx_level_beam_anim')) this.scene.anims.remove('fx_level_beam_anim')
-    if (this.scene.anims.exists('fx_level_label_anim')) this.scene.anims.remove('fx_level_label_anim')
-    this.scene.anims.create({ key: 'fx_level_beam_anim', frames: beamFrames, frameRate: 14, repeat: 0 })
-    this.scene.anims.create({ key: 'fx_level_label_anim', frames: labelFrames, frameRate: 14, repeat: 0 })
+    const cuts = [
+      [44, 140, 33, 567], [199, 317, 360, 566], [357, 499, 120, 568],
+      [525, 680, 152, 570], [702, 862, 37, 572], [885, 1061, 23, 573],
+      [1084, 1274, 19, 575], [1279, 1500, 41, 579], [1507, 1686, 41, 573],
+      [1709, 1856, 57, 571], [1882, 1997, 103, 571], [2038, 2128, 65, 565],
+    ] as const
+    const frames = cuts.map(([x, endX, y, endY], index) => {
+      const name = `level_up_${index}`
+      if (texture.has(name)) texture.remove(name)
+      texture.add(name, 0, x, y, endX - x, endY - y)
+      return { key: 'fx_level_up', frame: name }
+    })
+    if (this.scene.anims.exists('fx_level_up_anim')) this.scene.anims.remove('fx_level_up_anim')
+    this.scene.anims.create({ key: 'fx_level_up_anim', frames, frameRate: 14, repeat: 0 })
   }
 
   private defineJumpFrames() {
@@ -512,6 +516,35 @@ export class EffectManager {
     normalizeSize()
   }
 
+  crushingMoonSlash(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.crushingMoonPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_lubu_crushing_moon_anim')) return
+    this.scene.tweens.killTweensOf(sprite)
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 75, y + 18)
+      .setOrigin(0.5, 0.5).setFlipX(facing === -1).setAlpha(1)
+      .setScale(0.51).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_lubu_crushing_moon_anim')
+    this.scene.tweens.add({
+      targets: sprite,
+      x: x + facing * 175,
+      duration: 440,
+      ease: 'Linear',
+    })
+  }
+
+  severingSpirits(x: number, y: number, facing: -1 | 1) {
+    const sprite = this.severingSpiritsPool.get(x, y) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists('fx_skill_lubu_severing_spirits_anim')) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 105, y + 14)
+      .setOrigin(0.5, 0.5).setFlipX(facing === -1).setAlpha(1)
+      .setScale(0.442).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play('fx_skill_lubu_severing_spirits_anim')
+  }
+
   spearFlurry(x: number, y: number, facing: -1 | 1) {
     const sprite = this.spearPool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!sprite || !this.scene.anims.exists('fx_skill_spear_flurry_anim')) return
@@ -773,31 +806,25 @@ export class EffectManager {
    * 중앙 정렬하면 기둥이 공중에 뜬다.
    */
   /** 기둥 목표 높이(월드 px) — 캐릭터(~51px)보다 확실히 크게 */
-  private static readonly LEVELUP_FX_HEIGHT = 165
+  private static readonly LEVELUP_FX_SCALE = 0.65
   /**
    * 기둥은 캐릭터 **뒤**에 깐다 (플레이어 depth 0). 앞에 두면 정작 레벨업한 관우가 안 보인다.
    * NPC(-10)보다는 앞이라 옆에 NPC가 있어도 기둥이 가려지지 않는다.
    */
-  private static readonly LEVELUP_FX_DEPTH = -1
+  private static readonly LEVELUP_FX_DEPTH = 25
 
   /** 레벨업 빛 기둥 (GAME_DESIGN 5.1) — 저빈도라 풀 없이 생성/파괴 */
   levelUp(target: Phaser.GameObjects.Sprite) {
     // 발밑 = 스프라이트 프레임 하단. 캐릭터가 128 프레임에 하단 정렬돼 있어 둘이 사실상 같다
     // (캐릭터 바닥 y=127 vs 프레임 128) — target.y는 프레임 중심이라 그대로 쓰면 안 된다.
-    const footY = target.getBounds().bottom
-    if (!this.scene.anims.exists('fx_level_beam_anim')) return
-    const pillar = this.scene.add.sprite(target.x, footY, 'fx_level_up', 'level_beam_0')
-      .setOrigin(0.5, 1).setDepth(EffectManager.LEVELUP_FX_DEPTH).setBlendMode(Phaser.BlendModes.ADD)
-    const label = this.scene.add.sprite(target.x, target.y - 80, 'fx_level_up', 'level_label_0')
-      .setOrigin(0.5).setDepth(1)
-    const normalizePillar = () => pillar.setDisplaySize(130, EffectManager.LEVELUP_FX_HEIGHT)
-    const normalizeLabel = () => label.setDisplaySize(112, 58)
-    pillar.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizePillar)
-    label.on(Phaser.Animations.Events.ANIMATION_UPDATE, normalizeLabel)
-    pillar.play('fx_level_beam_anim'); normalizePillar()
-    label.play('fx_level_label_anim'); normalizeLabel()
-    pillar.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => pillar.destroy())
-    label.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => label.destroy())
+    const body = target.body as Phaser.Physics.Arcade.Body | null
+    const footY = body?.bottom ?? target.getBounds().bottom
+    if (!this.scene.anims.exists('fx_level_up_anim')) return
+    const effect = this.scene.add.sprite(target.x, footY, 'fx_level_up', 'level_up_0')
+      .setOrigin(0.5, 1).setDepth(EffectManager.LEVELUP_FX_DEPTH)
+      .setBlendMode(Phaser.BlendModes.ADD).setScale(EffectManager.LEVELUP_FX_SCALE)
+    effect.play('fx_level_up_anim')
+    effect.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => effect.destroy())
   }
 
   /**

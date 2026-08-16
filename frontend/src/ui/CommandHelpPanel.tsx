@@ -116,7 +116,7 @@ export function CommandHelpPanel() {
         </div>
         <div className="command-help__actions">
           <button className="command-help__key-settings" onClick={() => { close(); useUiStore.getState().setKeySettingsOpen(true) }}>단축키 설정</button>
-          <button className="command-help__close" onClick={close}>확인 (A, F1 또는 ESC)</button>
+          <button className="command-help__close" onClick={close}>확인 (F1 또는 ESC)</button>
         </div>
       </div>
     </div>

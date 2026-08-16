@@ -80,6 +80,12 @@ useUiStore.subscribe(
   (blocked) => EventBus.emit(GameEvents.INPUT_BLOCK, blocked),
 )
 
+// ESC 설정창은 일반 입력 차단과 달리 게임 월드의 시간/물리도 실제로 정지한다.
+useUiStore.subscribe(
+  (s) => s.settingsOpen,
+  (paused) => EventBus.emit(GameEvents.GAME_PAUSE, paused),
+)
+
 // Phaser 단축키 → 패널 토글 (게임 쪽은 이벤트만 쏘고 UI 상태는 여기서 관리)
 EventBus.on(GameEvents.TOGGLE_QUEST, () => useUiStore.getState().toggleQuest())
 EventBus.on(GameEvents.TOGGLE_MINIMAP, () => useUiStore.getState().toggleMinimap())

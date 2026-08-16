@@ -37,6 +37,11 @@ interface GameStateResponse {
   quickslots: { slotIndex: number; kind: 'item' | 'skill'; code: string }[]
 }
 
+export async function loadCharacterSummary(characterCode: string): Promise<GameStateResponse['character']> {
+  const { data } = await api.get<GameStateResponse>('/game/state', { params: { characterCode } })
+  return data.character
+}
+
 /** 접속 시 서버 상태 로드 → 스토어 하이드레이트 (첫 Phaser↔React↔서버 3자 연동) */
 export async function loadGameState(): Promise<void> {
   const characterCode = useScreenStore.getState().selectedCharacter

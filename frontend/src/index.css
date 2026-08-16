@@ -1748,9 +1748,13 @@ html, body, #root { height: 100%; }
    background-size는 시트 전체(512×128)에 배율을 곱한 값이어야 프레임 1장이 정확히 잘린다. */
 .ci-avatar {
   width: 96px; height: 96px;
-  background: url('/assets/img/char/guanwu_t1_idle_r.png') 0 0 / 384px 96px no-repeat;
+  background-position: 0 0;
+  background-repeat: no-repeat;
   image-rendering: pixelated;
 }
+.ci-avatar--guanwu { background-image: url('/assets/img/char/guanwu_t2_idle_r.png'); background-size: 576px 96px; }
+.ci-avatar--zhaoyun { background-image: url('/assets/img/char/zhaoyun_t2_idle_r.png'); background-size: 576px 96px; }
+.ci-avatar--lubu { background-image: url('/assets/img/char/lubu_t2_idle_r.png'); background-size: 768px 96px; }
 .ci-name { font-size: 15px; font-weight: 800; color: #26323a; }
 .ci-class { font-size: 11px; font-weight: 700; color: #e0587a; }
 .ci-cp {

@@ -34,6 +34,11 @@ export function parseLocalCommand(input: string): GuanYuCommand {
     })
   }
   const skillNames: Array<[string, string]> = [
+    ['패천격', 'skill_severing_spirits'],
+    ['단혼참', 'skill_crushing_moon_slash'],
+    ['진천폭쇄', 'skill_lubu_heaven_shatter'],
+    ['천지절멸', 'skill_lubu_world_annihilation'],
+    ['귀문연환', 'skill_lubu_demon_gate_chain'],
     ['돌격무쌍', 'skill_charge_slash'],
     ['용아일섬', 'skill_glaive_flurry'],
     ['유성창', 'skill_meteor_spear'],

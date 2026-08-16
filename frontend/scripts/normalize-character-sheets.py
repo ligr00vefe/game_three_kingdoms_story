@@ -42,11 +42,19 @@ CHARACTERS = {
             "jump_l": 8, "jump_r": 8, "climb": 8,
             "attack_l": 8, "attack_r": 8,
         },
-        "scale": SOURCE_SCALE,
+        # Keep canvas headroom for per-pose corrections. The runtime render
+        # scale compensates for this smaller packing scale.
+        "scale": 0.30,
         # Keep Lu Bu's apparent width stable across the independently drawn idle poses.
         "normalizeWidths": {"idle_l", "idle_r"},
         # walk_l만 다른 원본보다 약 1/2.8 해상도로 제공되어 같은 체격이 되도록 보정한다.
-        "actionScale": {"walk_l": 0.94},
+        "actionScale": {"walk_l": 0.829},
+        "frameScale": {
+            "attack_l": [1.00, 1.02, 1.05, 1.07, 1.09, 1.12, 1.10, 1.05],
+            "attack_r": [1.00, 1.02, 1.05, 1.07, 1.09, 1.12, 1.10, 1.05],
+            "jump_l": [1.00, 1.08, 1.04, 1.03, 1.02, 1.03, 1.09, 1.00],
+            "jump_r": [1.00, 1.08, 1.04, 1.03, 1.02, 1.03, 1.09, 1.00],
+        },
     },
 }
 
@@ -81,6 +89,7 @@ def normalize(
     expected: int,
     scale: float,
     normalize_width: bool = False,
+    frame_scales: list[float] | None = None,
 ) -> None:
     image = Image.open(source).convert("RGBA")
     runs = occupied_runs(image)
@@ -95,12 +104,14 @@ def normalize(
             raise ValueError(f"{source.name}: empty pose at {left}:{right}")
         poses.append(cell.crop(bbox))
 
+    frame_scales = frame_scales or [1.0] * expected
     scaled = [
         pose.resize(
-            (max(1, round(pose.width * scale)), max(1, round(pose.height * scale))),
+            (max(1, round(pose.width * scale * frame_scales[index])),
+             max(1, round(pose.height * scale * frame_scales[index]))),
             Image.Resampling.LANCZOS,
         )
-        for pose in poses
+        for index, pose in enumerate(poses)
     ]
     if normalize_width:
         target_width = max(pose.width for pose in scaled)
@@ -131,6 +142,7 @@ def main() -> None:
                 expected,
                 config.get("actionScale", {}).get(action, ACTION_SCALE.get(action, config["scale"])),
                 action in config.get("normalizeWidths", set()),
+                config.get("frameScale", {}).get(action),
             )
 
 if __name__ == "__main__":

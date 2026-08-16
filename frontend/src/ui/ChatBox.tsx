@@ -4,6 +4,8 @@ import { useGameStore } from '../stores/gameStore'
 import { useUiStore } from '../stores/uiStore'
 import { useAuthStore } from '../stores/authStore'
 import { EventBus, GameEvents } from '../game/EventBus'
+import { CHARACTERS } from '../data/characters'
+import { useScreenStore } from '../stores/screenStore'
 
 /**
  * 좌하단 채팅(댓글)창 — 메이플 하단 채팅 인터페이스.
@@ -24,7 +26,8 @@ export function ChatBox() {
 
   useEffect(() => {
     const onReply = (payload: { text: string }) => {
-      useChatStore.getState().addMessage({ kind: 'guanYu', author: '관우', text: payload.text })
+      const code = useScreenStore.getState().selectedCharacter
+      useChatStore.getState().addMessage({ kind: 'guanYu', author: CHARACTERS[code]?.name ?? '관우', text: payload.text })
     }
     EventBus.on(GameEvents.GUAN_YU_REPLY, onReply)
     return () => { EventBus.off(GameEvents.GUAN_YU_REPLY, onReply) }

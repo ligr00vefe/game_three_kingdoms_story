@@ -2,6 +2,7 @@ import { useKeybindingStore, ACTION_INFO, ALL_ACTIONS, keyForAction, keyLabel } 
 import type { GameAction } from '../stores/keybindingStore'
 import { useUiStore } from '../stores/uiStore'
 import { EventBus, GameEvents } from '../game/EventBus'
+import { useAutoCombatStore } from '../stores/autoCombatStore'
 
 /**
  * 우하단 단축키 안내바 (메이플 하단 키 표시).
@@ -29,7 +30,8 @@ export function QuickSlots() {
   const openAiHelp = () => {
     const ui = useUiStore.getState()
     ui.setSettingsOpen(false)
-    ui.setCommandHelpOpen(true)
+    ui.setCommandHelpOpen(false)
+    useAutoCombatStore.getState().toggleQuickHelp()
   }
 
   return (

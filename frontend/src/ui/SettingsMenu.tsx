@@ -54,10 +54,11 @@ export function SettingsMenu() {
           className="settings-item"
           onClick={() => {
             useUiStore.getState().setSettingsOpen(false)
-            useUiStore.getState().setCommandHelpOpen(true)
+            useUiStore.getState().setCommandHelpOpen(false)
+            useAutoCombatStore.getState().toggleQuickHelp()
           }}
         >
-          📜 AI 명령어 예시 (A/F1)
+          📜 AI 명령어 예시 (A)
         </button>
         <button
           className="settings-item"

@@ -3,6 +3,7 @@ import { useUiStore } from '../stores/uiStore'
 import { CHARACTERS } from '../data/characters'
 import { useScreenStore } from '../stores/screenStore'
 import { useDraggableWindow } from './useDraggableWindow'
+import { characterTitleForLevel } from '../data/characterTitles'
 
 /** 전투력: 공격력·크리티컬·주스탯·레벨을 합산한 간이 지표 (표시용) */
 function computeCombatPower(s: {
@@ -45,9 +46,9 @@ export function CharacterInfoPanel() {
       <div className="ci-hero">
         <span className="ci-lv">Lv. {g.level}</span>
         {/* 대기실과 같은 관우 t1 idle 첫 프레임 — 도형 placeholder를 실제 아트로 교체 */}
-        <span className="ci-avatar" />
+        <span className={`ci-avatar ci-avatar--${char.code}`} />
         <span className="ci-name">{g.characterName}</span>
-        <span className="ci-class">⚔ {char.clazz}</span>
+        <span className="ci-class">🏅 {characterTitleForLevel(char.code, g.level)}</span>
       </div>
 
       {/* 전투력 */}

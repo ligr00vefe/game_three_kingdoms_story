@@ -52,6 +52,18 @@ const ZHAOYUN_SKILLS: SkillDef[] = [
   { ...skillByCode('skill_lightning_descent'), name: '비호관천' },
 ]
 
+const lubuSkill = (code: string, name: string, icon: string, unlockLevel: number, baseDamage: number): SkillDef => ({
+  code, name, icon, type: 'active', maxLevel: 10, unlockLevel,
+  desc: (lv) => `${name}을 펼칩니다. 데미지 ${baseDamage + lv * 25}%, MP 15, 쿨타임 8초`,
+})
+const LUBU_SKILLS: SkillDef[] = [
+  lubuSkill('skill_severing_spirits', '패천격', '💥', 1, 240),
+  lubuSkill('skill_crushing_moon_slash', '단혼참', '🌙', 7, 220),
+  lubuSkill('skill_lubu_heaven_shatter', '진천폭쇄', '🔥', 12, 280),
+  lubuSkill('skill_lubu_world_annihilation', '천지절멸', '⚡', 17, 320),
+  lubuSkill('skill_lubu_demon_gate_chain', '귀문연환', '⛓️', 22, 360),
+]
+
 /**
  * 캐릭터별 스킬셋의 단일 레지스트리. 등록되지 않은 캐릭터가 관우 스킬을 물려받지 않도록
  * 반드시 빈 배열로 폴백한다. 새 캐릭터는 이 레지스트리에 자기 배열만 추가하면 된다.
@@ -59,7 +71,7 @@ const ZHAOYUN_SKILLS: SkillDef[] = [
 const CHARACTER_SKILLS: Readonly<Record<string, readonly SkillDef[]>> = {
   guanwu: GUANWU_SKILLS,
   zhaoyun: ZHAOYUN_SKILLS,
-  lubu: [],
+  lubu: LUBU_SKILLS,
 }
 
 export function getSkillsForCharacter(characterCode: string): readonly SkillDef[] {

@@ -46,7 +46,6 @@ const PORTAL_RANGE = 44
 /** T2 spear tip sits lower than the legacy 128px model on thrust combo steps. */
 const THRUST_FX_Y_OFFSET = 12
 /** Lu Bu crouches lower on combo thrusts; keep his effect aligned to the spear only. */
-const LUBU_THRUST_FX_Y_OFFSET = 16
 
 interface PortalDef {
   x: number
@@ -318,6 +317,9 @@ export class GameScene extends Phaser.Scene {
   private lastSkillStatusAt = -Infinity
   /** 현재 캐릭터에 실제 등록된 스킬만 허용한다. 씬 수명 동안 캐릭터는 바뀌지 않는다. */
   private activeSkillCodes: string[] = []
+  /** Pause sources are tracked separately so closing one menu cannot resume another. */
+  private pauseRequests = { settings: false, defense: false }
+  private worldPaused = false
 
   /** AI 생성 아트가 로드됐는지 — 없으면 placeholder 폴백 (Phase 7) */
   private art(key: string) {
@@ -373,12 +375,21 @@ export class GameScene extends Phaser.Scene {
     // scene.restart로 재진입해도 이전 구름 참조가 남지 않도록 초기화 (필드 초기값은 생성자에서 한 번만 실행됨)
     this.clouds = []
     this.cloudBandRight = 0
+    this.pauseRequests = { settings: false, defense: false }
+    this.worldPaused = false
   }
 
   create() {
     const map = this.cache.json.get(this.mapKey) as MapData
     this.map = map
     const { width } = this.scale
+
+    // Scene plugins survive scene.restart(); never inherit a paused world from
+    // the previous map or defense session.
+    this.physics.world.resume()
+    this.time.paused = false
+    this.tweens.resumeAll()
+    this.anims.resumeAll()
 
     this.physics.world.setBounds(0, 0, map.worldWidth, map.worldHeight)
     this.cameras.main.setBounds(0, 0, map.worldWidth, map.worldHeight)
@@ -832,20 +843,23 @@ export class GameScene extends Phaser.Scene {
       // 기본 공격 3연 콤보 — 0:찌르기 / 1:휘두르기 / 2:깊게 찌르기. 단계마다 이펙트만 다르고
       // 판정 로직은 공통이다. 판정을 **먼저** 돌려 명중 여부를 알아낸 뒤 이펙트를 고른다 — 둘 다
       // 같은 틱(ATTACK_HIT_AT_MS)이라 "빗나감 → 명중" 전환 없이 바로 맞는 아트를 쓸 수 있다.
-      const reach = comboStep === 2 ? COMBAT.COMBO_DASH_REACH : COMBAT.ATTACK_REACH
+      const reach = hitbox.width
+      // 여포의 긴 판정 사거리와 화면상 참격 위치는 분리한다. 이펙트는 창 가까이에 둔다.
+      const effectReach = character.code === 'lubu' ? Math.min(reach, 105) : reach
       const hits = this.resolveAttack(hitbox, COMBAT.ATTACK_MAX_TARGETS, false)
       // 타격 지점: 명중이면 가장 가까운 적(리치 안으로 클램프), 빗나가면 리치 끝.
       // y 오프셋 주의: 캐릭터는 128 프레임 하단 정렬이라 창끝이 sprite 중심(player.y)보다 아래다.
       // 창끝은 프레임 y≈95.5 = 중심 대비 +31.5px → VISUAL_SCALE(0.7) 적용 시 월드 +22px.
       const dist = hits.length > 0
-        ? Phaser.Math.Clamp((hits[0].x - this.player.x) * facing, 50, reach)
-        : reach
+        ? Phaser.Math.Clamp((hits[0].x - this.player.x) * facing, 50, effectReach)
+        : effectReach
       const fxX = this.player.x + facing * dist
       const isThrustStep = comboStep === 0 || comboStep === 2
-      const thrustYOffset = isThrustStep
-        ? THRUST_FX_Y_OFFSET + (character.code === 'lubu' ? LUBU_THRUST_FX_Y_OFFSET : 0)
-        : 0
-      const fxY = this.player.y + 22 + thrustYOffset
+      const thrustYOffset = isThrustStep ? THRUST_FX_Y_OFFSET : 0
+      const playerBottom = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+      const fxY = character.code === 'lubu' && isThrustStep
+        ? playerBottom - 28
+        : this.player.y + 22 + thrustYOffset
       const hit = hits.length > 0
       // 세 단계 모두 단일 이미지 이펙트(찌르기와 동일 방식). 전용 아트가 없으면 찌르기로 폴백한다.
       if (comboStep === 1) {
@@ -869,7 +883,7 @@ export class GameScene extends Phaser.Scene {
           this.effects.skillHorseCharge(this.player.x, this.player.y, facing)
           this.player.startChargeMotion()
         } else {
-          this.effects.skillCharge(this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET, this.player.y + 22, facing)
+          // 관우의 참마돌격 이펙트는 준비 자세가 아니라 실제 타격 프레임에서 출력한다.
           if (character.code === 'guanwu') this.player.startChargeMotion()
         }
         return
@@ -898,6 +912,17 @@ export class GameScene extends Phaser.Scene {
           this.effects.meteorSpear(this.player.x, this.player.y + 8, facing)
           this.player.startChargeMotion()
         }
+        return
+      }
+      if (skillCode === 'skill_crushing_moon_slash') {
+        if (character.code === 'lubu') {
+          this.effects.crushingMoonSlash(this.player.x, this.player.y + 8, facing)
+          this.player.startChargeMotion()
+        }
+        return
+      }
+      if (skillCode === 'skill_severing_spirits') {
+        if (character.code === 'lubu') this.effects.severingSpirits(this.player.x, this.player.y + 14, facing)
         return
       }
       if (skillCode === 'skill_dragon_slash') {
@@ -933,7 +958,14 @@ export class GameScene extends Phaser.Scene {
         else this.effects.lightningDescent(this.player.x, castGroundY)
       }
     }
-    this.player.onSkill = (hitbox, _facing, skillCode, _hitIndex) => {
+    this.player.onSkill = (hitbox, facing, skillCode, _hitIndex) => {
+      if (skillCode === 'skill_charge_slash' && character.code === 'guanwu') {
+        this.effects.skillCharge(
+          this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET,
+          this.player.y + 22,
+          facing,
+        )
+      }
       // 좌표는 타격 지점 — 기본 공격과 같은 규약(창끝 높이 = player.y + 22, 리치 끝).
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
       const isGlaiveSlash = false
@@ -957,10 +989,9 @@ export class GameScene extends Phaser.Scene {
         true,
         damageMultiplier,
       )
-      // 히트스톱 (GAME_DESIGN 4.2 — 짧은 타격 정지감)
-      this.physics.pause()
+      // Scene 전체 physics.pause()는 ESC/맵 전환과 겹칠 때 resume 타이머도
+      // 사라져 디펜스가 영구 정지할 수 있다. 전역 물리는 멈추지 않고 타격 흔들림만 준다.
       this.cameras.main.shake(90, 0.004)
-      this.time.delayedCall(COMBAT.SKILL_HITSTOP_MS, () => this.physics.resume())
     }
 
     // ---- 몬스터 타깃 뷰 ----
@@ -1020,6 +1051,7 @@ export class GameScene extends Phaser.Scene {
     EventBus.on(GameEvents.USE_ITEM, this.handleUseItem, this)
     EventBus.on(GameEvents.ITEM_PICKED, this.handleItemPicked, this)
     EventBus.on(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
+    EventBus.on(GameEvents.GAME_PAUSE, this.handleGamePause, this)
     EventBus.on(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
     EventBus.on(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
     EventBus.on(GameEvents.GUAN_YU_CHAT, this.handleGuanYuHybridChat, this)
@@ -1042,6 +1074,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.USE_ITEM, this.handleUseItem, this)
       EventBus.off(GameEvents.ITEM_PICKED, this.handleItemPicked, this)
       EventBus.off(GameEvents.INPUT_BLOCK, this.handleInputBlock, this)
+      EventBus.off(GameEvents.GAME_PAUSE, this.handleGamePause, this)
       EventBus.off(GameEvents.CHAT_BUBBLE, this.handleChatBubble, this)
       EventBus.off(GameEvents.GUAN_YU_COMMAND, this.handleGuanYuCommand, this)
       EventBus.off(GameEvents.GUAN_YU_CHAT, this.handleGuanYuHybridChat, this)
@@ -1089,7 +1122,12 @@ export class GameScene extends Phaser.Scene {
     })
 
     // 대기 대사는 승인된 로컬 문장만 순환한다. 외부 API/로컬 모델 호출이 전혀 없다.
-    const idleLines = ['주공, 명령을 내려주십시오.', '소장은 준비되어 있습니다.', '어디를 지키면 되겠습니까?']
+    const idleLinesByCharacter: Readonly<Record<string, readonly string[]>> = {
+      guanwu: ['주공, 명령을 내려주십시오.', '소장은 준비되어 있습니다.', '어디를 지키면 되겠습니까?'],
+      zhaoyun: ['주공, 하명만 내려주십시오.', '소장 조자룡, 삼가 명을 기다리고 있습니다.', '분부를 내려주시면 반드시 받들겠습니다.'],
+      lubu: ['그래서, 뭘 하면 되지?', '싸울 거면 빨리 말해.', '흥, 명령은 듣고 있어.'],
+    }
+    const idleLines = idleLinesByCharacter[character.code] ?? idleLinesByCharacter.guanwu
     let idleLine = 0
     this.time.addEvent({
       delay: 30_000,
@@ -1163,6 +1201,9 @@ export class GameScene extends Phaser.Scene {
   private handleDefenseExit = () => {
     // 일시정지 상태에서 나가면 fadeOut 트윈이 안 도니 먼저 재개한다
     if (this.scene.isPaused()) this.scene.resume()
+    this.game.loop.wake()
+    // 정지 중 시작됐다 완료되지 못한 fade 전환이 남아 있어도 복귀 요청은 새로 수행한다.
+    this.transitioning = false
     // 사망으로 패배했든 아니든, 디펜스를 떠날 땐 HP/MP·사망 상태를 원복해 감숙성에서 멀쩡히 시작
     const store = useGameStore.getState()
     store.setStats({ hp: store.maxHp, mp: store.maxMp })
@@ -1174,8 +1215,8 @@ export class GameScene extends Phaser.Scene {
   /** 디펜스 ESC 일시정지 메뉴: 씬을 pause/resume (좀비·타이머·트윈 모두 정지). 디펜스 모드에서만 유효. */
   private handleDefensePause = (paused: boolean) => {
     if (!this.defense) return
-    if (paused) this.scene.pause()
-    else if (this.scene.isPaused()) this.scene.resume()
+    this.pauseRequests.defense = paused
+    this.applyWorldPause()
   }
 
   /** 바리케이트 배치 대기 모드 토글 (구매 창에서 바리케이트 선택 시 on) */
@@ -1559,6 +1600,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** ESC 설정창은 키 입력뿐 아니라 월드의 물리와 시간도 함께 멈춘다. */
+  private handleGamePause = (paused: boolean) => {
+    this.pauseRequests.settings = paused
+    this.applyWorldPause()
+  }
+
+  /**
+   * Keep the Scene alive so React's ESC event can always release the pause.
+   * Only simulation clocks are stopped; this avoids Phaser's queued
+   * scene.pause()/resume() transition getting stuck between frames.
+   */
+  private applyWorldPause() {
+    const shouldPause = this.pauseRequests.settings || this.pauseRequests.defense
+    if (shouldPause === this.worldPaused) return
+    this.worldPaused = shouldPause
+
+    if (shouldPause) {
+      this.physics.world.pause()
+      this.time.paused = true
+      this.tweens.pauseAll()
+      this.anims.pauseAll()
+      this.input_.clearAll()
+      return
+    }
+
+    this.physics.world.resume()
+    this.time.paused = false
+    this.tweens.resumeAll()
+    this.anims.resumeAll()
+    this.game.loop.wake()
+  }
+
   /** 스크린샷: 게임 캔버스를 PNG로 저장 (메이플 Scroll Lock 스샷) */
   private takeScreenshot() {
     this.game.renderer.snapshot((image) => {
@@ -1830,6 +1903,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    if (this.worldPaused) return
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
     const commandActive = this.guanYu.isCommandActive()

@@ -37,7 +37,7 @@ export class PreloadScene extends Phaser.Scene {
     // manifest 등록 에셋 일괄 로드 (아직 비어 있음 — 이미지 도입 시 여기만 통과하면 됨)
     // Version the manifest request so a browser refresh cannot reuse an old
     // images/spritesheets classification after an asset-layout deployment.
-    this.load.json('asset_manifest', 'assets/manifest.json?v=20260816-4')
+    this.load.json('asset_manifest', 'assets/manifest.json?v=20260817-2')
   }
 
   create() {
@@ -106,6 +106,14 @@ export class PreloadScene extends Phaser.Scene {
       { x: 493, y: 0, width: 138, height: 327 },
       { x: 631, y: 0, width: 132, height: 327 },
     ])
+    registerFrames('fx_skill_lubu_crushing_moon', [
+      [0, 389], [389, 804], [804, 1302], [1302, 1902],
+      [1902, 2552], [2552, 3133], [3133, 3615], [3615, 4096],
+    ].map(([x, endX]) => ({ x, y: 0, width: endX - x, height: 553 })))
+    registerFrames('fx_skill_lubu_severing_spirits', [
+      [0, 412], [412, 838], [838, 1309], [1309, 1870],
+      [1870, 2527], [2527, 3137], [3137, 3626], [3626, 4096],
+    ].map(([x, endX]) => ({ x, y: 0, width: endX - x, height: 553 })))
     registerFrames('fx_skill_zhao_flower', Array.from({ length: 9 }, (_, index) => ({
       x: 0, y: index === 8 ? 312 : index * 39, width: 707, height: index === 8 ? 41 : 39,
     })))

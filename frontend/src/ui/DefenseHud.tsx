@@ -184,9 +184,11 @@ export function DefenseHud() {
   // ESC 일시정지 메뉴
   const resumeGame = () => useDefenseStore.getState().setPauseOpen(false)
   const returnToLobby = () => {
-    useDefenseStore.getState().setPauseOpen(false) // 씬 재개 후 언마운트 (pause 잔류 방지)
-    useDefenseStore.getState().reset()
+    // 화면 전환을 먼저 확정한다. 정지된 Phaser Scene의 resume 처리에 문제가 생겨도
+    // React의 대기실 전환까지 함께 중단되지 않게 한다.
     useScreenStore.getState().setScreen('lobby')
+    useDefenseStore.getState().setPauseOpen(false)
+    useDefenseStore.getState().reset()
   }
   const giveUp = () => {
     if (!window.confirm('방어전을 포기하고 감숙성으로 돌아가시겠습니까?')) return
