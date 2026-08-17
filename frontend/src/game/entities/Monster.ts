@@ -73,6 +73,13 @@ const HIT_FRAME_RATE = 16
 const DEATH_FRAME_RATE = 7
 /** 감지(추적 시작)의 세로 허용 거리 — 이보다 높이 차가 크면 없는 사람 취급 */
 const DETECT_VERTICAL_RANGE = 90
+/** 고체력 몬스터 체력바 한 층의 HP. 한 번의 타격은 한 층까지만 깎는다. */
+const HP_BAR_LAYER_SIZE = 100
+/** 아래층부터 위층 순서. 현재 층이 소진되면 바로 아래 색상의 체력바가 드러난다. */
+const HP_BAR_LAYER_COLORS = [
+  0xef5350, 0xffc107, 0xab47bc, 0x42a5f5, 0x66bb6a,
+  0x26c6da, 0xff7043, 0x5c6bc0, 0xec407a, 0x8d6e63,
+] as const
 
 export interface MonsterTarget {
   x: number
@@ -313,16 +320,22 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     const isBoss = this.monsterCode === 'zombie_boss'
     const width = isBoss ? 46 : 26
     const height = isBoss ? 5 : 3
-    const ratio = Phaser.Math.Clamp(this.hp / Math.max(1, this.maxHp), 0, 1)
+    const totalLayers = Math.max(1, Math.ceil(this.maxHp / HP_BAR_LAYER_SIZE))
+    const layerSize = Math.ceil(this.maxHp / totalLayers)
+    const currentLayer = Math.max(1, Math.ceil(this.hp / layerSize))
+    const hpInLayer = this.hp <= 0 ? 0 : ((this.hp - 1) % layerSize) + 1
+    const layerCapacity = currentLayer === totalLayers
+      ? ((this.maxHp - 1) % layerSize) + 1
+      : layerSize
+    const ratio = Phaser.Math.Clamp(hpInLayer / layerCapacity, 0, 1)
     const x = this.x - width / 2
     const y = this.getBounds().top - 5
     bar.clear()
     bar.fillStyle(0x111318, 0.82).fillRect(x - 1, y - 1, width + 2, height + 2)
-    const color = ratio > 0.8 ? 0xab47bc
-      : ratio > 0.6 ? 0x42a5f5
-        : ratio > 0.4 ? 0x66bb6a
-          : ratio > 0.2 ? 0xffc107
-            : 0xef5350
+    // 화면에는 체력바를 하나만 표시한다. 최상층은 빨강이며 한 층이 완전히 소진될 때
+    // 노랑 → 보라 → 파랑 순으로 다음 색상의 가득 찬 바가 나타난다.
+    const depletedLayers = totalLayers - currentLayer
+    const color = HP_BAR_LAYER_COLORS[depletedLayers % HP_BAR_LAYER_COLORS.length]
     bar.fillStyle(color, 1)
     bar.fillRect(x, y, width * ratio, height)
     bar.setAlpha(this.alpha)
@@ -479,20 +492,30 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   /** 플레이어 공격 적중 (GameScene 전투 판정에서 호출) */
   /** @returns true면 이 공격으로 사망 (경험치 지급 트리거) */
   receiveHit(amount: number, crit: boolean, fromX: number, effects: EffectManager, now: number): boolean {
-    // 공격 모션(windup)을 끝까지 우선 재생한다. 공격 중에는 피해와 피격 반응을 모두 무시한다.
-    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning' || this.state_ === 'charge' || this.state_ === 'windup') return false
-    this.hp -= amount
-    effects.damageNumber(this.x, this.y - 40, amount, 'deal', crit, this) // 연타 스택 키 = 몬스터 자신
+    if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning') return false
+    const wasAttacking = this.state_ === 'charge' || this.state_ === 'windup'
+    // 다중 체력층은 한 번의 큰 피해로 여러 색을 건너뛰지 않는다. 실제 적용 피해 숫자도 이에 맞춘다.
+    const totalLayers = Math.max(1, Math.ceil(this.maxHp / HP_BAR_LAYER_SIZE))
+    const layerSize = Math.ceil(this.maxHp / totalLayers)
+    const damageToLayerEdge = totalLayers > 1
+      ? ((this.hp - 1) % layerSize) + 1
+      : this.hp
+    const appliedDamage = Math.min(amount, Math.max(1, damageToLayerEdge))
+    this.hp -= appliedDamage
+    effects.damageNumber(this.x, this.y - 40, appliedDamage, 'deal', crit, this) // 연타 스택 키 = 몬스터 자신
     effects.hitSpark(this.x, this.y - 10)
 
     if (this.hp <= 0) {
       this.die()
       return true
     }
-    this.state_ = 'hit'
-    this.hitStunUntil = now + (this.def.hitStunMs ?? 200)
+    // 공격 중 피격도 피해는 받되 진행 중인 공격 모션은 유지한다.
+    if (!wasAttacking) {
+      this.state_ = 'hit'
+      this.hitStunUntil = now + (this.def.hitStunMs ?? 200)
+    }
     this.setTint(0xff8a80)
-    this.setVelocityX(fromX < this.x ? 90 : -90) // 밀려남
+    if (!wasAttacking) this.setVelocityX(fromX < this.x ? 90 : -90) // 밀려남
     return false
   }
 

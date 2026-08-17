@@ -43,19 +43,19 @@ public class CommunityController {
 
 	@GetMapping("/defense-ranking")
 	public List<RankingDto> defenseRanking() {
-		List<GameCharacter> characters = gameCharacterRepository.findTop20ByOrderByDefenseStageDescLevelDescExpDesc();
-		var accountNames = playerAccountRepository.findAllById(characters.stream()
-			.map(GameCharacter::getAccountId)
-			.filter(java.util.Objects::nonNull)
-			.toList())
-			.stream()
-			.collect(java.util.stream.Collectors.toMap(account -> account.getId(), account -> account.getDisplayName()));
-		return IntStream.range(0, characters.size())
+		var accounts = playerAccountRepository.findTop20ByOrderByDefenseStageDescDefenseStageReachedAtAscIdAsc();
+		return IntStream.range(0, accounts.size())
 			.mapToObj(index -> {
-				GameCharacter character = characters.get(index);
-				String playerName = accountNames.getOrDefault(character.getAccountId(), character.getName());
-				return new RankingDto(index + 1, playerName, character.getName(), character.getCharacterCode(),
-					character.getDefenseStage(), character.getLevel());
+				var account = accounts.get(index);
+				String characterCode = account.getLastCharacterCode();
+				GameCharacter character = gameCharacterRepository
+					.findByAccountIdAndCharacterCode(account.getId(), characterCode)
+					.orElseGet(() -> gameCharacterRepository.findByAccountIdAndCharacterCode(account.getId(), "guanwu")
+						.orElse(null));
+				String characterName = character == null ? "관우" : character.getName();
+				int level = character == null ? 1 : character.getLevel();
+				return new RankingDto(index + 1, account.getDisplayName(), characterName, characterCode,
+					account.getDefenseStage(), level);
 			})
 			.toList();
 	}

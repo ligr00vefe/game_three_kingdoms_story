@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useDefenseStore } from '../stores/defenseStore'
 
 const ROTATE_MS = 6000
 
@@ -7,6 +8,7 @@ const ROTATE_MS = 6000
 export function NoticeBanner() {
   const [notices, setNotices] = useState<string[]>([])
   const [idx, setIdx] = useState(0)
+  const paused = useDefenseStore((s) => s.pauseOpen)
 
   useEffect(() => {
     api.get<{ id: number; message: string }[]>('/notices')
@@ -15,10 +17,10 @@ export function NoticeBanner() {
   }, [])
 
   useEffect(() => {
-    if (notices.length < 2) return
+    if (notices.length < 2 || paused) return
     const t = setInterval(() => setIdx((i) => (i + 1) % notices.length), ROTATE_MS)
     return () => clearInterval(t)
-  }, [notices])
+  }, [notices, paused])
 
   if (notices.length === 0) return null
   return (

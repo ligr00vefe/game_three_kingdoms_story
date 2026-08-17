@@ -34,8 +34,8 @@ export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>
 const DEFENSE = {
   /** 다음 Wave 경고를 표시하는 대기 시간 */
   WAIT_MS: 5_000,
-  /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 10, stage2 = 11 …) */
-  BASE_ZOMBIES: 9,
+  /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 12, stage2 = 13 …) */
+  BASE_ZOMBIES: 11,
   /** 좀비 순차 스폰 간격 */
   SPAWN_INTERVAL_MS: 1_800,
   /** 좀비 스폰 x (맨 오른쪽에서) — worldWidth 기준 offset */
@@ -252,18 +252,19 @@ export class DefenseManager {
     const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET - Phaser.Math.Between(0, 180)
     const code = this.monsterCodeFor(this.spawnedCount)
     const monster = this.spawner.spawnAt(code, x, x - 30, x + 20, (m) => this.onZombieDied(m))
-    // Every stage strengthens the whole wave, not only the displayed stage
-    // number. Combat stats grow steadily, while behavioural acceleration is
-    // capped so late waves remain readable and fair.
+    // 10스테이지 단위 계단식 성장. 구간 안에서는 완만히 오르고 10/20/30... 진입 시
+    // 기본 체급이 한 단계 상승한다. 매 스테이지 고율 복리를 쓰지 않아 장기 진행도 감당 가능하다.
     const stageSteps = Math.max(0, this.stage - 1)
-    const hpScale = 1 + stageSteps * 0.04
-    const attackScale = 1 + stageSteps * 0.025
-    const speedScale = 1 + Math.min(stageSteps * 0.012, 0.20)
-    const cooldownScale = 1 - Math.min(stageSteps * 0.008, 0.15)
+    const difficultyTier = Math.floor(this.stage / 10)
+    const stepInTier = this.stage < 10 ? stageSteps : this.stage % 10
+    const hpScale = 1.2 + difficultyTier * 0.25 + stepInTier * 0.02
+    const attackScale = 1.1 + difficultyTier * 0.12 + stepInTier * 0.01
+    const speedScale = 1 + Math.min(difficultyTier * 0.04 + stepInTier * 0.004, 0.20)
+    const cooldownScale = 1 - Math.min(difficultyTier * 0.04 + stepInTier * 0.004, 0.18)
     monster.def = {
       ...monster.def,
       attack: Math.max(1, Math.round(monster.def.attack * attackScale)),
-      defense: monster.def.defense + Math.floor(stageSteps / 4),
+      defense: monster.def.defense + difficultyTier * 2 + Math.floor(stepInTier / 5),
       moveSpeed: monster.def.moveSpeed * speedScale,
       attackCooldownMs: Math.round(monster.def.attackCooldownMs * cooldownScale),
     }
@@ -275,11 +276,10 @@ export class DefenseManager {
     monster.onDropImpact = code === 'zombie_shield'
       ? (attacker, radius, damage) => this.applyShieldDropDamage(attacker, radius, damage)
       : undefined
-    // 보스는 기존에 모든 스테이지에서 체력이 고정되어 후반에도 너무 빨리 쓰러졌다.
-    // 기본 900에 스테이지마다 6%를 더해 20스테이지에서는 1,926 HP가 된다.
     if (code === 'zombie_boss') {
-      // Bosses receive an additional 2% HP per stage on top of wave scaling.
-      monster.maxHp = Math.round(monster.def.maxHp * (1 + stageSteps * 0.06))
+      // 보스도 선형 고율 증가 대신 일반 몬스터 계단식 배율에 구간별 보너스만 더한다.
+      const bossHpScale = hpScale + 0.35 + difficultyTier * 0.10
+      monster.maxHp = Math.round(monster.def.maxHp * bossHpScale)
       monster.hp = monster.maxHp
     }
     this.scene.time.delayedCall(700, () => {

@@ -19,10 +19,6 @@ export function PortalMenu() {
 
   if (!open) return null
 
-  const goOutside = () => {
-    usePortalMenuStore.getState().close()
-    EventBus.emit(GameEvents.PORTAL_GO_OUTSIDE)
-  }
   const enterDefense = () => {
     usePortalMenuStore.getState().close()
     EventBus.emit(GameEvents.PORTAL_ENTER_DEFENSE)
@@ -34,7 +30,7 @@ export function PortalMenu() {
       <div className="portal-menu" onClick={(e) => e.stopPropagation()}>
         <div className="portal-menu-title">성문 앞</div>
         <p className="portal-menu-desc">어디로 향하시겠습니까?</p>
-        <button className="portal-menu-btn" onClick={goOutside}>🏞️ 성밖으로</button>
+        <button className="portal-menu-btn portal-menu-btn--disabled" disabled>🏞️ 성밖으로 · 준비 중</button>
         <button className="portal-menu-btn portal-menu-btn--accent" onClick={enterDefense}>⚔️ 디펜스 아레나</button>
         <button className="portal-menu-close" onClick={close}>닫기</button>
       </div>

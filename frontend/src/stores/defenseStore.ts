@@ -64,9 +64,13 @@ export const useDefenseStore = create<DefenseState>((set) => ({
   setPlacing: (placing) => set({ placing }),
   // 일시정지 메뉴 열림/닫힘에 맞춰 Phaser 씬을 pause/resume 한다 (좀비·타이머 정지)
   setPauseOpen: (pauseOpen) => { set({ pauseOpen }); EventBus.emit(GameEvents.DEFENSE_PAUSE, pauseOpen) },
-  reset: () => set({
-    active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false,
-    gold: 0, archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
-    builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
-  }),
+  reset: () => {
+    set({
+      active: false, phase: 'idle', defeatReason: null, purchaseOpen: false, placing: false, pauseOpen: false,
+      gold: 0, archerCooldownMs: 0, combo: 0, eventName: null, rewardChoices: [], supplyLevel: 0,
+      builtOffensive: { watchtower: false, cannonTower: false, bastion: false },
+    })
+    // 화면 전환 중 reset이 직접 호출돼도 Phaser에 정지 해제를 반드시 전달한다.
+    EventBus.emit(GameEvents.DEFENSE_PAUSE, false)
+  },
 }))

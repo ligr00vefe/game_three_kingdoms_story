@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DialogueChoice, DialogueNode } from '../data/dialogues'
+import type { DialogueChoice, DialogueLine, DialogueNode } from '../data/dialogues'
 
 /**
  * 메인 NPC 시네마틱 대화 진행 상태 (노드 그래프 워커).
@@ -13,6 +13,7 @@ interface OpenPayload {
   portrait?: string
   start: string
   nodes: Record<string, DialogueNode>
+  dismissible?: boolean
 }
 
 interface CinematicState {
@@ -23,10 +24,11 @@ interface CinematicState {
   nodes: Record<string, DialogueNode>
   nodeId: string
   /** 현재 노드의 대사(함수형 lines를 평가한 결과) */
-  lines: string[]
+  lines: (string | DialogueLine)[]
   lineIndex: number
   /** 마지막 대사까지 읽어 선택지가 뜬 상태 */
   choicesVisible: boolean
+  dismissible: boolean
   open: (p: OpenPayload) => void
   /** 다음 대사 → (마지막이면) 선택지 표시 / 다음 노드 / 대화 종료 */
   advance: () => void
@@ -66,9 +68,10 @@ export const useCinematicStore = create<CinematicState>((set, get) => {
     lines: [],
     lineIndex: 0,
     choicesVisible: false,
+    dismissible: true,
 
     open: (p) => {
-      set({ code: p.code, speaker: p.speaker, portrait: p.portrait, nodes: p.nodes })
+      set({ code: p.code, speaker: p.speaker, portrait: p.portrait, nodes: p.nodes, dismissible: p.dismissible ?? true })
       goto(p.start)
     },
 
@@ -97,7 +100,7 @@ export const useCinematicStore = create<CinematicState>((set, get) => {
 
     close: () => set({
       code: null, speaker: '', portrait: undefined,
-      nodes: {}, nodeId: '', lines: [], lineIndex: 0, choicesVisible: false,
+      nodes: {}, nodeId: '', lines: [], lineIndex: 0, choicesVisible: false, dismissible: true,
     }),
   }
 })

@@ -10,7 +10,7 @@ const TIGER_TEARS_GROUND_Y = 39
 // 여포 스킬 이펙트 조정값. x는 진행 방향 기준(+는 앞), y는 바닥 기준(+는 아래)이다.
 // durationMs를 늘리면 애니메이션이 느려지고, 줄이면 빨라진다.
 const LUBU_EFFECT_TUNING = {
-  severingSpirits: { x: 105, y: 28, scale: 0.442, durationMs: 444 },
+  severingSpirits: { x: 105, y: 50, scale: 0.442, durationMs: 444 },
   heavenShatter: { x: 100, y: 30, scale: 0.7, durationMs: 900 },
   worldAnnihilation: { x: 110, y: 90, scale: 0.7, durationMs: 720 },
   demonGateChain: { x: -30, y: 75, scale: 0.9, durationMs: 760 },
@@ -888,7 +888,10 @@ export class EffectManager {
    * 중앙 정렬하면 기둥이 공중에 뜬다.
    */
   /** 기둥 목표 높이(월드 px) — 캐릭터(~51px)보다 확실히 크게 */
-  private static readonly LEVELUP_FX_SCALE = 0.65
+  private static readonly LEVELUP_FX_SCALE = 0.4
+  /** 레벨업 이펙트 위치 미세 조정값. +X는 오른쪽, +Y는 아래쪽이다. */
+  private static readonly LEVELUP_FX_OFFSET_X = 0
+  private static readonly LEVELUP_FX_OFFSET_Y = 10
   /**
    * 기둥은 캐릭터 **뒤**에 깐다 (플레이어 depth 0). 앞에 두면 정작 레벨업한 관우가 안 보인다.
    * NPC(-10)보다는 앞이라 옆에 NPC가 있어도 기둥이 가려지지 않는다.
@@ -902,11 +905,26 @@ export class EffectManager {
     const body = target.body as Phaser.Physics.Arcade.Body | null
     const footY = body?.bottom ?? target.getBounds().bottom
     if (!this.scene.anims.exists('fx_level_up_anim')) return
-    const effect = this.scene.add.sprite(target.x, footY, 'fx_level_up', 'level_up_0')
+    const effect = this.scene.add.sprite(
+      target.x + EffectManager.LEVELUP_FX_OFFSET_X,
+      footY + EffectManager.LEVELUP_FX_OFFSET_Y,
+      'fx_level_up', 'level_up_0',
+    )
       .setOrigin(0.5, 1).setDepth(EffectManager.LEVELUP_FX_DEPTH)
       .setBlendMode(Phaser.BlendModes.ADD).setScale(EffectManager.LEVELUP_FX_SCALE)
     effect.play('fx_level_up_anim')
-    effect.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => effect.destroy())
+    const followTarget = () => {
+      const targetBody = target.body as Phaser.Physics.Arcade.Body | null
+      effect.setPosition(
+        target.x + EffectManager.LEVELUP_FX_OFFSET_X,
+        (targetBody?.bottom ?? target.getBounds().bottom) + EffectManager.LEVELUP_FX_OFFSET_Y,
+      )
+    }
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, followTarget)
+    effect.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.scene.events.off(Phaser.Scenes.Events.UPDATE, followTarget)
+      effect.destroy()
+    })
   }
 
   /**

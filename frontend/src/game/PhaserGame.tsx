@@ -31,6 +31,11 @@ export function PhaserGame() {
 
     return () => {
       ro.disconnect()
+      // game.destroy()는 다음 Phaser 프레임까지 파괴를 미룬다. 먼저 GameScene을
+      // 동기적으로 shutdown해 공용 EventBus 구독과 씬 소유 Group을 즉시 정리한다.
+      // 그렇지 않으면 캐릭터를 바꿔 새 게임이 만들어진 직후, 이전 씬의 코인 획득
+      // 핸들러가 파괴된 EffectManager.textPool에 접근할 수 있다.
+      game.scene.stop('Game')
       game.destroy(true)
       // destroy가 부팅 중이면 캔버스를 못 지우는 경우가 있어 직접 제거
       container.querySelectorAll('canvas').forEach((c) => c.remove())

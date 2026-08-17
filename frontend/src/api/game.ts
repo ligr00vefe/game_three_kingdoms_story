@@ -38,7 +38,7 @@ interface GameStateResponse {
 }
 
 export async function loadCharacterSummary(characterCode: string): Promise<GameStateResponse['character']> {
-  const { data } = await api.get<GameStateResponse>('/game/state', { params: { characterCode } })
+  const { data } = await api.get<GameStateResponse>('/game/state', { params: { characterCode, summary: true } })
   return data.character
 }
 

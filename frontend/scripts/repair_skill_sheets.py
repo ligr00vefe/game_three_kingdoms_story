@@ -222,12 +222,23 @@ def pack_explicit_grid(
     boxes: list[tuple[int, int, int, int]],
     cell_w: int,
     cell_h: int,
+    fit_alpha: bool = False,
 ) -> None:
     """Pack hand-inspected, variable-sized grid panels on one bottom-aligned strip."""
     src = Image.open(FX / source_name).convert("RGBA")
     sheet = Image.new("RGBA", (cell_w * len(boxes), cell_h))
     for index, box in enumerate(boxes):
         frame = src.crop(box)
+        if fit_alpha:
+            alpha_bounds = frame.getchannel("A").getbbox()
+            if alpha_bounds is not None:
+                frame = frame.crop(alpha_bounds)
+            scale = min(1.0, cell_w / frame.width, cell_h / frame.height)
+            if scale < 1.0:
+                frame = frame.resize(
+                    (round(frame.width * scale), round(frame.height * scale)),
+                    Image.Resampling.LANCZOS,
+                )
         if frame.width > cell_w or frame.height > cell_h:
             raise ValueError(f"{source_name} frame {index} ({frame.size}) exceeds cell {(cell_w, cell_h)}")
         bounds = frame.getchannel("A").getbbox()
@@ -269,13 +280,14 @@ def rebuild_lubu_advanced_skills() -> None:
         "skill_ghost_gate_chain.png",
         "skill_ghost_gate_chain_fixed.png",
         boxes=[
-            (0, 0, 334, 362), (334, 0, 721, 362), (721, 0, 1105, 362),
-            (1105, 0, 1657, 362), (1657, 0, 2172, 362),
-            (0, 362, 453, 724), (453, 362, 1000, 724), (1000, 362, 1460, 724),
-            (1460, 362, 1865, 724), (1865, 362, 2172, 724),
+            (0, 0, 630, 431), (630, 0, 1335, 431), (1335, 0, 1967, 431),
+            (1967, 0, 2641, 431), (2641, 0, 3322, 431),
+            (0, 431, 602, 962), (602, 431, 1343, 962), (1343, 431, 2053, 962),
+            (2053, 431, 2612, 962), (2612, 431, 3322, 962),
         ],
         cell_w=576,
         cell_h=400,
+        fit_alpha=True,
     )
 
 

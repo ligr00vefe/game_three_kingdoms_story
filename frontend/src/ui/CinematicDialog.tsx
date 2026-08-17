@@ -28,7 +28,9 @@ export function CinematicDialog() {
   const lineIndex = useCinematicStore((s) => s.lineIndex)
   const nodeId = useCinematicStore((s) => s.nodeId)
   const choicesVisible = useCinematicStore((s) => s.choicesVisible)
+  const dismissible = useCinematicStore((s) => s.dismissible)
   const choices = useCinematicStore((s) => s.nodes[s.nodeId]?.choices ?? NO_CHOICES)
+  const announcement = useCinematicStore((s) => s.nodes[s.nodeId]?.announcement ?? false)
 
   const [typedLen, setTypedLen] = useState(0)
   const [selected, setSelected] = useState(0)
@@ -36,7 +38,10 @@ export function CinematicDialog() {
   const selectedRef = useRef(0)
   const openedAt = useRef(0)
 
-  const line = lines[lineIndex] ?? ''
+  const entry = lines[lineIndex] ?? ''
+  const line = typeof entry === 'string' ? entry : entry.text
+  const activeSpeaker = typeof entry === 'string' ? speaker : (entry.speaker ?? speaker)
+  const activePortrait = typeof entry === 'string' ? portrait : (entry.portrait ?? portrait)
   const typing = typedLen < line.length
 
   const pick = useCallback((index: number) => {
@@ -60,6 +65,7 @@ export function CinematicDialog() {
         portrait: p.portrait,
         start: script?.start ?? 'intro',
         nodes: script?.nodes ?? { intro: { lines: p.fallbackLines ?? [] } },
+        dismissible: script?.dismissible,
       })
     }
     EventBus.on(GameEvents.OPEN_CINEMATIC, onOpen)
@@ -75,6 +81,10 @@ export function CinematicDialog() {
 
   // 타자기 효과 — 줄이 바뀔 때마다 처음부터 다시 찍는다
   useEffect(() => {
+    if (announcement) {
+      setTypedLen(line.length)
+      return
+    }
     setTypedLen(0)
     if (!line) return
     let n = 0
@@ -84,7 +94,7 @@ export function CinematicDialog() {
       if (n >= line.length) clearInterval(timer)
     }, TYPE_MS)
     return () => clearInterval(timer)
-  }, [line, lineIndex, nodeId])
+  }, [line, lineIndex, nodeId, announcement])
 
   // 선택지가 새로 뜨면 항상 첫 항목부터
   useEffect(() => { pick(0) }, [nodeId, choicesVisible, pick])
@@ -97,7 +107,11 @@ export function CinematicDialog() {
       if (performance.now() - openedAt.current < OPEN_GRACE_MS) return
       const store = useCinematicStore.getState()
 
-      if (e.key === 'Escape') { e.preventDefault(); store.close(); return }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (store.dismissible) store.close()
+        return
+      }
 
       if (store.choicesVisible) {
         const list = store.nodes[store.nodeId]?.choices ?? NO_CHOICES
@@ -131,9 +145,15 @@ export function CinematicDialog() {
   if (code === null) return null
 
   return (
-    <div className="cine-overlay" onClick={advance}>
-      {portrait && <img className="cine-portrait" src={portrait} alt={speaker} draggable={false} />}
-      <div className="cine-bottom">
+    <div className={`cine-overlay${announcement ? ' cine-overlay--announcement' : ''}`} onClick={advance}>
+      {!announcement && activePortrait && <img className="cine-portrait" src={activePortrait} alt={activeSpeaker} draggable={false} />}
+      {announcement ? (
+        <div className="cine-unlock-banner">
+          <span className="cine-unlock-title">새로운 무장 해금</span>
+          <p>{line}</p>
+          <small>Enter / 클릭으로 확인</small>
+        </div>
+      ) : <div className="cine-bottom">
         {choicesVisible && choices.length > 0 && (
           <ul className="cine-choices">
             {choices.map((c, i) => (
@@ -150,15 +170,15 @@ export function CinematicDialog() {
           </ul>
         )}
         <div className="cine-box">
-          <div className="cine-name">{speaker}</div>
+          <div className="cine-name">{activeSpeaker}</div>
           <p className="cine-text">{line.slice(0, typedLen)}</p>
           <span className="cine-hint">
             {choicesVisible
               ? '숫자키 · ↑↓ + Enter · 클릭으로 선택'
-              : typing ? '' : '↑ / Enter / 클릭 — 계속 (ESC 대화 종료)'}
+              : typing ? '' : `↑ / Enter / 클릭 — 계속${dismissible ? ' (ESC 대화 종료)' : ''}`}
           </span>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

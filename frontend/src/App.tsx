@@ -41,6 +41,8 @@ import { LoadingScreen } from './ui/LoadingScreen'
 import { CommandHelpPanel } from './ui/CommandHelpPanel'
 import { AiQuickHelp } from './ui/AiQuickHelp'
 import { useAutoCombatStore } from './stores/autoCombatStore'
+import { SkillUnlockNotice } from './ui/SkillUnlockNotice'
+import { FreezeDiagnostic } from './ui/FreezeDiagnostic'
 
 /** 게임 창인지 판별: 런처가 window.open으로 띄우는 URL에 붙는 ?mode=game */
 const isGameWindow = new URLSearchParams(location.search).get('mode') === 'game'
@@ -55,6 +57,18 @@ function GameApp() {
   const screen = useScreenStore((s) => s.screen)
   // 바리케이트 배치 중엔 오버레이를 클릭 통과(pointer-events:none)시켜 Phaser 캔버스가 클릭을 받게 한다
   const placing = useDefenseStore((s) => s.placing)
+
+  // 레벨 10 달성 순간 후속 무장 합류 시네마틱을 연다.
+  useEffect(() => {
+    const onLevelUp = (level: number) => {
+      if (level !== 10) return
+      const character = useScreenStore.getState().selectedCharacter
+      if (character === 'guanwu') EventBus.emit(GameEvents.OPEN_CINEMATIC, { code: 'unlock_zhaoyun', name: '조운' })
+      else if (character === 'zhaoyun') EventBus.emit(GameEvents.OPEN_CINEMATIC, { code: 'unlock_lubu', name: '여포' })
+    }
+    EventBus.on(GameEvents.LEVEL_UP, onLevelUp)
+    return () => { EventBus.off(GameEvents.LEVEL_UP, onLevelUp) }
+  }, [])
 
   // 게임 창 크기 잠금: 항상 내부(콘텐츠)를 GAME_WINDOW(1280×720)으로 유지한다.
   // 사용자가 창을 늘리면 그만큼 되돌린다. 팝업 resizable=no는 크롬이 무시하므로 여기서 강제한다.
@@ -193,6 +207,8 @@ function GameApp() {
             <Minimap />
             <GoldDisplay />
             <NoticeBanner />
+            <SkillUnlockNotice />
+            <FreezeDiagnostic />
             <AiQuickHelp />
             {FEATURES.equipment && <InventoryPanel />}
             {FEATURES.equipment && <EquipmentPanel />}

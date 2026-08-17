@@ -220,7 +220,7 @@ export function DefenseHud() {
       </div>
 
       {/* 짧은 대기 동안 숫자 카운트 없이 Wave 임박만 알린다. */}
-      {phase === 'wait' && timeLeftMs > 0 && (
+      {phase === 'wait' && timeLeftMs > 0 && !pauseOpen && (
         <div className="def-wave-warning" role="alert">
           ⚠ 곧 Wave가 시작됩니다. Warning...!
         </div>

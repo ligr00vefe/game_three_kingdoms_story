@@ -53,6 +53,8 @@ export const GameEvents = {
   SKILL_STATUS: 'game:skill-status',
   EXP_CHANGED: 'game:exp-changed',
   LEVEL_UP: 'game:level-up',
+  SKILL_UNLOCKED: 'game:skill-unlocked',
+  FREEZE_DIAGNOSTIC: 'game:freeze-diagnostic',
   SCENE_READY: 'game:scene-ready',
   /** 맵 전환과 새 스폰 좌표를 서버에 즉시 저장한다. */
   MAP_CHANGED: 'game:map-changed',

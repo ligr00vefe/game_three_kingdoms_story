@@ -23,8 +23,9 @@ public class GameStateController {
 
 	/** 접속 시 캐릭터/인벤토리/아이템 정의 로드 (캐릭터 없으면 관우 자동 생성) */
 	@GetMapping("/state")
-	public GameStateResponse loadState(@RequestParam(defaultValue = "guanwu") String characterCode, HttpSession session) {
-		return gameStateService.loadState(requireAccount(session), characterCode);
+	public GameStateResponse loadState(@RequestParam(defaultValue = "guanwu") String characterCode,
+			@RequestParam(defaultValue = "false") boolean summary, HttpSession session) {
+		return gameStateService.loadState(requireAccount(session), characterCode, !summary);
 	}
 
 	/** 자동 저장 (클라이언트 10초 주기 + 주요 이벤트 시) */

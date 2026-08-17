@@ -77,7 +77,7 @@
     "fx_skill_lubu_severing_spirits": { "url": "assets/img/fx/skill_severing_spirits.png?v=20260817-1", "frameWidth": 512, "frameHeight": 553 },
     "fx_skill_lubu_heaven_shatter": { "url": "assets/img/fx/skill_shake_the_sky_explode_and_shatter_fixed.png?v=20260817-1", "frameWidth": 640, "frameHeight": 400 },
     "fx_skill_lubu_world_annihilation": { "url": "assets/img/fx/skill_annihilation_of_heaven_and_earth_fixed.png?v=20260817-1", "frameWidth": 480, "frameHeight": 724 },
-    "fx_skill_lubu_demon_gate_chain": { "url": "assets/img/fx/skill_ghost_gate_chain_fixed.png?v=20260817-1", "frameWidth": 576, "frameHeight": 400 },
+    "fx_skill_lubu_demon_gate_chain": { "url": "assets/img/fx/skill_ghost_gate_chain_fixed.png?v=20260817-2", "frameWidth": 576, "frameHeight": 400 },
     "fx_skill_glaive": { "url": "assets/img/fx/skill_crescent_moon_dance_fixed_v5.png", "frameWidth": 896, "frameHeight": 420 },
     "fx_skill_dragon": { "url": "assets/img/fx/skill_blue_dragon_slash_fixed_v3.png", "frameWidth": 320, "frameHeight": 648 },
     "fx_skill_zhao_dragon": { "url": "assets/img/fx/skill_dragons_fang_flash_fixed.png?v=20260817-1", "frameWidth": 438, "frameHeight": 724 },

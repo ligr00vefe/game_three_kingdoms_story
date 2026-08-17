@@ -66,7 +66,8 @@ const TORCHES = [
  */
 export function CharacterSelect() {
   const recentCharacter = useScreenStore.getState().selectedCharacter
-  const initialCharacter = CHARACTERS[recentCharacter] ? recentCharacter : 'guanwu'
+  // 서버 레벨을 읽기 전에는 잠금 여부를 알 수 없으므로 관우만 안전하게 선택한다.
+  const initialCharacter = 'guanwu'
   const [selected, setSelected] = useState<string | null>(initialCharacter)
   /** 두루마리에 실제로 그려진 캐릭터 — selected와 갈라져 있어야 "다 말린 뒤 교체"가 가능하다 */
   const [shown, setShown] = useState<string | null>(initialCharacter)
@@ -75,6 +76,7 @@ export function CharacterSelect() {
   const [characterLevels, setCharacterLevels] = useState<Record<string, number>>({
     [initialCharacter]: useGameStore.getState().level,
   })
+  const [levelsLoaded, setLevelsLoaded] = useState(false)
   const char = shown ? CHARACTERS[shown] : null
   const game = useGameStore()
 
@@ -102,10 +104,18 @@ export function CharacterSelect() {
       const state = await loadCharacterSummary(code)
       return [code, state.level] as const
     })).then((entries) => {
-      if (!cancelled) setCharacterLevels(Object.fromEntries(entries))
+      if (!cancelled) {
+        const levels = Object.fromEntries(entries)
+        setCharacterLevels(levels)
+        setLevelsLoaded(true)
+        const unlocked = recentCharacter === 'guanwu'
+          || (recentCharacter === 'zhaoyun' && (levels.guanwu ?? 1) >= 10)
+          || (recentCharacter === 'lubu' && (levels.zhaoyun ?? 1) >= 10)
+        setSelected(unlocked && CHARACTERS[recentCharacter] ? recentCharacter : 'guanwu')
+      }
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [])
+  }, [recentCharacter])
 
   // 캐릭터 변경: 말고(open=false) → 다 말리면 내용 교체 → 다시 편다.
   // 교체를 말리는 도중에 하면 바뀐 글자가 펼쳐진 종이에 그대로 비쳐 보인다.
@@ -176,14 +186,17 @@ export function CharacterSelect() {
           if (slot?.type !== 'char') return null
           const seat = SEATS[i]
           const on = selected === slot.code
+          const unlocked = slot.code === 'guanwu'
+            || (slot.code === 'zhaoyun' && levelsLoaded && (characterLevels.guanwu ?? 1) >= 10)
+            || (slot.code === 'lubu' && levelsLoaded && (characterLevels.zhaoyun ?? 1) >= 10)
           // 예고 캐릭터(locked)는 선택·게임시작 불가 — 클릭을 막고 무채색(CSS)으로만 보여 준다.
           return (
             <button
               key={i}
-              className={`lobby-seat lobby-seat--${slot.code} ${on ? 'lobby-seat--on' : ''} ${slot.locked ? 'lobby-seat--locked' : ''}`}
+              className={`lobby-seat lobby-seat--${slot.code} ${on ? 'lobby-seat--on' : ''} ${!unlocked ? 'lobby-seat--locked' : ''}`}
               style={{ left: `${seat.x}%`, top: `${seat.y}%`, '--seat-scale': seat.scale } as CSSProperties}
-              onClick={slot.locked ? undefined : () => setSelected(slot.code)}
-              disabled={slot.locked}
+              onClick={unlocked ? () => setSelected(slot.code) : undefined}
+              disabled={!unlocked}
             >
               {/* 캐릭터별 standBy 일러스트 — 코드마다 다른 배경 이미지를 CSS 변형 클래스로 건다 */}
               <span className={`lobby-char lobby-char--${slot.code}`} />
@@ -199,39 +212,37 @@ export function CharacterSelect() {
       </div>
 
       {/* 상단 서버/타이틀 장식 */}
-      <div className="lobby-top">
-        <span className="lobby-server">삼국 서버 · CH. 1</span>
-        <span className="lobby-slots-info">캐릭터 슬롯 {LOBBY_SLOTS.filter((slot) => slot?.type === 'char' && !slot.locked).length} / {LOBBY_SLOTS.length}</span>
-      </div>
       <h1 className="lobby-title">캐릭터 선택</h1>
 
       {/* 우측 능력치 두루마리 — 축(rod) 2개는 종이 위/아래에 이어져 있고, 가운데 뷰포트 높이만
           0↔측정높이(px)로 여닫는다. 뷰포트가 자라면 아래 축이 그만큼 밀려나 축과 종이가 한 몸으로
           움직인다. 게임 시작 버튼은 두루마리 밖(아래)이라 말려도 같이 접히지 않는다. */}
       {char && (
-        <aside className="lobby-side" style={{ '--roll-ms': `${ROLL_MS}ms` } as CSSProperties}>
-          <div className="lobby-scroll">
-            <span className="scroll-rod scroll-rod--top" />
-            <div className="scroll-viewport" style={{ height: open ? contentH : 0 }}>
-              <div className="scroll-content" ref={contentRef}>
-                <div className="lobby-card-lv">Lv. <b>{characterLevels[char.code] ?? 1}</b></div>
-                <div className="lobby-card-name">{char.name}</div>
-                <div className="lobby-card-class">⚔ {char.clazz}</div>
-                <p className="lobby-card-desc">{char.desc}</p>
-                <div className="lobby-card-stats">
-                  <div className="lobby-stat"><span>HP</span><b>{char.stats.hp}</b></div>
-                  <div className="lobby-stat"><span>MP</span><b>{char.stats.mp}</b></div>
-                  <div className="lobby-stat"><span>공격력</span><b>{char.stats.attack}</b></div>
-                  <div className="lobby-stat"><span>이동속도</span><b>{char.stats.speedPct}%</b></div>
+        <>
+          <aside className="lobby-side" style={{ '--roll-ms': `${ROLL_MS}ms` } as CSSProperties}>
+            <div className="lobby-scroll">
+              <span className="scroll-rod scroll-rod--top" />
+              <div className="scroll-viewport" style={{ height: open ? contentH : 0 }}>
+                <div className="scroll-content" ref={contentRef}>
+                  <div className="lobby-card-lv">Lv. <b>{characterLevels[char.code] ?? 1}</b></div>
+                  <div className="lobby-card-name">{char.name}</div>
+                  <div className="lobby-card-class">⚔ {char.clazz}</div>
+                  <p className="lobby-card-desc">{char.desc}</p>
+                  <div className="lobby-card-stats">
+                    <div className="lobby-stat"><span>HP</span><b>{char.stats.hp}</b></div>
+                    <div className="lobby-stat"><span>MP</span><b>{char.stats.mp}</b></div>
+                    <div className="lobby-stat"><span>공격력</span><b>{char.stats.attack}</b></div>
+                    <div className="lobby-stat"><span>이동속도</span><b>{char.stats.speedPct}%</b></div>
+                  </div>
                 </div>
               </div>
+              <span className="scroll-rod scroll-rod--bottom" />
             </div>
-            <span className="scroll-rod scroll-rod--bottom" />
-          </div>
+          </aside>
           <button className="lobby-start" onClick={() => void startGame()} disabled={starting}>
             {starting ? '불러오는 중…' : '게임 시작'}
           </button>
-        </aside>
+        </>
       )}
     </div>
   )

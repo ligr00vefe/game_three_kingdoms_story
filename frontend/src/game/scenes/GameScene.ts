@@ -29,6 +29,8 @@ import { CHARACTERS } from '../../data/characters'
 import { getCharacterModel } from '../../data/characterModels'
 import { useScreenStore } from '../../stores/screenStore'
 import { getSkillsForCharacter } from '../../stores/skillStore'
+import { useUiStore } from '../../stores/uiStore'
+import { useDefenseStore } from '../../stores/defenseStore'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -263,6 +265,8 @@ const SKILL_EFFECT_OFFSET = {
  * Phase 2 범위 추가: 전투(참격/청룡참), 황건당 좀비, 데미지/경험치/레벨업, 피격/사망.
  */
 export class GameScene extends Phaser.Scene {
+  /** Browser watchdog heartbeat. Uses performance time, independent of Phaser clocks. */
+  public lastUpdateHeartbeat = performance.now()
   private player!: Player
   private input_!: InputManager
   private effects!: EffectManager
@@ -875,7 +879,12 @@ export class GameScene extends Phaser.Scene {
     // 점프 대시는 대쉬 먼지 하나만, 이단 점프는 상승 기류 하나만 재생해 서로 겹치지 않게 한다.
     const airDashEffectYOffset = getCharacterModel(character.modelCode).airDashEffectYOffset
     this.player.onAirDash = (x, y, facing) => this.effects.dashTrail(x, y + airDashEffectYOffset, facing)
-    this.player.onDoubleJump = (x, y) => this.effects.doubleJumpBurst(x, y + 24)
+    this.player.onDoubleJump = (x) => {
+      // 프레임 중심이 아니라 실제 발끝을 기준으로 잡아 모든 무장의 몸통과 겹치지 않게 한다.
+      const footGap = character.code === 'lubu' ? 10 : 8
+      const effectY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + footGap
+      this.effects.doubleJumpBurst(x, effectY)
+    }
     const isZhaoYun = character.skillStyle === 'zhaoyun'
     this.player.onSkillStart = (facing, skillCode) => {
       if (skillCode === 'skill_charge_slash') {
@@ -1120,7 +1129,7 @@ export class GameScene extends Phaser.Scene {
       EventBus.off(GameEvents.DEFENSE_PAUSE, this.handleDefensePause, this)
       EventBus.off(GameEvents.DEFENSE_ARCHER_VOLLEY, this.handleArcherVolley, this)
       EventBus.off(GameEvents.DEFENSE_REPAIR, this.handleDefenseRepair, this)
-    EventBus.off(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
+      EventBus.off(GameEvents.DEFENSE_CHOOSE_UPGRADE, this.handleDefenseUpgrade, this)
       this.defense?.destroy()
     })
 
@@ -1244,13 +1253,13 @@ export class GameScene extends Phaser.Scene {
     this.transitionTo({ mapKey: 'map_ye_castle', spawnX: 2400, spawnY: 440 })
   }
 
-  /** 디펜스 ESC 일시정지 메뉴: 씬을 pause/resume (좀비·타이머·트윈 모두 정지). 디펜스 모드에서만 유효. */
   private handleDefensePause = (paused: boolean) => {
     if (!this.defense) return
     this.pauseRequests.defense = paused
     this.applyWorldPause()
   }
 
+  /** 디펜스 ESC 일시정지 메뉴: 씬을 pause/resume (좀비·타이머·트윈 모두 정지). 디펜스 모드에서만 유효. */
   /** 바리케이트 배치 대기 모드 토글 (구매 창에서 바리케이트 선택 시 on) */
   private handleDefensePlaceMode = (request: boolean | DefenseBuildType | BarricadeTier) => {
     if (!this.defense) return
@@ -1947,6 +1956,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
+    this.lastUpdateHeartbeat = performance.now()
+    // React 메뉴 상태가 정지/재개 이벤트보다 권위 있는 단일 상태다. 씬 재시작이나 이벤트 수신
+    // 타이밍 때문에 둘이 어긋나도 다음 프레임에 반드시 복구한다.
+    const ui = useUiStore.getState()
+    const defenseUi = useDefenseStore.getState()
+    const settingsPause = ui.settingsOpen || ui.cinematicOpen
+    const defensePause = this.mode === 'defense' && defenseUi.active && defenseUi.pauseOpen
+    if (this.pauseRequests.settings !== settingsPause || this.pauseRequests.defense !== defensePause) {
+      this.pauseRequests.settings = settingsPause
+      this.pauseRequests.defense = defensePause
+      this.applyWorldPause()
+    }
     if (this.worldPaused) return
     this.ensureSimulationRunning()
     this.input_.update(this.time.now)

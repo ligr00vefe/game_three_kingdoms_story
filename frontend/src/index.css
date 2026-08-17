@@ -1179,13 +1179,7 @@ html, body, #root { height: 100%; }
   white-space: nowrap;
 }
 .lobby-top {
-  position: absolute;
-  top: 14px;
-  right: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
+  display: none;
 }
 .lobby-server {
   padding: 6px 14px;
@@ -1272,6 +1266,36 @@ html, body, #root { height: 100%; }
 }
 .lobby-seat--locked { cursor: default; }
 .lobby-seat--locked:hover .lobby-char { transform: none; } /* 잠긴 좌석은 hover 들썩임 없음 */
+
+.cine-unlock-banner {
+  position: absolute; left: 50%; top: 50%; width: min(620px, 78vw);
+  transform: translate(-50%, -50%); padding: 30px 42px;
+  border: 2px solid #d6ad55; border-radius: 8px;
+  background: linear-gradient(180deg, rgba(42, 25, 13, .98), rgba(18, 12, 9, .98));
+  box-shadow: 0 0 0 4px rgba(78, 45, 20, .8), 0 18px 60px #000;
+  color: #f7e8bd; text-align: center; white-space: pre-line; z-index: 3;
+}
+.cine-unlock-title { display: block; margin-bottom: 12px; color: #e9bf62; font-size: 18px; letter-spacing: .18em; }
+.cine-unlock-banner p { margin: 0; font-size: 25px; line-height: 1.65; font-weight: 700; }
+.cine-unlock-banner small { display: block; margin-top: 16px; color: #bfae8b; }
+
+.skill-unlock-notice {
+  position: absolute; z-index: 90; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  min-width: 300px; display: flex; align-items: center; gap: 14px; padding: 12px 22px;
+  border: 1px solid #e4bd63; border-radius: 7px;
+  background: linear-gradient(90deg, rgba(35, 19, 9, .96), rgba(74, 42, 16, .97), rgba(35, 19, 9, .96));
+  color: #fff1c5; box-shadow: 0 8px 30px #000a;
+  animation: skill-unlock-in 2.6s ease both; pointer-events: none;
+}
+.skill-unlock-icon { font-size: 32px; filter: drop-shadow(0 0 8px #ffd76a); }
+.skill-unlock-notice span:last-child { display: flex; flex-direction: column; }
+.skill-unlock-notice small { color: #d2ad61; }
+.skill-unlock-notice b { font-size: 20px; }
+@keyframes skill-unlock-in {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% - 20px)) scale(.9); }
+  12%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 8px)) scale(.98); }
+}
 
 /*
  * 화로대 횃불 — effect_torch_flame.png (1216×332, 152px 8프레임).
@@ -1422,15 +1446,41 @@ html, body, #root { height: 100%; }
 .lobby-card-lv { margin-bottom: 8px; font-size: 15px; font-weight: 700; color: #8a5a2b; text-align: center; }
 .lobby-card-lv b { font-size: 26px; color: #5b3a17; }
 .lobby-card-name {
-  padding: 6px 0;
-  margin-bottom: 9px;
+  min-height: 48px;
+  padding: 9px 18px 0;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 17px; font-weight: 800; text-align: center;
-  color: #2f1d0b;
-  background: rgba(120, 78, 34, 0.16);
-  border-radius: 9px;
+  color: #fff;
+  text-shadow: 0 1px 2px #000, 0 0 4px rgba(0, 0, 0, .8);
+  background: transparent url('/assets/img/standBy/naming_tag.png') center / auto 48px no-repeat;
 }
 .lobby-card-class { margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #a33b2c; text-align: center; }
-.lobby-card-desc { margin: 0 0 13px; font-size: 11px; line-height: 1.65; color: #5e4526; }
+.lobby-card-desc {
+  margin: 0 0 13px;
+  font-size: 11px;
+  line-height: 1.65;
+  color: #5e4526;
+  white-space: pre-line;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  line-break: strict;
+}
+
+.freeze-diagnostic {
+  position: fixed; z-index: 10000; left: 50%; top: 50%; width: min(760px, 88vw);
+  max-height: 78vh; transform: translate(-50%, -50%); overflow: auto;
+  padding: 16px; border: 2px solid #ff5252; border-radius: 8px;
+  background: rgba(18, 10, 10, .97); color: #fff; box-shadow: 0 12px 50px #000;
+  pointer-events: auto;
+}
+.freeze-diagnostic__title { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; color: #ff8a80; }
+.freeze-diagnostic__title button { border: 0; background: transparent; color: #fff; font-size: 24px; cursor: pointer; }
+.freeze-diagnostic p { margin: 8px 0; }
+.freeze-diagnostic pre { padding: 10px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: #070707; color: #d7ffd9; font: 11px/1.45 Consolas, monospace; }
+.freeze-diagnostic > button { padding: 7px 12px; border: 1px solid #d6a84e; background: #34230e; color: #ffe7a6; cursor: pointer; }
 .lobby-card-stats {
   margin-top: 4px;
   display: grid;
@@ -1469,8 +1519,13 @@ html, body, #root { height: 100%; }
    background-size 125.2% = 1536/1227 (테두리 여백 밴드가 아니라 버튼 밴드가 버튼 폭을 꽉 채우게).
    position-y 22.5%/74.7% = 위/아래 밴드의 세로 중심을 버튼 중앙에 맞춘 계산값. */
 .lobby-start {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 55px;
+  transform: translateX(-50%);
   aspect-ratio: 1227 / 285;
-  width: 100%;
+  width: 224px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1842,8 +1897,9 @@ html, body, #root { height: 100%; }
 }
 .lobby-defense-badge {
   position: absolute;
-  left: 4.5%;
-  bottom: 7%;
+  z-index: 6;
+  left: calc((100% - 100vw) / 2 + 18px);
+  top: calc((100% - 100dvh) / 2 + 18px);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1972,6 +2028,8 @@ html, body, #root { height: 100%; }
   transition: background 0.12s;
 }
 .portal-menu-btn:hover { background: #455a64; }
+.portal-menu-btn--disabled { opacity: .55; filter: grayscale(.6); cursor: not-allowed; }
+.portal-menu-btn--disabled:hover { background: #263238; }
 .portal-menu-btn--accent { background: #a83232; border-color: #c14b3a; }
 .portal-menu-btn--accent:hover { background: #c0392b; }
 .portal-menu-close {
@@ -2276,7 +2334,7 @@ html, body, #root { height: 100%; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 45;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 200;
 }
 .def-pause-backdrop .settings-menu { width: 390px; max-height: calc(100vh - 60px); overflow-y: auto; }

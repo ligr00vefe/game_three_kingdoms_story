@@ -3,6 +3,9 @@ import { PHYSICS } from './config'
 import { BootScene } from './scenes/BootScene'
 import { PreloadScene } from './scenes/PreloadScene'
 import { GameScene } from './scenes/GameScene'
+import { useUiStore } from '../stores/uiStore'
+import { useDefenseStore } from '../stores/defenseStore'
+import { EventBus, GameEvents } from './EventBus'
 
 export const GAME_WIDTH = 1024
 export const GAME_HEIGHT = 576
@@ -42,5 +45,115 @@ export function startGame(parent: HTMLElement): Phaser.Game {
   if (import.meta.env.DEV) {
     ;(window as Window & { __tkGame?: Phaser.Game }).__tkGame = game
   }
+
+  // Phaser 키보드 플러그인이 blur 이후 keydown을 놓쳐도 DOM 단계에서 코어 루프를 깨운다.
+  // wake()는 내부 월드 pause를 해제하지 않으므로 ESC/시네마틱의 의도한 정지는 유지된다.
+  const wakeGameLoop = () => {
+    if (!game.loop.inFocus) game.loop.focus()
+    if (!game.loop.running) game.loop.wake()
+  }
+  const resumeHiddenGame = () => {
+    game.loop.resume()
+    wakeGameLoop()
+  }
+  const wakeWhenVisible = () => {
+    if (document.visibilityState === 'visible') wakeGameLoop()
+  }
+  window.addEventListener('focus', wakeGameLoop)
+  window.addEventListener('keydown', wakeGameLoop, true)
+  window.addEventListener('pointerdown', wakeGameLoop, true)
+  document.addEventListener('visibilitychange', wakeWhenVisible)
+  game.events.on(Phaser.Core.Events.BLUR, wakeGameLoop)
+  game.events.on(Phaser.Core.Events.HIDDEN, resumeHiddenGame)
+
+  let lastRuntimeError: { message: string; stack?: string; at: string } | null = null
+  const recordRuntimeError = (event: ErrorEvent) => {
+    lastRuntimeError = {
+      message: event.message,
+      stack: event.error instanceof Error ? event.error.stack : undefined,
+      at: new Date().toISOString(),
+    }
+    EventBus.emit(GameEvents.FREEZE_DIAGNOSTIC, {
+      kind: 'runtime-error',
+      ...lastRuntimeError,
+    })
+  }
+  const recordRejectedPromise = (event: PromiseRejectionEvent) => {
+    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason))
+    lastRuntimeError = { message: error.message, stack: error.stack, at: new Date().toISOString() }
+    EventBus.emit(GameEvents.FREEZE_DIAGNOSTIC, { kind: 'runtime-error', ...lastRuntimeError })
+  }
+  window.addEventListener('error', recordRuntimeError)
+  window.addEventListener('unhandledrejection', recordRejectedPromise)
+
+  // Scene.update 자체가 멈추면 씬 내부 코드는 복구를 실행할 수 없다. 브라우저 타이머에서
+  // 의도된 UI pause 여부와 실제 Phaser 상태를 대조해 비정상 정지만 복구하고 원인을 남긴다.
+  const watchdog = window.setInterval(() => {
+    if (document.visibilityState !== 'visible') return
+    const scene = game.scene.getScene('Game') as GameScene | null
+    if (!scene?.sys.isActive()) return
+
+    const ui = useUiStore.getState()
+    const defense = useDefenseStore.getState()
+    const intendedPause = ui.settingsOpen || ui.cinematicOpen || (defense.active && defense.pauseOpen)
+    if (intendedPause) return
+
+    const staleUpdate = performance.now() - scene.lastUpdateHeartbeat > 1500
+    const abnormalPause = game.isPaused || scene.scene.isPaused() || scene.scene.isSleeping()
+      || scene.physics.world.isPaused || scene.time.paused
+    if (!staleUpdate && !abnormalPause) return
+
+    const diagnostic = {
+      at: new Date().toISOString(),
+      character: (scene as unknown as { player?: { modelCode?: string } }).player?.modelCode,
+      staleUpdate,
+      heartbeatAgeMs: Math.round(performance.now() - scene.lastUpdateHeartbeat),
+      gamePaused: game.isPaused,
+      loopRunning: game.loop.running,
+      loopInFocus: game.loop.inFocus,
+      scenePaused: scene.scene.isPaused(),
+      sceneSleeping: scene.scene.isSleeping(),
+      physicsPaused: scene.physics.world.isPaused,
+      timePaused: scene.time.paused,
+      ui: {
+        settingsOpen: ui.settingsOpen,
+        cinematicOpen: ui.cinematicOpen,
+        chatFocused: ui.chatFocused,
+        defenseActive: defense.active,
+        defensePauseOpen: defense.pauseOpen,
+      },
+      lastRuntimeError,
+    }
+    localStorage.setItem('tk_last_freeze_diagnostic', JSON.stringify(diagnostic))
+    console.error('[game-freeze-recovery]', diagnostic)
+    EventBus.emit(GameEvents.FREEZE_DIAGNOSTIC, {
+      kind: 'freeze',
+      at: diagnostic.at,
+      message: lastRuntimeError?.message,
+      stack: lastRuntimeError?.stack,
+      state: diagnostic,
+    })
+
+    game.resume()
+    if (scene.scene.isSleeping()) scene.scene.wake()
+    if (scene.scene.isPaused()) scene.scene.resume()
+    scene.physics.world.resume()
+    scene.time.paused = false
+    scene.tweens.resumeAll()
+    scene.anims.resumeAll()
+    wakeGameLoop()
+  }, 500)
+
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    window.removeEventListener('focus', wakeGameLoop)
+    window.removeEventListener('keydown', wakeGameLoop, true)
+    window.removeEventListener('pointerdown', wakeGameLoop, true)
+    document.removeEventListener('visibilitychange', wakeWhenVisible)
+    game.events.off(Phaser.Core.Events.BLUR, wakeGameLoop)
+    game.events.off(Phaser.Core.Events.HIDDEN, resumeHiddenGame)
+    window.removeEventListener('error', recordRuntimeError)
+    window.removeEventListener('unhandledrejection', recordRejectedPromise)
+    window.clearInterval(watchdog)
+  })
   return game
 }

@@ -50,7 +50,7 @@ export const CHARACTER_MODELS: Record<string, CharacterModelDef> = {
     assetAction: { skill: 'attack' },
   },
   lubu_t2: {
-    code: 'lubu_t2', assetPrefix: 'lubu_t2', fallbackTexture: 'guanwu_idle', frameSize: 192, groundLift: -10, visualScale: 1.587,
+    code: 'lubu_t2', assetPrefix: 'lubu_t2', fallbackTexture: 'guanwu_idle', frameSize: 192, groundLift: -10, visualScale: 1.45,
     airDashEffectYOffset: 36,
     attackSpeed: 1.25,
     basicAttackReach: 155,

@@ -1,5 +1,6 @@
 package com.project.threekingdoms.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.project.threekingdoms.api.dto.GameStateDtos.CharacterDto;
@@ -15,6 +16,7 @@ import com.project.threekingdoms.api.dto.GameStateDtos.QuickslotDto;
 import com.project.threekingdoms.repository.GameCharacterRepository;
 import com.project.threekingdoms.repository.InventoryItemRepository;
 import com.project.threekingdoms.repository.ItemDefinitionRepository;
+import com.project.threekingdoms.repository.PlayerAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class GameStateService {
 	private final InventoryItemRepository inventoryRepository;
 	private final ItemDefinitionRepository itemDefinitionRepository;
 	private final CharacterQuickslotRepository quickslotRepository;
+	private final PlayerAccountRepository accountRepository;
 
 	@Transactional
 	public GameStateResponse loadState() {
@@ -55,13 +58,23 @@ public class GameStateService {
 
 	@Transactional
 	public GameStateResponse loadState(Long accountId, String characterCode) {
+		return loadState(accountId, characterCode, true);
+	}
+
+	@Transactional
+	public GameStateResponse loadState(Long accountId, String characterCode, boolean markAsRecentCharacter) {
+		var account = accountRepository.findById(accountId).orElseThrow();
+		if (markAsRecentCharacter) {
+			account.setLastCharacterCode(characterCode);
+			accountRepository.save(account);
+		}
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
 			.orElseGet(() -> characterRepository.save(createCharacter(accountId, characterCode)));
 		List<InventoryItemDto> inventory = inventoryRepository.findByCharacterId(character.getId()).stream()
 			.map(i -> new InventoryItemDto(i.getItemCode(), i.getQuantity(), i.getSlotIndex(), i.isEquipped())).toList();
 		List<ItemDefinitionDto> defs = itemDefinitionRepository.findAll().stream()
 			.map(d -> new ItemDefinitionDto(d.getCode(), d.getName(), d.getItemType(), d.getIconKey(), d.getEffectJson(), d.getDescription())).toList();
-		return new GameStateResponse(toDto(character), inventory, defs, loadQuickslots(character.getId()));
+		return new GameStateResponse(toDto(character, account.getDefenseStage(), account.getGold()), inventory, defs, loadQuickslots(character.getId()));
 	}
 
 	/**
@@ -85,9 +98,17 @@ public class GameStateService {
 
 	@Transactional
 	public void saveState(Long accountId, String characterCode, SaveStateRequest request) {
+		var account = accountRepository.findById(accountId).orElseThrow();
 		GameCharacter character = characterRepository.findByAccountIdAndCharacterCode(accountId, characterCode)
 			.orElseGet(() -> characterRepository.save(createCharacter(accountId, characterCode)));
-		applyState(character, request);
+		account.setLastCharacterCode(characterCode);
+		account.setGold(Math.max(0, request.gold()));
+		if (request.defenseStage() > account.getDefenseStage()) {
+			account.setDefenseStage(request.defenseStage());
+			account.setDefenseStageReachedAt(LocalDateTime.now());
+		}
+		accountRepository.save(account);
+		applyState(character, request, account.getDefenseStage(), account.getGold());
 		inventoryRepository.deleteByCharacterId(character.getId());
 		List<InventoryItem> items = request.inventory().stream()
 			.map(i -> new InventoryItem(character, i.itemCode(), i.quantity(), i.slotIndex(), i.equipped())).toList();
@@ -112,6 +133,10 @@ public class GameStateService {
 	}
 
 	private void applyState(GameCharacter character, SaveStateRequest request) {
+		applyState(character, request, request.defenseStage(), request.gold());
+	}
+
+	private void applyState(GameCharacter character, SaveStateRequest request, int defenseStage, long gold) {
 		character.setLevel(request.level());
 		character.setExp(request.exp());
 		character.setMaxHp(request.maxHp());
@@ -119,18 +144,22 @@ public class GameStateService {
 		character.setMaxMp(request.maxMp());
 		character.setMp(Math.min(request.mp(), request.maxMp()));
 		character.setAttackPower(request.attackPower());
-		character.setGold(request.gold());
+		character.setGold(gold);
 		if (request.stageCode() != null && !request.stageCode().isBlank()) character.setStageCode(request.stageCode());
-		character.setDefenseStage(request.defenseStage());
+		character.setDefenseStage(defenseStage);
 		character.setPositionX(request.positionX());
 		character.setPositionY(request.positionY());
 	}
 
 	private CharacterDto toDto(GameCharacter c) {
+		return toDto(c, c.getDefenseStage(), c.getGold());
+	}
+
+	private CharacterDto toDto(GameCharacter c, int defenseStage, long gold) {
 		return new CharacterDto(
 			c.getName(), c.getCharacterCode(), c.getLevel(), c.getExp(),
 			c.getMaxHp(), c.getHp(), c.getMaxMp(), c.getMp(),
-			c.getAttackPower(), c.getGold(), c.getStageCode(), c.getDefenseStage(),
+			c.getAttackPower(), gold, c.getStageCode(), defenseStage,
 			c.getPositionX(), c.getPositionY());
 	}
 
@@ -149,18 +178,18 @@ public class GameStateService {
 		character.setCharacterCode(characterCode);
 		switch (characterCode) {
 			case "zhaoyun" -> {
-				character.setMaxHp(100); character.setHp(100);
-				character.setMaxMp(50); character.setMp(50);
+				character.setMaxHp(200); character.setHp(200);
+				character.setMaxMp(150); character.setMp(150);
 				character.setAttackPower(90);
 			}
 			case "lubu" -> {
-				character.setMaxHp(120); character.setHp(120);
-				character.setMaxMp(40); character.setMp(40);
+				character.setMaxHp(250); character.setHp(250);
+				character.setMaxMp(100); character.setMp(100);
 				character.setAttackPower(100);
 			}
 			default -> {
-				character.setMaxHp(100); character.setHp(100);
-				character.setMaxMp(50); character.setMp(50);
+				character.setMaxHp(220); character.setHp(220);
+				character.setMaxMp(120); character.setMp(120);
 				character.setAttackPower(95);
 			}
 		}

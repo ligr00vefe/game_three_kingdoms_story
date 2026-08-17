@@ -6,27 +6,28 @@ export interface CharacterDef {
   clazz: string
   desc: string
   stats: { hp: number; mp: number; attack: number; speedPct: number }
-  /** 전투 스킬 연출 모듈. 스킬 미구현 캐릭터는 none으로 명시한다. */
+  /** Character-specific combat effect module. */
   skillStyle: 'guanwu' | 'zhaoyun' | 'none'
 }
 
-const BALANCED_STATS = { hp: 100, mp: 50, attack: 95, speedPct: 100 }
-const MOBILE_STATS = { hp: 100, mp: 50, attack: 90, speedPct: 120 }
+const GUANWU_STATS = { hp: 220, mp: 120, attack: 95, speedPct: 100 }
+const ZHAOYUN_STATS = { hp: 200, mp: 150, attack: 90, speedPct: 120 }
+
 export const CHARACTERS: Record<string, CharacterDef> = {
   guanwu: {
     code: 'guanwu', modelCode: 'guanwu_t2', name: '관우', clazz: '균형형 무장',
-    desc: '청룡언월도를 휘두르는 촉한의 명장입니다.',
-    stats: BALANCED_STATS, skillStyle: 'guanwu',
+    desc: '유비와 생사를 함께한 의형제로 알려졌으며,\n만 명도 능히 상대한다 하여,\n‘만인지적(萬人之敵), 세지호신(世之虎臣)’이라 평가 받은 문무겸전의 명장.',
+    stats: GUANWU_STATS, skillStyle: 'guanwu',
   },
   zhaoyun: {
     code: 'zhaoyun', modelCode: 'zhaoyun_t2', name: '조운', clazz: '기동형 무장',
-    desc: '날렵한 창술로 전장을 누비는 촉한의 명장입니다.',
-    stats: MOBILE_STATS, skillStyle: 'zhaoyun',
+    desc: '장판에서 유비의 아들을 구해낸 충의의 장수로,\n유비가 ‘일신시담(一身是膽), 온몸에 담력을 둘렀다’라 칭송할 만큼\n용맹과 침착함을 겸비한 무장.',
+    stats: ZHAOYUN_STATS, skillStyle: 'zhaoyun',
   },
   lubu: {
     code: 'lubu', modelCode: 'lubu_t2', name: '여포', clazz: '강공형 무장',
-    desc: '압도적인 힘으로 전장을 휩쓰는 강공형 무장입니다.',
-    stats: { hp: 120, mp: 40, attack: 100, speedPct: 90 }, skillStyle: 'none',
+    desc: '전장을 누비는 모습이 마치 날아다니는 듯하다 하여 ‘비장(飛將)’이라 불렸으며,\n‘마중적토, 인중여포’라 일컬어진 당대 최고의 맹장.',
+    stats: { hp: 250, mp: 100, attack: 100, speedPct: 90 }, skillStyle: 'none',
   },
 }
 

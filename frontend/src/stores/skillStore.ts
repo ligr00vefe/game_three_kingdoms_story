@@ -17,19 +17,19 @@ export const SKILLS: SkillDef[] = [
     desc: (lv) => `전방으로 돌진하며 베기. 데미지 ${180 + lv * 20}%, MP 12, 쿨타임 8초.`,
   },
   {
-    code: 'skill_glaive_flurry', name: '용아일섬', icon: '🐲', type: 'active', maxLevel: 10, unlockLevel: 7,
+    code: 'skill_glaive_flurry', name: '용아일섬', icon: '🐲', type: 'active', maxLevel: 10, unlockLevel: 6,
     desc: (lv) => `전방을 ${3 + Math.floor(lv / 4)}회 연속 타격. 타격당 데미지 ${90 + lv * 10}%, MP 20, 쿨타임 10초.`,
   },
   {
-    code: 'skill_decisive_strike', name: '창영난무', icon: '🔱', type: 'active', maxLevel: 10, unlockLevel: 12,
+    code: 'skill_decisive_strike', name: '창영난무', icon: '🔱', type: 'active', maxLevel: 10, unlockLevel: 7,
     desc: (lv) => `전방 적 하나에 필살의 일격. 데미지 ${300 + lv * 30}%, 대상 HP 30% 이하면 데미지 2배. MP 25, 쿨타임 12초.`,
   },
   {
-    code: 'skill_dragon_slash', name: '백화연창', icon: '🌸', type: 'active', maxLevel: 10, unlockLevel: 17,
+    code: 'skill_dragon_slash', name: '백화연창', icon: '🌸', type: 'active', maxLevel: 10, unlockLevel: 8,
     desc: (lv) => `전방 광역 참격. 데미지 ${250 + lv * 25}%, MP 15, 쿨타임 5초.`,
   },
   {
-    code: 'skill_lightning_descent', name: '비호관천', icon: '🐯', type: 'active', maxLevel: 10, unlockLevel: 22,
+    code: 'skill_lightning_descent', name: '비호관천', icon: '🐯', type: 'active', maxLevel: 10, unlockLevel: 9,
     desc: (lv) => `하늘에서 뇌신의 벼락을 소환해 광역을 강타한다. 데미지 ${400 + lv * 40}%, MP 40, 쿨타임 25초.`,
   },
 ]
@@ -45,11 +45,11 @@ const GUANWU_SKILLS: SkillDef[] = SKILLS.map((skill, index) => [
 
 const skillByCode = (code: string) => SKILLS.find((skill) => skill.code === code)!
 const ZHAOYUN_SKILLS: SkillDef[] = [
-  { ...skillByCode('skill_decisive_strike'), code: 'skill_meteor_spear', name: '유성창', icon: '☄️' },
-  { ...skillByCode('skill_glaive_flurry'), name: '용아일섬' },
-  { ...skillByCode('skill_charge_slash'), name: '돌격무쌍' },
-  { ...skillByCode('skill_dragon_slash'), name: '백화연창' },
-  { ...skillByCode('skill_lightning_descent'), name: '비호관천' },
+  { ...skillByCode('skill_decisive_strike'), code: 'skill_meteor_spear', name: '유성창', icon: '☄️', unlockLevel: 1 },
+  { ...skillByCode('skill_glaive_flurry'), name: '용아일섬', unlockLevel: 6 },
+  { ...skillByCode('skill_charge_slash'), name: '돌격무쌍', unlockLevel: 7 },
+  { ...skillByCode('skill_dragon_slash'), name: '백화연창', unlockLevel: 8 },
+  { ...skillByCode('skill_lightning_descent'), name: '비호관천', unlockLevel: 9 },
 ]
 
 const lubuSkill = (code: string, name: string, icon: string, unlockLevel: number, baseDamage: number): SkillDef => ({
@@ -58,10 +58,10 @@ const lubuSkill = (code: string, name: string, icon: string, unlockLevel: number
 })
 const LUBU_SKILLS: SkillDef[] = [
   lubuSkill('skill_severing_spirits', '패천격', '💥', 1, 240),
-  lubuSkill('skill_crushing_moon_slash', '단혼참', '🌙', 7, 220),
-  lubuSkill('skill_lubu_heaven_shatter', '진천폭쇄', '🔥', 12, 280),
-  lubuSkill('skill_lubu_world_annihilation', '천지절멸', '⚡', 17, 320),
-  lubuSkill('skill_lubu_demon_gate_chain', '귀문연환', '⛓️', 22, 360),
+  lubuSkill('skill_crushing_moon_slash', '단혼참', '🌙', 6, 220),
+  lubuSkill('skill_lubu_heaven_shatter', '진천폭쇄', '🔥', 7, 280),
+  lubuSkill('skill_lubu_world_annihilation', '천지절멸', '⚡', 8, 320),
+  lubuSkill('skill_lubu_demon_gate_chain', '귀문연환', '⛓️', 9, 360),
 ]
 
 /**
@@ -95,7 +95,7 @@ interface SkillState extends SavedSkillProfile {
 }
 
 const initialLevelsFor = (characterCode: string): Record<string, number> => Object.fromEntries(
-  getSkillsForCharacter(characterCode).map((skill) => [skill.code, 1]),
+  getSkillsForCharacter(characterCode).map((skill) => [skill.code, skill.unlockLevel === 1 ? 1 : 0]),
 )
 
 const storageKey = (profileKey: string) => `tks-skills-v3-${profileKey}`
@@ -105,8 +105,9 @@ function saveProfile(profileKey: string | null, levels: Record<string, number>, 
   localStorage.setItem(storageKey(profileKey), JSON.stringify({ levels, points }))
 }
 
-function levelsForCharacter(characterCode: string, saved: Record<string, number>, _characterLevel: number) {
+function levelsForCharacter(characterCode: string, saved: Record<string, number>, characterLevel: number) {
   return Object.fromEntries(getSkillsForCharacter(characterCode).map((def) => {
+    if (characterLevel < def.unlockLevel) return [def.code, 0]
     return [def.code, Math.max(1, Math.min(def.maxLevel, saved[def.code] ?? 0))]
   }))
 }

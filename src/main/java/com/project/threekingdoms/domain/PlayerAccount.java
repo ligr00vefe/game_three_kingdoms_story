@@ -1,5 +1,7 @@
 package com.project.threekingdoms.domain;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,6 +30,18 @@ public class PlayerAccount {
 
 	@Column(name = "display_name", nullable = false, length = 30)
 	private String displayName;
+
+	@Column(name = "defense_stage", nullable = false)
+	private int defenseStage = 1;
+
+	@Column(name = "defense_stage_reached_at", nullable = false)
+	private LocalDateTime defenseStageReachedAt = LocalDateTime.now();
+
+	@Column(name = "last_character_code", nullable = false, length = 30)
+	private String lastCharacterCode = "guanwu";
+
+	@Column(nullable = false)
+	private long gold = 0;
 
 	public PlayerAccount(String loginId, String passwordHash, String displayName) {
 		this.loginId = loginId;

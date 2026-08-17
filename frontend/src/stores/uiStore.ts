@@ -80,9 +80,9 @@ useUiStore.subscribe(
   (blocked) => EventBus.emit(GameEvents.INPUT_BLOCK, blocked),
 )
 
-// ESC 설정창은 일반 입력 차단과 달리 게임 월드의 시간/물리도 실제로 정지한다.
+// 설정창과 시네마틱은 입력뿐 아니라 게임 월드의 시간/물리도 실제로 정지한다.
 useUiStore.subscribe(
-  (s) => s.settingsOpen,
+  (s) => s.settingsOpen || s.cinematicOpen,
   (paused) => EventBus.emit(GameEvents.GAME_PAUSE, paused),
 )
 

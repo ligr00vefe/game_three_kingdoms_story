@@ -1,6 +1,6 @@
 import { PROGRESSION } from '../config'
 import { useGameStore } from '../../stores/gameStore'
-import { useSkillStore } from '../../stores/skillStore'
+import { getSkillsForCharacter, useSkillStore } from '../../stores/skillStore'
 import { EventBus, GameEvents } from '../EventBus'
 
 /** GAME_DESIGN 5.1: 필요 경험치 = 100 × 1.2^(레벨-1) */
@@ -36,7 +36,15 @@ export function gainExp(exp: number) {
   if (levelsGained > 0) {
     // 레벨업당 스킬 포인트 1 지급 + 직책 스케줄에 도달한 스킬 자동 해금 (character-progression-pivot)
     useSkillStore.getState().grantPoints(levelsGained)
-    useSkillStore.getState().unlockScheduled(level)
+    const skillStore = useSkillStore.getState()
+    const before = skillStore.levels
+    skillStore.unlockScheduled(level)
+    const after = useSkillStore.getState().levels
+    for (const skill of getSkillsForCharacter(skillStore.characterCode)) {
+      if ((before[skill.code] ?? 0) <= 0 && (after[skill.code] ?? 0) > 0) {
+        EventBus.emit(GameEvents.SKILL_UNLOCKED, { name: skill.name, icon: skill.icon, level: skill.unlockLevel })
+      }
+    }
     EventBus.emit(GameEvents.LEVEL_UP, level)
   }
 }
