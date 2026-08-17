@@ -114,23 +114,11 @@ export class PreloadScene extends Phaser.Scene {
       [0, 412], [412, 838], [838, 1309], [1309, 1870],
       [1870, 2527], [2527, 3137], [3137, 3626], [3626, 4096],
     ].map(([x, endX]) => ({ x, y: 0, width: endX - x, height: 553 })))
-    registerFrames('fx_skill_zhao_flower', Array.from({ length: 9 }, (_, index) => ({
-      x: 0, y: index === 8 ? 312 : index * 39, width: 707, height: index === 8 ? 41 : 39,
-    })))
     // 유성창 7컷: 각 동작의 실제 alpha 영역만 잘라 인접 컷이 섞이지 않게 한다.
     registerFrames('fx_skill_zhao_meteor', [
       [169, 254, 170, 129], [563, 250, 251, 140], [1056, 243, 299, 157],
       [1649, 181, 338, 266], [2287, 110, 487, 421], [3094, 203, 324, 227],
       [3726, 235, 264, 152],
-    ].map(([x, y, width, height]) => ({ x, y, width, height })))
-    // 비호관천 새 시트(1306x191)는 한 줄의 9컷이다. 실제 alpha 최하단은 y=164이므로
-    // 공통 세로 범위를 0..164로 잡아 상승/하강 위치는 보존하면서 아래 26px 투명 여백은
-    // 제거한다. origin bottom 배치 시 확대해도 호랑이의 시작점이 지면에서 뜨지 않는다.
-    // 가로는 실제 alpha 영역에 4px만 더하고 x=983의 작은 노이즈는 7번에 포함한다.
-    registerFrames('fx_skill_zhao_tiger', [
-      [37, 0, 72, 165], [161, 0, 88, 165], [307, 0, 90, 165],
-      [457, 0, 84, 165], [604, 0, 89, 165], [748, 0, 90, 165],
-      [900, 0, 88, 165], [1038, 0, 74, 165], [1188, 0, 62, 165],
     ].map(([x, y, width, height]) => ({ x, y, width, height })))
     // 3162x627 shield-zombie death strip: preserve each pose's full logical
     // canvas so the widening fall is not cropped or stretched between frames.

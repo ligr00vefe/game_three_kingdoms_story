@@ -922,16 +922,40 @@ export class GameScene extends Phaser.Scene {
         return
       }
       if (skillCode === 'skill_severing_spirits') {
-        if (character.code === 'lubu') this.effects.severingSpirits(this.player.x, this.player.y + 14, facing)
+        if (character.code === 'lubu') this.effects.severingSpirits(this.player.x, this.player.y, facing)
+        return
+      }
+      if (character.code === 'lubu' && skillCode === 'skill_lubu_heaven_shatter') {
+        const groundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+        this.effects.heavenShatter(this.player.x, groundY, facing)
+        return
+      }
+      if (character.code === 'lubu' && skillCode === 'skill_lubu_world_annihilation') {
+        const groundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+        this.effects.worldAnnihilation(this.player.x, groundY, facing)
+        return
+      }
+      if (character.code === 'lubu' && skillCode === 'skill_lubu_demon_gate_chain') {
+        const groundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom
+        this.effects.demonGateChain(this.player.x, groundY, facing)
         return
       }
       if (skillCode === 'skill_dragon_slash') {
         const castGroundY = (this.player.body as Phaser.Physics.Arcade.Body).bottom + SKILL_EFFECT_OFFSET.dragonY
         this.dragonSlashImpactX = this.player.x + facing * 72
         this.dragonSlashImpactY = castGroundY
-        if (isZhaoYun) this.effects.flowerAttackOnly(this.player.x, castGroundY, facing)
-        else this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
-        this.player.startDragonSlashMotion()
+        if (isZhaoYun) {
+          this.effects.flowerBloom(
+            this.player.x,
+            this.player.y + 22,
+            castGroundY,
+            facing,
+            (phase) => this.player.startHundredFlowerMotion(facing, phase),
+          )
+        } else {
+          this.effects.dragonSlash(this.dragonSlashImpactX, castGroundY, facing)
+          this.player.startDragonSlashMotion()
+        }
         return
       }
       if (skillCode === 'skill_glaive_flurry_legacy') {
@@ -958,7 +982,7 @@ export class GameScene extends Phaser.Scene {
         else this.effects.lightningDescent(this.player.x, castGroundY)
       }
     }
-    this.player.onSkill = (hitbox, facing, skillCode, _hitIndex) => {
+    this.player.onSkill = (hitbox, facing, skillCode, hitIndex) => {
       if (skillCode === 'skill_charge_slash' && character.code === 'guanwu') {
         this.effects.skillCharge(
           this.player.x + facing * COMBAT.CHARGE_EFFECT_CENTER_OFFSET,
@@ -970,8 +994,16 @@ export class GameScene extends Phaser.Scene {
       const isGlaiveFlurry = skillCode === 'skill_glaive_flurry'
       const isGlaiveSlash = false
       const isDragonSlash = skillCode === 'skill_dragon_slash'
+      const isHundredFlower = isZhaoYun && isDragonSlash
       const isDragonFang = isZhaoYun && isGlaiveFlurry
-      const attackArea = isDragonSlash || isDragonFang
+      const hundredFlowerOffset = hitIndex === 2 ? 72 : 46
+      const attackArea = isHundredFlower
+        ? new Phaser.Geom.Circle(
+            this.player.x + facing * hundredFlowerOffset,
+            this.player.y + 22,
+            hitIndex === 2 ? 105 : 115,
+          )
+        : isDragonSlash || isDragonFang
         ? new Phaser.Geom.Circle(this.dragonSlashImpactX, this.dragonSlashImpactY - 42, 125)
         : isGlaiveSlash
         // 좌·우 베기는 시전 중 현재 플레이어 전방에서 각각 판정한다.
@@ -1632,6 +1664,18 @@ export class GameScene extends Phaser.Scene {
     this.game.loop.wake()
   }
 
+  /**
+   * React pause UI는 닫혔는데 Phaser 플러그인 일부만 정지 상태로 남는 것을 복구한다.
+   * 캐릭터에 무관한 공통 안전장치라 관우·조운·여포가 동일하게 적용받는다.
+   */
+  private ensureSimulationRunning() {
+    if (this.worldPaused || this.pauseRequests.settings || this.pauseRequests.defense) return
+    if (this.physics.world.isPaused) this.physics.world.resume()
+    if (this.time.paused) this.time.paused = false
+    this.tweens.resumeAll()
+    this.anims.resumeAll()
+  }
+
   /** 스크린샷: 게임 캔버스를 PNG로 저장 (메이플 Scroll Lock 스샷) */
   private takeScreenshot() {
     this.game.renderer.snapshot((image) => {
@@ -1904,6 +1948,7 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     if (this.worldPaused) return
+    this.ensureSimulationRunning()
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
     const commandActive = this.guanYu.isCommandActive()

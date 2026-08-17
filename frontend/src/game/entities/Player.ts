@@ -583,9 +583,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.actionStartedAt = now
     this.actionHitDone = false
     this.actionHitIndex = 0
-    this.actionHitTimes = this.skillQueuedCode === 'skill_glaive_flurry' && kind === 'skill'
-      ? [COMBAT.GLAIVE_HIT_AT_MS]
-      : [hitAt]
+    const isHundredFlower = kind === 'skill'
+      && this.skillQueuedCode === 'skill_dragon_slash'
+      && this.modelCode === 'zhaoyun_t2'
+    this.actionHitTimes = isHundredFlower
+      // 15fps 공격 이펙트의 각 3컷 묶음 중앙에 타격 판정을 맞춘다.
+      ? [130, 330, 530]
+      : this.skillQueuedCode === 'skill_glaive_flurry' && kind === 'skill'
+        ? [COMBAT.GLAIVE_HIT_AT_MS]
+        : [hitAt]
     this.skillMotionReleased = kind !== 'skill' || this.skillQueuedCode !== 'skill_decisive_strike'
     if (kind === 'skill' && this.skillQueuedCode === 'skill_glaive_flurry') {
       this.glaiveMotionPhase = 'ground-swing'
@@ -708,6 +714,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   startDragonSlashMotion() {
     if (this.body.blocked.down) this.setVelocityY(-390)
+  }
+
+  /** 백화연창 3단 모션: 정방향 베기 → 역방향 베기 → 정방향 전진 찌르기. */
+  startHundredFlowerMotion(castFacing: -1 | 1, phase: 0 | 1 | 2) {
+    this.facing = phase === 1 ? (castFacing * -1) as -1 | 1 : castFacing
+    this.currentAnimKey = null
+    this.anims.stop()
+
+    if (phase === 2 && (this.body.blocked.down || this.body.touching.down)) {
+      this.dashLungeUntil = this.scene.time.now + COMBAT.COMBO_DASH_MS
+      this.setVelocityX(castFacing * COMBAT.COMBO_DASH_VX)
+    }
   }
 
   startChargeMotion() {

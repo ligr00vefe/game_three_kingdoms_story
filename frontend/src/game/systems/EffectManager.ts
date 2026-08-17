@@ -1,6 +1,23 @@
 import Phaser from 'phaser'
 import { COMBAT } from '../config'
 
+// 백화연창 위치 튜닝값 (오른쪽 시전 기준, 왼쪽 시전은 facing으로 자동 반전).
+// 순서: 오른쪽 베기 / 왼쪽 베기 / 오른쪽 찌르기.
+const HUNDRED_FLOWER_ATTACK_X = [46, -46, 72] as const
+const HUNDRED_FLOWER_BLOOM_GROUND_Y = 90
+const TIGER_TEARS_GROUND_Y = 39
+
+// 여포 스킬 이펙트 조정값. x는 진행 방향 기준(+는 앞), y는 바닥 기준(+는 아래)이다.
+// durationMs를 늘리면 애니메이션이 느려지고, 줄이면 빨라진다.
+const LUBU_EFFECT_TUNING = {
+  severingSpirits: { x: 105, y: 28, scale: 0.442, durationMs: 444 },
+  heavenShatter: { x: 100, y: 30, scale: 0.7, durationMs: 900 },
+  worldAnnihilation: { x: 110, y: 90, scale: 0.7, durationMs: 720 },
+  demonGateChain: { x: -30, y: 75, scale: 0.9, durationMs: 760 },
+} as const
+
+const effectFrameRate = (frames: number, durationMs: number) => frames * 1000 / durationMs
+
 /**
  * 전투 이펙트/데미지 숫자 전담 — 전부 오브젝트 풀링 (DEVELOPMENT_PLAN 문제 1).
  * 새 이펙트가 필요하면 반드시 이 클래스에 풀을 추가한다. 씬에서 직접 생성 금지.
@@ -18,6 +35,9 @@ export class EffectManager {
   private meteorPool: Phaser.GameObjects.Group
   private crushingMoonPool: Phaser.GameObjects.Group
   private severingSpiritsPool: Phaser.GameObjects.Group
+  private heavenShatterPool: Phaser.GameObjects.Group
+  private worldAnnihilationPool: Phaser.GameObjects.Group
+  private demonGateChainPool: Phaser.GameObjects.Group
   private spearPool: Phaser.GameObjects.Group
   private flowerPool: Phaser.GameObjects.Group
   private flowerAttackPool: Phaser.GameObjects.Group
@@ -44,6 +64,9 @@ export class EffectManager {
     this.meteorPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_meteor', maxSize: 2 })
     this.crushingMoonPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_crushing_moon', maxSize: 2 })
     this.severingSpiritsPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_severing_spirits', maxSize: 2 })
+    this.heavenShatterPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_heaven_shatter', maxSize: 2 })
+    this.worldAnnihilationPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_world_annihilation', maxSize: 2 })
+    this.demonGateChainPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_lubu_demon_gate_chain', maxSize: 2 })
     this.spearPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_spear', maxSize: 8 })
     this.flowerPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower', maxSize: 2 })
     this.flowerAttackPool = scene.add.group({ classType: Phaser.GameObjects.Sprite, defaultKey: 'fx_skill_zhao_flower_attack', maxSize: 2 })
@@ -140,11 +163,14 @@ export class EffectManager {
       ['fx_skill_horse_charge_anim', 'fx_skill_zhao_charge', 7, 18],
       ['fx_skill_meteor_anim', 'fx_skill_zhao_meteor', 7, 18],
       ['fx_skill_lubu_crushing_moon_anim', 'fx_skill_lubu_crushing_moon', 8, 18],
-      ['fx_skill_lubu_severing_spirits_anim', 'fx_skill_lubu_severing_spirits', 8, 18],
+      ['fx_skill_lubu_severing_spirits_anim', 'fx_skill_lubu_severing_spirits', 8, effectFrameRate(8, LUBU_EFFECT_TUNING.severingSpirits.durationMs)],
+      ['fx_skill_lubu_heaven_shatter_anim', 'fx_skill_lubu_heaven_shatter', 10, effectFrameRate(10, LUBU_EFFECT_TUNING.heavenShatter.durationMs)],
+      ['fx_skill_lubu_world_annihilation_anim', 'fx_skill_lubu_world_annihilation', 10, effectFrameRate(10, LUBU_EFFECT_TUNING.worldAnnihilation.durationMs)],
+      ['fx_skill_lubu_demon_gate_chain_anim', 'fx_skill_lubu_demon_gate_chain', 10, effectFrameRate(10, LUBU_EFFECT_TUNING.demonGateChain.durationMs)],
       ['fx_skill_spear_flurry_anim', 'fx_skill_zhao_spear', 10, 60],
-      ['fx_skill_flower_anim', 'fx_skill_zhao_flower', 9, 10],
-      ['fx_skill_flower_attack_anim', 'fx_skill_zhao_flower_attack', 3, 12],
-      ['fx_skill_tiger_anim', 'fx_skill_zhao_tiger', 9, 60],
+      ['fx_skill_flower_anim', 'fx_skill_zhao_flower', 7, 10],
+      ['fx_skill_flower_attack_anim', 'fx_skill_zhao_flower_attack', 9, 15],
+      ['fx_skill_tiger_anim', 'fx_skill_zhao_tiger', 10, 12],
     ] as const
     for (const [key, texture, length, frameRate] of definitions) {
       if (!this.scene.textures.exists(texture)) continue
@@ -538,11 +564,43 @@ export class EffectManager {
     const sprite = this.severingSpiritsPool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!sprite || !this.scene.anims.exists('fx_skill_lubu_severing_spirits_anim')) return
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    sprite.setActive(true).setVisible(true).setPosition(x + facing * 105, y + 14)
+    const tuning = LUBU_EFFECT_TUNING.severingSpirits
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * tuning.x, y + tuning.y)
       .setOrigin(0.5, 0.5).setFlipX(facing === -1).setAlpha(1)
-      .setScale(0.442).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+      .setScale(tuning.scale).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
     sprite.play('fx_skill_lubu_severing_spirits_anim')
+  }
+
+  private playLubuGroundEffect(
+    pool: Phaser.GameObjects.Group,
+    animationKey: string,
+    x: number,
+    groundY: number,
+    facing: -1 | 1,
+    tuning: { readonly x: number; readonly y: number; readonly scale: number },
+  ) {
+    const sprite = pool.get(x, groundY) as Phaser.GameObjects.Sprite | null
+    if (!sprite || !this.scene.anims.exists(animationKey)) return
+    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+    sprite.setActive(true).setVisible(true)
+      .setPosition(x + facing * tuning.x, groundY + tuning.y)
+      .setOrigin(0.5, 1).setFlipX(facing === -1).setAlpha(1)
+      .setScale(tuning.scale).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
+    sprite.play(animationKey)
+  }
+
+  heavenShatter(x: number, groundY: number, facing: -1 | 1) {
+    this.playLubuGroundEffect(this.heavenShatterPool, 'fx_skill_lubu_heaven_shatter_anim', x, groundY, facing, LUBU_EFFECT_TUNING.heavenShatter)
+  }
+
+  worldAnnihilation(x: number, groundY: number, facing: -1 | 1) {
+    this.playLubuGroundEffect(this.worldAnnihilationPool, 'fx_skill_lubu_world_annihilation_anim', x, groundY, facing, LUBU_EFFECT_TUNING.worldAnnihilation)
+  }
+
+  demonGateChain(x: number, groundY: number, facing: -1 | 1) {
+    this.playLubuGroundEffect(this.demonGateChainPool, 'fx_skill_lubu_demon_gate_chain_anim', x, groundY, facing, LUBU_EFFECT_TUNING.demonGateChain)
   }
 
   spearFlurry(x: number, y: number, facing: -1 | 1) {
@@ -567,25 +625,46 @@ export class EffectManager {
     playNext()
   }
 
-  flowerBloom(x: number, y: number, facing: -1 | 1) {
-    const sprite = this.flowerPool.get(x, y) as Phaser.GameObjects.Sprite | null
-    if (!sprite || !this.scene.anims.exists('fx_skill_flower_anim')) return
-    sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    sprite.setActive(true).setVisible(true).setPosition(x, y - 88).setOrigin(0.5, 0.5)
-      .setAlpha(0.92).setDisplaySize(920, 74).setDepth(EffectManager.COMBAT_FX_DEPTH - 1)
-    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
-    sprite.play('fx_skill_flower_anim')
+  flowerBloom(
+    x: number,
+    attackY: number,
+    groundY: number,
+    facing: -1 | 1,
+    onMotionPhase?: (phase: 0 | 1 | 2) => void,
+  ) {
+    const attack = this.flowerAttackPool.get(x, attackY) as Phaser.GameObjects.Sprite | null
+    if (!attack || !this.scene.anims.exists('fx_skill_flower_attack_anim')) return
+    this.scene.tweens.killTweensOf(attack)
+    attack.removeAllListeners()
+    attack.setActive(true).setVisible(true).setOrigin(0.5, 0.5)
+      // 공격 프레임의 실제 알파 중심을 조운의 창 높이에 직접 맞춘다.
+      .setPosition(x + facing * HUNDRED_FLOWER_ATTACK_X[0], attackY)
+      .setFlipX(facing === -1).setAlpha(1).setScale(0.8)
+      .setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
 
-    // 꽃잎 배경이 먼저 퍼진 뒤 공격 궤적이 전경을 가르도록 짧게 시차를 둔다.
-    this.scene.time.delayedCall(220, () => {
-      const attack = this.flowerAttackPool.get(x, y) as Phaser.GameObjects.Sprite | null
-      if (!attack || !this.scene.anims.exists('fx_skill_flower_attack_anim')) return
-      attack.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-      attack.setActive(true).setVisible(true).setPosition(x + facing * 72, y - 82).setOrigin(0.5, 0.5)
-        .setFlipX(facing === -1).setAlpha(1).setDisplaySize(520, 210).setDepth(EffectManager.COMBAT_FX_DEPTH + 1)
-      attack.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => attack.setActive(false).setVisible(false))
-      attack.play('fx_skill_flower_attack_anim')
+    const setAttackPhase = (phase: 0 | 1 | 2) => {
+      if (!attack.active) return
+      attack.setX(x + facing * HUNDRED_FLOWER_ATTACK_X[phase])
+      onMotionPhase?.(phase)
+    }
+    setAttackPhase(0)
+    this.scene.time.delayedCall(200, () => setAttackPhase(1))
+    this.scene.time.delayedCall(400, () => setAttackPhase(2))
+
+    // 9컷 공격 애니메이션이 완전히 끝난 뒤 연꽃이 몸 뒤에서 피어난다.
+    attack.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      attack.setActive(false).setVisible(false)
+      const bloom = this.flowerPool.get(x, groundY) as Phaser.GameObjects.Sprite | null
+      if (!bloom || !this.scene.anims.exists('fx_skill_flower_anim')) return
+      bloom.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
+      bloom.setActive(true).setVisible(true)
+        .setPosition(x + facing * 28, groundY + HUNDRED_FLOWER_BLOOM_GROUND_Y).setOrigin(0.5, 1)
+        .setFlipX(facing === -1).setAlpha(0.92).setDisplaySize(315, 521)
+        .setDepth(EffectManager.COMBAT_FX_DEPTH - 1)
+      bloom.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => bloom.setActive(false).setVisible(false))
+      bloom.play('fx_skill_flower_anim')
     })
+    attack.play('fx_skill_flower_attack_anim')
   }
 
   spearFlurryZhao(x: number, y: number, facing: -1 | 1) {
@@ -608,8 +687,8 @@ export class EffectManager {
     const attack = this.flowerAttackPool.get(x, y) as Phaser.GameObjects.Sprite | null
     if (!attack || !this.scene.anims.exists('fx_skill_flower_attack_anim')) return
     attack.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    attack.setActive(true).setVisible(true).setPosition(x + facing * 72, y - 82).setOrigin(0.5, 0.5)
-      .setFlipX(facing === -1).setAlpha(1).setDisplaySize(520, 210).setDepth(EffectManager.COMBAT_FX_DEPTH)
+    attack.setActive(true).setVisible(true).setPosition(x + facing * 72, y - 170).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(1).setDisplaySize(520, 448).setDepth(EffectManager.COMBAT_FX_DEPTH)
     attack.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => attack.setActive(false).setVisible(false))
     attack.play('fx_skill_flower_attack_anim')
   }
@@ -619,8 +698,9 @@ export class EffectManager {
     if (!sprite || !this.scene.anims.exists('fx_skill_tiger_anim')) return
     this.scene.tweens.killTweensOf(sprite)
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    sprite.setActive(true).setVisible(true).setPosition(x + facing * 48, y + 4).setOrigin(0.5, 1)
-      .setFlipX(facing === -1).setAlpha(1).setAngle(0).setScale(2.2)
+    sprite.setActive(true).setVisible(true)
+      .setPosition(x + facing * 92, y + TIGER_TEARS_GROUND_Y).setOrigin(0.5, 1)
+      .setFlipX(facing === -1).setAlpha(1).setAngle(0).setScale(0.75)
       .setDepth(EffectManager.COMBAT_FX_DEPTH)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
     sprite.play('fx_skill_tiger_anim')
@@ -740,8 +820,10 @@ export class EffectManager {
     if (!sprite || !this.scene.anims.exists('fx_skill_zhao_dragon_anim')) return
     this.scene.tweens.killTweensOf(sprite)
     sprite.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE)
-    sprite.setActive(true).setVisible(true).setPosition(x, groundY).setOrigin(0.5, 0.5)
-      .setFlipX(facing === -1).setAlpha(0.98).setDisplaySize(470, 760)
+    // 원본 프레임 비율을 유지해 기존보다 약 10% 작게 표시하고,
+    // 축소되어 비는 공간만큼 공격 방향의 창끝 쪽으로 중심을 옮긴다.
+    sprite.setActive(true).setVisible(true).setPosition(x + facing * 24, groundY).setOrigin(0.5, 0.5)
+      .setFlipX(facing === -1).setAlpha(0.98).setDisplaySize(420, 694)
       .setDepth(EffectManager.COMBAT_FX_DEPTH)
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setActive(false).setVisible(false))
     sprite.play('fx_skill_zhao_dragon_anim')

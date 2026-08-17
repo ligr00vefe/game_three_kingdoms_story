@@ -11,6 +11,7 @@ import type { GameAction } from '../../stores/keybindingStore'
  */
 export class InputManager {
   readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys
+  private readonly scene: Phaser.Scene
   /** 현재 눌려 있는 code 집합 */
   private pressed = new Set<string>()
   /** 프레임 사이에 들어온 keydown 버퍼 — update()에서 justPressed로 승격 */
@@ -19,6 +20,7 @@ export class InputManager {
   private justPressed = new Set<string>()
 
   constructor(scene: Phaser.Scene) {
+    this.scene = scene
     const kb = scene.input.keyboard!
     this.cursors = kb.createCursorKeys()
 
@@ -39,6 +41,8 @@ export class InputManager {
   }
 
   private handleKeyDown = (event: KeyboardEvent) => {
+    // 팝업/ESC 포커스 전환 뒤 RAF만 잠든 경우에도 첫 게임 입력으로 즉시 복구한다.
+    this.scene.game.loop.wake()
     // 1~7은 React 퀵슬롯에서 처리한다.
     if (/^Digit[1-7]$/.test(event.code)) return
     // 바인딩된 키는 브라우저 기본 동작(스크롤/메뉴 포커스 등)을 막는다
