@@ -18,6 +18,7 @@ import { gainExp } from '../systems/progression'
 import { useGameStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useAutoCombatStore } from '../../stores/autoCombatStore'
+import type { CombatPolicy } from '../../stores/autoCombatStore'
 import { CAMERA, COMBAT, PLAYER } from '../config'
 import { FEATURES } from '../../features'
 import { drawSpeechBubble, WORLD_UI_RESOLUTION } from '../utils/bubble'
@@ -28,9 +29,10 @@ import { chatWithLocalAi, interpretWithLocalAi } from '../../api/command'
 import { CHARACTERS } from '../../data/characters'
 import { getCharacterModel } from '../../data/characterModels'
 import { useScreenStore } from '../../stores/screenStore'
-import { getSkillsForCharacter } from '../../stores/skillStore'
+import { getSkillsForCharacter, useSkillStore } from '../../stores/skillStore'
 import { useUiStore } from '../../stores/uiStore'
 import { useDefenseStore } from '../../stores/defenseStore'
+import { defenseRecovery } from '../systems/defenseSupplies'
 
 /**
  * 플레이어 머리 꼭대기의 월드 y 오프셋 (Player.y 기준). Player.ts 생성자 주석대로
@@ -319,6 +321,10 @@ export class GameScene extends Phaser.Scene {
   private commandRequestId = 0
   private pickupCommandQueued = false
   private lastSkillStatusAt = -Infinity
+  private lastAutoRecoveryAt = -Infinity
+  private nextAutoSkillDecisionAt = 0
+  private lastAutoEnabled = false
+  private lastAutoPolicy: CombatPolicy | null = null
   /** 현재 캐릭터에 실제 등록된 스킬만 허용한다. 씬 수명 동안 캐릭터는 바뀌지 않는다. */
   private activeSkillCodes: string[] = []
   /** Pause sources are tracked separately so closing one menu cannot resume another. */
@@ -822,6 +828,10 @@ export class GameScene extends Phaser.Scene {
     const character = CHARACTERS[useScreenStore.getState().selectedCharacter] ?? CHARACTERS.guanwu
     this.activeSkillCodes = getSkillsForCharacter(character.code).map((skill) => skill.code)
     this.player = new Player(this, spawn.x, spawn.y, character.modelCode)
+    this.player.skillMpCostFor = (skillCode) => {
+      const rank = Math.max(0, this.activeSkillCodes.indexOf(skillCode))
+      return COMBAT.SKILL_MP_COST_BY_RANK[Math.min(rank, COMBAT.SKILL_MP_COST_BY_RANK.length - 1)]
+    }
     useGameStore.getState().setStats({
       stageCode: this.mapKey,
       playerX: Math.round(spawn.x),
@@ -1022,11 +1032,14 @@ export class GameScene extends Phaser.Scene {
         // 현재 y가 아니라 착지 지점 중심으로 판정해 지상의 적을 놓치지 않게 한다.
         ? new Phaser.Geom.Circle(this.player.x, this.glaiveImpactY - 42, 150)
         : hitbox
-      // 각 스킬의 전용 이펙트는 onSkillStart에서 한 번만 시작한다.
-      const damageMultiplier = isGlaiveFlurry ? COMBAT.GLAIVE_SLAM_DAMAGE_MULTIPLIER : 1
+      // 캐릭터별 스킬 목록의 순서가 곧 위력·MP·동시 공격 수 등급이다.
+      const skillRank = Math.max(0, this.activeSkillCodes.indexOf(skillCode))
+      const rankIndex = Math.min(skillRank, COMBAT.SKILL_TARGETS_BY_RANK.length - 1)
+      const maxTargets = COMBAT.SKILL_TARGETS_BY_RANK[rankIndex]
+      const damageMultiplier = COMBAT.SKILL_POWER_BY_RANK[rankIndex]
       this.resolveAttack(
         attackArea,
-        isGlaiveFlurry ? COMBAT.SKILL_MAX_TARGETS + 2 : COMBAT.SKILL_MAX_TARGETS,
+        maxTargets,
         true,
         damageMultiplier,
       )
@@ -1692,7 +1705,7 @@ export class GameScene extends Phaser.Scene {
       const a = document.createElement('a')
       const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
       a.href = src
-      a.download = `threeKingdomsStory_${ts}.png`
+      a.download = `threeKingdomsDefense_${ts}.png`
       a.click()
     })
     this.cameras.main.flash(120, 255, 255, 255) // 촬영 피드백
@@ -1972,9 +1985,37 @@ export class GameScene extends Phaser.Scene {
     this.ensureSimulationRunning()
     this.input_.update(this.time.now)
     const manualInput = this.hasManualGameplayInput()
-    const commandActive = this.guanYu.isCommandActive()
+    let commandActive = this.guanYu.isCommandActive()
     if (manualInput) this.guanYu.cancelForManualControl()
     const auto = useAutoCombatStore.getState()
+    // AUTO를 켜거나 방침을 바꾸는 사용자의 명시적 선택은 이전 자연어 전투 상태보다 우선한다.
+    if (auto.enabled && (!this.lastAutoEnabled || this.lastAutoPolicy !== auto.policy)) {
+      this.guanYu.cancelForManualControl()
+      this.guanYu.activateAutoCombat()
+      commandActive = this.guanYu.isCommandActive()
+    }
+    this.lastAutoEnabled = auto.enabled
+    this.lastAutoPolicy = auto.policy
+    if (auto.enabled && this.defense && this.time.now - this.lastAutoRecoveryAt >= 250) {
+      this.lastAutoRecoveryAt = this.time.now
+      const stats = useGameStore.getState()
+      const supplyLevel = useDefenseStore.getState().supplyLevel
+      const hpRatio = stats.maxHp > 0 ? stats.hp / stats.maxHp : 1
+      if (hpRatio < auto.minHpPercent / 100) {
+        const potion = defenseRecovery('hp', supplyLevel)
+        if (stats.gold >= potion.cost) {
+          stats.setStats({ gold: stats.gold - potion.cost, hp: Math.min(stats.maxHp, stats.hp + potion.amount) })
+        }
+      }
+      const refreshed = useGameStore.getState()
+      const mpRatio = refreshed.maxMp > 0 ? refreshed.mp / refreshed.maxMp : 1
+      if (mpRatio < auto.minMpPercent / 100) {
+        const potion = defenseRecovery('mp', supplyLevel)
+        if (refreshed.gold >= potion.cost) {
+          refreshed.setStats({ gold: refreshed.gold - potion.cost, mp: Math.min(refreshed.maxMp, refreshed.mp + potion.amount) })
+        }
+      }
+    }
     const gameStats = useGameStore.getState()
     if (auto.enabled && !manualInput && !commandActive) this.guanYu.activateAutoCombat()
     const previousGuanYuState = this.guanYu.state
@@ -1984,7 +2025,7 @@ export class GameScene extends Phaser.Scene {
       auto.enabled ? auto.policy : 'nearest',
       gameStats.maxHp > 0 ? gameStats.hp / gameStats.maxHp : 0,
     )
-    if (auto.enabled && auto.autoSkill && !manualInput && !commandActive) {
+    if (auto.enabled && auto.autoSkill && !manualInput && !commandActive && this.time.now >= this.nextAutoSkillDecisionAt) {
       let nearbyCount = 0
       let bossPresent = false
       for (const monster of this.spawner.monsters) {
@@ -1992,10 +2033,19 @@ export class GameScene extends Phaser.Scene {
         if (Math.abs(monster.x - this.player.x) <= 280) nearbyCount += 1
         if (monster.def.name.includes('대장')) bossPresent = true
       }
-      const enoughMp = gameStats.maxMp > 0 && gameStats.mp / gameStats.maxMp >= auto.minMpPercent / 100
-      if (enoughMp && nearbyCount >= auto.minEnemyCount && (!auto.reserveSkillForBoss || bossPresent)) {
-        const firstSkill = this.activeSkillCodes[0]
-        if (firstSkill) this.player.queueSkill(firstSkill)
+      if (nearbyCount >= auto.minEnemyCount && (!auto.reserveSkillForBoss || bossPresent)) {
+        const skillLevels = useSkillStore.getState().levels
+        const availableSkills = this.activeSkillCodes.filter((code) =>
+          (skillLevels[code] ?? 0) > 0
+          && this.player.skillCooldownLeftFor(code, this.time.now) <= 0
+          && gameStats.mp >= this.player.skillMpCostFor(code),
+        )
+        if (availableSkills.length > 0) {
+          const selected = availableSkills[Phaser.Math.Between(0, availableSkills.length - 1)]
+          this.player.queueSkill(selected)
+          // 같은 프레임대에 요청을 계속 덮어쓰지 않고 Player가 선택된 스킬을 소비할 시간을 준다.
+          this.nextAutoSkillDecisionAt = this.time.now + 300
+        }
       }
     }
     const arrivedCommandTarget = this.guanYu.consumeArrival()
@@ -2008,12 +2058,13 @@ export class GameScene extends Phaser.Scene {
       const skills = Object.fromEntries(this.activeSkillCodes.map((code) => {
         const cooldownMs = this.player.skillCooldownMs(code)
         const cooldownLeftMs = this.player.skillCooldownLeftFor(code, this.time.now)
+        const mpCost = this.player.skillMpCostFor(code)
         return [code, {
           cooldownLeftMs,
           cooldownMs,
           mp: gameStats.mp,
-          mpCost: COMBAT.SKILL_MP_COST,
-          available: cooldownLeftMs <= 0 && gameStats.mp >= COMBAT.SKILL_MP_COST,
+          mpCost,
+          available: cooldownLeftMs <= 0 && gameStats.mp >= mpCost,
         }]
       }))
       EventBus.emit(GameEvents.SKILL_STATUS, {

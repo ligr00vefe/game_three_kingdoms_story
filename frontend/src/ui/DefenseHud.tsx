@@ -6,6 +6,7 @@ import { useScreenStore } from '../stores/screenStore'
 import { useUiStore } from '../stores/uiStore'
 import { EventBus, GameEvents } from '../game/EventBus'
 import { AutoCombatControls } from './AutoCombatControls'
+import { defenseRecovery } from '../game/systems/defenseSupplies'
 
 interface DefenseStatePayload {
   phase: DefensePhase
@@ -39,8 +40,6 @@ const OFFENSIVE_STRUCTURES = [
   { kind: 'cannonTower' as const, name: '포탑', cost: 330, hp: 380, desc: '소형 포탄·범위 공격', icon: '💣' },
   { kind: 'bastion' as const, name: '성루', cost: 450, hp: 520, desc: '중포·강력한 범위 공격', icon: '🏰' },
 ] as const
-const BASE_HP_POTION = { cost: 20, amount: 40 }
-const BASE_MP_POTION = { cost: 15, amount: 30 }
 const ARCHER_COST = 50
 const UPGRADE_INFO: Record<DefenseUpgrade, { icon: string; name: string; desc: string }> = {
   attack: { icon: '⚔️', name: '청룡의 기세', desc: '공격력 +3' },
@@ -82,8 +81,8 @@ export function DefenseHud() {
   const maxHp = useGameStore((s) => s.maxHp)
   const mp = useGameStore((s) => s.mp)
   const maxMp = useGameStore((s) => s.maxMp)
-  const hpPotion = { cost: BASE_HP_POTION.cost + supplyLevel * 8, amount: BASE_HP_POTION.amount + supplyLevel * 20 }
-  const mpPotion = { cost: BASE_MP_POTION.cost + supplyLevel * 6, amount: BASE_MP_POTION.amount + supplyLevel * 15 }
+  const hpPotion = defenseRecovery('hp', supplyLevel)
+  const mpPotion = defenseRecovery('mp', supplyLevel)
 
   useEffect(() => {
     if (phase !== 'victory' || rewardChoices.length === 0) {

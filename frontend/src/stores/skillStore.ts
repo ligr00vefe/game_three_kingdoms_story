@@ -78,6 +78,11 @@ export function getSkillsForCharacter(characterCode: string): readonly SkillDef[
   return CHARACTER_SKILLS[characterCode] ?? []
 }
 
+/** 캐릭터 해금 직후 1번 퀵슬롯에 배치할 기본 액티브 스킬. */
+export function getFirstSkillForCharacter(characterCode: string): SkillDef | undefined {
+  return getSkillsForCharacter(characterCode).find((skill) => skill.type === 'active' && skill.unlockLevel === 1)
+}
+
 interface SavedSkillProfile {
   levels: Record<string, number>
   points: number

@@ -98,6 +98,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   onBasicAttack?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, comboStep: number) => void
   onSkill?: (hitbox: Phaser.Geom.Rectangle, facing: -1 | 1, skillCode: string, hitIndex: number) => void
   onSkillStart?: (facing: -1 | 1, skillCode: string) => void
+  /** GameScene이 캐릭터별 스킬 순서에 맞는 MP 비용을 주입한다. */
+  skillMpCostFor: (skillCode: string) => number = () => COMBAT.SKILL_MP_COST_BY_RANK[0]
   /** GameScene이 주입: 공중 액션 이펙트 훅 */
   onAirDash?: (x: number, y: number, facing: -1 | 1) => void
   onDoubleJump?: (x: number, y: number) => void
@@ -367,8 +369,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const skillReadyAt = this.skillReadyAt.get(skillCode) ?? 0
     if (wantSkill && now >= skillReadyAt) {
       const s = useGameStore.getState()
-      if (s.mp >= COMBAT.SKILL_MP_COST) {
-        s.setStats({ mp: s.mp - COMBAT.SKILL_MP_COST })
+      const mpCost = this.skillMpCostFor(skillCode)
+      if (s.mp >= mpCost) {
+        s.setStats({ mp: s.mp - mpCost })
         this.skillReadyAt.set(skillCode, now + this.skillCooldownMs(skillCode))
         this.startAction('skill', now)
         return

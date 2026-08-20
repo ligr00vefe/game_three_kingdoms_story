@@ -4,7 +4,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useInventoryStore, INVENTORY_SIZE } from '../stores/inventoryStore'
 import type { ItemDef, ItemType } from '../stores/inventoryStore'
 import { useScreenStore } from '../stores/screenStore'
-import { getSkillsForCharacter, useSkillStore } from '../stores/skillStore'
+import { getFirstSkillForCharacter, getSkillsForCharacter, useSkillStore } from '../stores/skillStore'
 import { QUICKSLOT_COUNT, useQuickslotStore } from '../stores/quickslotStore'
 import { useAuthStore } from '../stores/authStore'
 import { CHARACTERS } from '../data/characters'
@@ -73,10 +73,31 @@ export async function loadGameState(): Promise<void> {
   useInventoryStore.getState().hydrate(data.inventory, defs)
   const quickslots = Array(QUICKSLOT_COUNT).fill(null)
   const allowedSkillCodes = new Set(getSkillsForCharacter(characterCode).map((skill) => skill.code))
+  let validQuickslotCount = 0
   for (const slot of data.quickslots ?? []) {
     if (slot.slotIndex >= 0 && slot.slotIndex < QUICKSLOT_COUNT) {
       if (slot.kind === 'skill' && !allowedSkillCodes.has(slot.code)) continue
       quickslots[slot.slotIndex] = { kind: slot.kind, code: slot.code }
+      validQuickslotCount += 1
+    }
+  }
+
+  // 각 캐릭터를 처음 플레이할 때 첫 액티브 스킬을 1번 슬롯에 자동 배치한다.
+  // 계정·캐릭터별 초기화 표식을 남겨 사용자가 이후 슬롯을 비워도 다시 강제 등록하지 않는다.
+  const defaultSkill = getFirstSkillForCharacter(characterCode)
+  if (accountId !== undefined && defaultSkill) {
+    const initializedKey = `tks-quickslot-default-v1-${accountId}-${characterCode}`
+    let initialized = false
+    try {
+      initialized = localStorage.getItem(initializedKey) === '1'
+    } catch {
+      // 저장소 접근이 막혀도 서버 슬롯을 불러오는 기본 흐름은 유지한다.
+    }
+    if (!initialized && validQuickslotCount === 0) {
+      quickslots[0] = { kind: 'skill', code: defaultSkill.code }
+    }
+    if (!initialized) {
+      try { localStorage.setItem(initializedKey, '1') } catch { /* 다음 서버 저장으로도 기본 배치는 유지된다. */ }
     }
   }
   useQuickslotStore.getState().hydrate(quickslots)

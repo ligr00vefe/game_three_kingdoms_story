@@ -65,6 +65,13 @@ export class SpawnManager {
       idle.monsterCode = code
       return idle
     }
+    // 디펜스 웨이브 몬스터는 지역 리젠 풀을 거치지 않으므로 비활성 인스턴스를 직접 재사용한다.
+    // 스테이지마다 새 객체가 계속 누적되는 것을 막되, 지역 리젠 대기 중인 풀 객체는 건드리지 않는다.
+    const reusable = this.monsters.find((monster) => !monster.active && !this.pool.includes(monster))
+    if (reusable) {
+      reusable.monsterCode = code
+      return reusable
+    }
     const m = new Monster(this.scene, this.defs[code])
     m.monsterCode = code
     for (const group of this.collideWith) {

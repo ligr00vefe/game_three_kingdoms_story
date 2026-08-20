@@ -259,7 +259,9 @@ export class GuanYuController {
   }
 
   activateAutoCombat() {
-    if (this.state === 'STANDBY' || this.state === 'HOLDING') this.state = 'AUTO_COMBAT'
+    // 사용자가 AUTO 전투방침을 바꾸면 이전의 수비/추격 명령 상태에 머물지 않고
+    // policyTarget이 매 프레임 새 방침을 실제 타깃 선정에 반영하게 한다.
+    if (!this.commandActive && this.state !== 'DEAD') this.state = 'AUTO_COMBAT'
   }
 
   isCommandActive() {

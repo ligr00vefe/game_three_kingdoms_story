@@ -3,6 +3,7 @@ import { useScreenStore } from '../stores/screenStore'
 import { useUiStore } from '../stores/uiStore'
 import { CHARACTERS } from '../data/characters'
 import { useDraggableWindow } from './useDraggableWindow'
+import { COMBAT } from '../game/config'
 
 /**
  * 스킬창 (SKILL) — 처음부터 사용할 수 있는 5개 액티브 스킬.
@@ -34,10 +35,14 @@ export function SkillPanel() {
         {skills.length === 0 && (
           <p className="sk-empty">아직 사용할 수 있는 스킬이 없습니다.</p>
         )}
-        {skills.map((def) => {
+        {skills.map((def, index) => {
           const lv = levels[def.code] ?? 0
           const locked = lv <= 0
           const maxed = lv >= def.maxLevel
+          const rank = Math.min(index, COMBAT.SKILL_MP_COST_BY_RANK.length - 1)
+          const mpCost = COMBAT.SKILL_MP_COST_BY_RANK[rank]
+          const targets = COMBAT.SKILL_TARGETS_BY_RANK[rank]
+          const attackPercent = Math.round(COMBAT.WEAPON_MULTIPLIER * COMBAT.SKILL_MULTIPLIER * COMBAT.SKILL_POWER_BY_RANK[rank] * 100)
           return (
             <div
               className={`sk-cell ${lv > 0 ? 'sk-cell--learned' : ''} ${locked ? 'sk-cell--locked' : ''}`}
@@ -55,7 +60,7 @@ export function SkillPanel() {
                   e.dataTransfer.setDragImage(icon, r.width / 2, r.height / 2)
                 }
               }}
-              title={locked ? `Lv ${def.unlockLevel}에 해금` : `${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
+              title={locked ? `Lv ${def.unlockLevel}에 해금` : `공격력 ${attackPercent}% · MP ${mpCost} · 최대 ${targets}명\n${def.desc(lv)}\n퀵슬롯으로 드래그해 등록`}
             >
               <span className="sk-icon" data-type={def.type}>
                 {locked ? '🔒' : def.iconImage ? <img src={def.iconImage} alt="" /> : def.icon}

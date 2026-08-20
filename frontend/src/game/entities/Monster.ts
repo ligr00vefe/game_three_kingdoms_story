@@ -73,9 +73,9 @@ const HIT_FRAME_RATE = 16
 const DEATH_FRAME_RATE = 7
 /** 감지(추적 시작)의 세로 허용 거리 — 이보다 높이 차가 크면 없는 사람 취급 */
 const DETECT_VERTICAL_RANGE = 90
-/** 고체력 몬스터 체력바 한 층의 HP. 한 번의 타격은 한 층까지만 깎는다. */
+/** 고체력 몬스터의 한 체력바가 나타내는 HP. 화면에는 현재 체력바 하나만 표시한다. */
 const HP_BAR_LAYER_SIZE = 100
-/** 아래층부터 위층 순서. 현재 층이 소진되면 바로 아래 색상의 체력바가 드러난다. */
+/** 현재 체력바가 소진될 때마다 다음 색으로 바뀌어 남은 체력 층을 구분한다. */
 const HP_BAR_LAYER_COLORS = [
   0xef5350, 0xffc107, 0xab47bc, 0x42a5f5, 0x66bb6a,
   0x26c6da, 0xff7043, 0x5c6bc0, 0xec407a, 0x8d6e63,
@@ -104,6 +104,8 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   monsterCode = ''
   hp = 0
   maxHp = 0
+  /** 현재 스테이지 일반 좀비 한 마리의 최대 HP. 고체력 몬스터의 색상 체력바 단위로 사용한다. */
+  hpBarLayerSize = 1
   private hpBar: Phaser.GameObjects.Graphics
   private state_: MonsterState = 'inactive'
   private homeXMin = 0
@@ -206,6 +208,7 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.homeXMax = xMax
     this.hp = this.def.maxHp
     this.maxHp = this.def.maxHp
+    this.hpBarLayerSize = this.maxHp
     this.setActive(true).setVisible(true)
     // 풀에서 재사용되므로 이전 생의 애니메이션을 지우고 대기 모습으로 되돌린다
     this.anims.stop()
@@ -320,24 +323,24 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     const isBoss = this.monsterCode === 'zombie_boss'
     const width = isBoss ? 46 : 26
     const height = isBoss ? 5 : 3
-    const totalLayers = Math.max(1, Math.ceil(this.maxHp / HP_BAR_LAYER_SIZE))
-    const layerSize = Math.ceil(this.maxHp / totalLayers)
-    const currentLayer = Math.max(1, Math.ceil(this.hp / layerSize))
-    const hpInLayer = this.hp <= 0 ? 0 : ((this.hp - 1) % layerSize) + 1
-    const layerCapacity = currentLayer === totalLayers
-      ? ((this.maxHp - 1) % layerSize) + 1
-      : layerSize
-    const ratio = Phaser.Math.Clamp(hpInLayer / layerCapacity, 0, 1)
+    const layerSize = Math.max(1, this.hpBarLayerSize || HP_BAR_LAYER_SIZE)
+    const totalLayers = Math.max(1, Math.ceil(this.maxHp / layerSize))
+    const currentLayer = this.hp > 0 ? Math.ceil(this.hp / layerSize) : 0
+    const hpInLayer = this.hp > 0 ? ((this.hp - 1) % layerSize) + 1 : 0
+    // 최대 HP가 100의 배수가 아니면 최초(최상위) 체력바도 가득 찬 상태로 보이게 한다.
+    const topLayerCapacity = this.maxHp - (totalLayers - 1) * layerSize
+    const layerCapacity = currentLayer === totalLayers ? topLayerCapacity : layerSize
+    const ratio = layerCapacity > 0 ? Phaser.Math.Clamp(hpInLayer / layerCapacity, 0, 1) : 0
     const x = this.x - width / 2
     const y = this.getBounds().top - 5
     bar.clear()
     bar.fillStyle(0x111318, 0.82).fillRect(x - 1, y - 1, width + 2, height + 2)
-    // 화면에는 체력바를 하나만 표시한다. 최상층은 빨강이며 한 층이 완전히 소진될 때
-    // 노랑 → 보라 → 파랑 순으로 다음 색상의 가득 찬 바가 나타난다.
-    const depletedLayers = totalLayers - currentLayer
-    const color = HP_BAR_LAYER_COLORS[depletedLayers % HP_BAR_LAYER_COLORS.length]
-    bar.fillStyle(color, 1)
-    bar.fillRect(x, y, width * ratio, height)
+    bar.fillStyle(0x30343b, 1).fillRect(x, y, width, height)
+    if (ratio > 0) {
+      const depletedLayers = totalLayers - currentLayer
+      bar.fillStyle(HP_BAR_LAYER_COLORS[depletedLayers % HP_BAR_LAYER_COLORS.length], 1)
+      bar.fillRect(x, y, width * ratio, height)
+    }
     bar.setAlpha(this.alpha)
   }
 
@@ -494,13 +497,9 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
   receiveHit(amount: number, crit: boolean, fromX: number, effects: EffectManager, now: number): boolean {
     if (this.state_ === 'inactive' || this.state_ === 'dead' || this.state_ === 'spawning') return false
     const wasAttacking = this.state_ === 'charge' || this.state_ === 'windup'
-    // 다중 체력층은 한 번의 큰 피해로 여러 색을 건너뛰지 않는다. 실제 적용 피해 숫자도 이에 맞춘다.
-    const totalLayers = Math.max(1, Math.ceil(this.maxHp / HP_BAR_LAYER_SIZE))
-    const layerSize = Math.ceil(this.maxHp / totalLayers)
-    const damageToLayerEdge = totalLayers > 1
-      ? ((this.hp - 1) % layerSize) + 1
-      : this.hp
-    const appliedDamage = Math.min(amount, Math.max(1, damageToLayerEdge))
+    // 체력바 줄 경계와 무관하게 계산된 피해를 그대로 적용한다.
+    // 한 공격이 여러 줄 분량이라면 해당 줄들을 지나 실제 HP까지 감소해야 한다.
+    const appliedDamage = Math.min(this.hp, Math.max(1, amount))
     this.hp -= appliedDamage
     effects.damageNumber(this.x, this.y - 40, appliedDamage, 'deal', crit, this) // 연타 스택 키 = 몬스터 자신
     effects.hitSpark(this.x, this.y - 10)

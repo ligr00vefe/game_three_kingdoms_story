@@ -14,6 +14,7 @@ export function AutoCombatControls() {
         </select>
       </label>
       <label className="auto-setting-row"><span>자동 스킬</span><input type="checkbox" checked={auto.autoSkill} onChange={(e) => auto.setAutoSkill(e.target.checked)} /></label>
+      <label className="auto-setting-row"><span>최소 HP {auto.minHpPercent}%</span><input type="range" min="20" max="100" step="10" value={auto.minHpPercent} onChange={(e) => auto.setMinHpPercent(Number(e.target.value))} /></label>
       <label className="auto-setting-row"><span>최소 MP {auto.minMpPercent}%</span><input type="range" min="20" max="100" step="10" value={auto.minMpPercent} onChange={(e) => auto.setMinMpPercent(Number(e.target.value))} /></label>
       <label className="auto-setting-row"><span>적 {auto.minEnemyCount}명 이상</span><input type="range" min="1" max="6" value={auto.minEnemyCount} onChange={(e) => auto.setMinEnemyCount(Number(e.target.value))} /></label>
       <label className="auto-setting-row"><span>보스에게 스킬 보존</span><input type="checkbox" checked={auto.reserveSkillForBoss} onChange={(e) => auto.setReserveSkillForBoss(e.target.checked)} /></label>

@@ -34,12 +34,23 @@ export const OFFENSIVE_STRUCTURES: Record<Exclude<DefenseBuildType, 'barricade'>
 const DEFENSE = {
   /** 다음 Wave 경고를 표시하는 대기 시간 */
   WAIT_MS: 5_000,
-  /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 12, stage2 = 13 …) */
+  /** 스테이지 n의 좀비 수 = n + BASE_ZOMBIES (stage1 = 12, stage20 = 31) */
   BASE_ZOMBIES: 11,
-  /** 좀비 순차 스폰 간격 */
+  /** 좀비 무리 스폰 간격 */
   SPAWN_INTERVAL_MS: 1_800,
+  /** 한 번에 출현하는 좀비 무리의 최소·최대 크기 */
+  SPAWN_GROUP_MIN: 3,
+  SPAWN_GROUP_MAX: 5,
   /** 좀비 스폰 x (맨 오른쪽에서) — worldWidth 기준 offset */
   SPAWN_X_OFFSET: 80,
+  /** 같은 무리가 흩어져 나타나는 가로 범위 */
+  SPAWN_SPREAD_X: 260,
+  /** 스테이지당 추가 HP. 매번 이전 HP에 곱하지 않는 선형 성장값이다. */
+  HP_GAIN_PER_STAGE: 24,
+  /** 이 스테이지 수마다 공격력 1을 추가한다. */
+  ATTACK_GAIN_INTERVAL: 2,
+  /** 이 스테이지 수마다 방어력 1을 추가한다. */
+  DEFENSE_GAIN_INTERVAL: 3,
   /** 바리케이트 사이 최소 간격 */
   BARRICADE_GAP: 12,
   /** 궁수 지원 */
@@ -233,23 +244,39 @@ export class DefenseManager {
     this.phase = 'combat'
     // 전투는 남은 좀비를 모두 처치할 때까지 계속된다.
     this.phaseEndsAt = 0
-    // 좀비 순차 스폰. 첫 마리는 아래에서 즉시 스폰하므로 타이머는 나머지(waveTotal-1)만 담당한다.
-    // repeat=N은 콜백을 N+1회 실행하므로, 나머지 waveTotal-1회를 원하면 repeat=waveTotal-2.
-    // (예전엔 repeat=waveTotal-1이라 타이머가 waveTotal회 + 즉시 1회 = waveTotal+1마리를 스폰,
-    //  승리 조건(waveTotal 처치)은 1마리 남았는데 먼저 충족돼 조기 클리어되던 버그가 있었다.)
+    // 첫 무리는 즉시, 이후에는 남은 웨이브를 3~5마리씩 묶어 생성한다.
+    this.spawnGroup()
+    if (this.spawnedCount >= this.waveTotal) {
+      this.emitState()
+      return
+    }
     this.spawnEvent = this.scene.time.addEvent({
       delay: this.spawnIntervalMs,
-      repeat: Math.max(0, this.waveTotal - 2),
-      callback: () => this.spawnOne(),
+      loop: true,
+      callback: () => this.spawnGroup(),
     })
-    // 첫 마리는 즉시
-    this.spawnOne()
     this.emitState()
+  }
+
+  private spawnGroup() {
+    if (this.phase !== 'combat') return
+    const remaining = this.waveTotal - this.spawnedCount
+    if (remaining <= 0) {
+      this.spawnEvent?.remove()
+      this.spawnEvent = undefined
+      return
+    }
+    const groupSize = Math.min(remaining, Phaser.Math.Between(DEFENSE.SPAWN_GROUP_MIN, DEFENSE.SPAWN_GROUP_MAX))
+    for (let i = 0; i < groupSize; i += 1) this.spawnOne()
+    if (this.spawnedCount >= this.waveTotal) {
+      this.spawnEvent?.remove()
+      this.spawnEvent = undefined
+    }
   }
 
   private spawnOne() {
     if (this.phase !== 'combat') return
-    const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET - Phaser.Math.Between(0, 180)
+    const x = this.worldWidth - DEFENSE.SPAWN_X_OFFSET - Phaser.Math.Between(0, DEFENSE.SPAWN_SPREAD_X)
     const code = this.monsterCodeFor(this.spawnedCount)
     const monster = this.spawner.spawnAt(code, x, x - 30, x + 20, (m) => this.onZombieDied(m))
     // 10스테이지 단위 계단식 성장. 구간 안에서는 완만히 오르고 10/20/30... 진입 시
@@ -257,19 +284,26 @@ export class DefenseManager {
     const stageSteps = Math.max(0, this.stage - 1)
     const difficultyTier = Math.floor(this.stage / 10)
     const stepInTier = this.stage < 10 ? stageSteps : this.stage % 10
-    const hpScale = 1.2 + difficultyTier * 0.25 + stepInTier * 0.02
-    const attackScale = 1.1 + difficultyTier * 0.12 + stepInTier * 0.01
+    // 스테이지 강화는 구간별 선형 가산만 사용한다. 이전 스탯에 다시 곱하지 않아 기하급수적으로 불어나지 않는다.
+    const hpScale = 1.2 + difficultyTier * 0.30 + stepInTier * 0.02
+    const attackScale = 1.1 + difficultyTier * 0.15 + stepInTier * 0.01
     const speedScale = 1 + Math.min(difficultyTier * 0.04 + stepInTier * 0.004, 0.20)
     const cooldownScale = 1 - Math.min(difficultyTier * 0.04 + stepInTier * 0.004, 0.18)
+    const stageAttackBonus = Math.floor(stageSteps / DEFENSE.ATTACK_GAIN_INTERVAL)
+    const stageDefenseBonus = Math.floor(stageSteps / DEFENSE.DEFENSE_GAIN_INTERVAL)
+    const stageHpBonus = stageSteps * DEFENSE.HP_GAIN_PER_STAGE
     monster.def = {
       ...monster.def,
-      attack: Math.max(1, Math.round(monster.def.attack * attackScale)),
-      defense: monster.def.defense + difficultyTier * 2 + Math.floor(stepInTier / 5),
+      attack: Math.max(1, Math.round(monster.def.attack * attackScale) + stageAttackBonus),
+      defense: monster.def.defense + stageDefenseBonus,
       moveSpeed: monster.def.moveSpeed * speedScale,
       attackCooldownMs: Math.round(monster.def.attackCooldownMs * cooldownScale),
     }
-    monster.maxHp = Math.max(1, Math.round(monster.def.maxHp * hpScale))
+    monster.maxHp = Math.max(1, Math.round(monster.def.maxHp * hpScale) + stageHpBonus)
     monster.hp = monster.maxHp
+    // 체력바 한 색의 기준은 고정 100이 아니라 이 스테이지 일반 좀비 한 마리의 전체 HP다.
+    // 일반 좀비는 항상 한 줄, 방패·대장 좀비만 체급 차이만큼 다음 색 체력바를 사용한다.
+    monster.hpBarLayerSize = Math.max(1, Math.round(30 * hpScale) + stageHpBonus)
     monster.onRangedAttack = code === 'zombie_exploder'
       ? (attacker, impactX) => this.throwZombieBomb(attacker, impactX)
       : undefined
@@ -279,7 +313,7 @@ export class DefenseManager {
     if (code === 'zombie_boss') {
       // 보스도 선형 고율 증가 대신 일반 몬스터 계단식 배율에 구간별 보너스만 더한다.
       const bossHpScale = hpScale + 0.35 + difficultyTier * 0.10
-      monster.maxHp = Math.round(monster.def.maxHp * bossHpScale)
+      monster.maxHp = Math.round(monster.def.maxHp * bossHpScale) + stageHpBonus
       monster.hp = monster.maxHp
     }
     this.scene.time.delayedCall(700, () => {

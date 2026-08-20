@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useUiStore } from '../stores/uiStore'
 
 const GAME_CONTROLS = [
-  { title: '이동', commands: [['방향키 / WASD', '캐릭터 이동'], ['Space', '점프'], ['S', '앉기 또는 상호작용'], ['K', '스킬 창 열기']] },
-  { title: '전투', commands: [['J', '기본 공격'], ['1 - 7', '퀵슬롯 스킬 사용'], ['자동 전투', '가까운 적 공격 및 스킬 자동 사용']] },
-  { title: '인터페이스', commands: [['F1', '전체 도움말 열기'], ['A', 'AI 명령어 예시 열기'], ['M', '미니맵 전환'], ['ESC', '현재 창 닫기 또는 설정 열기']] },
+  { title: '이동', commands: [['방향키', '캐릭터 이동 및 사다리 이용'], ['↑', 'NPC·포탈 상호작용'], ['Space / Alt', '점프'], ['X', '앉기']] },
+  { title: '전투', commands: [['Ctrl', '기본 공격'], ['1 - 7', '퀵슬롯 스킬 사용'], ['자동 전투', '가까운 적 공격 및 스킬 자동 사용']] },
+  { title: '인터페이스', commands: [['F1', '전체 도움말 열기'], ['A', 'AI 명령어 예시 열기'], ['S', '스탯 창 열기'], ['K', '스킬 창 열기'], ['M', '미니맵 열기'], ['ESC', '현재 창 닫기 또는 설정 열기']] },
 ] as const
 
 const COMMAND_GROUPS = [

@@ -85,7 +85,12 @@ export const COMBAT = {
   CRIT_MULTIPLIER: 1.5,
 
   /** 스킬: 청룡참 (GAME_DESIGN 4.2) */
-  SKILL_MP_COST: 15,
+  /** 캐릭터별 스킬 목록의 1~5번째 순서에 따른 MP 소모량. */
+  SKILL_MP_COST_BY_RANK: [12, 18, 25, 34, 45] as readonly number[],
+  /** 1~5번째 스킬의 기본 스킬 배율(2.5)에 추가로 적용되는 공격력 비례 계수. */
+  SKILL_POWER_BY_RANK: [0.8, 1, 1.2, 1.45, 1.75] as readonly number[],
+  /** 1~5번째 스킬이 한 번에 공격할 수 있는 적 수. */
+  SKILL_TARGETS_BY_RANK: [3, 4, 5, 7, 9] as readonly number[],
   SKILL_MULTIPLIER: 2.5,
   /** 스킬별 재사용 대기시간. 등록되지 않은 스킬은 기본값을 사용한다. */
   SKILL_COOLDOWN_MS: 5000,
@@ -114,7 +119,6 @@ export const COMBAT = {
   CHARGE_SKILL_REACH: 140,
   CHARGE_SKILL_HEIGHT: 85,
   CHARGE_EFFECT_CENTER_OFFSET: 70,
-  SKILL_MAX_TARGETS: 8,
   SKILL_DURATION_MS: 450,
   GLAIVE_DURATION_MS: 950,
   DECISIVE_DURATION_MS: 900,

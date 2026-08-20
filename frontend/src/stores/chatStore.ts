@@ -21,7 +21,7 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set) => ({
   messages: [
-    { id: nextId++, kind: 'system', text: '삼국지 스토리에 오신 것을 환영합니다.' },
+    { id: nextId++, kind: 'system', text: '삼국지 디펜스에 오신 것을 환영합니다.' },
     { id: nextId++, kind: 'system', text: '업적 혜택을 받을 수 있습니다.' },
   ],
   addMessage: (msg) =>

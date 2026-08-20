@@ -93,6 +93,10 @@ export function SettingsMenu() {
               <input type="checkbox" checked={auto.autoSkill} onChange={(e) => auto.setAutoSkill(e.target.checked)} />
             </label>
             <label className="auto-setting-row">
+              <span>최소 HP {auto.minHpPercent}%</span>
+              <input type="range" min="20" max="100" step="10" value={auto.minHpPercent} onChange={(e) => auto.setMinHpPercent(Number(e.target.value))} />
+            </label>
+            <label className="auto-setting-row">
               <span>최소 MP {auto.minMpPercent}%</span>
               <input type="range" min="20" max="100" step="10" value={auto.minMpPercent} onChange={(e) => auto.setMinMpPercent(Number(e.target.value))} />
             </label>

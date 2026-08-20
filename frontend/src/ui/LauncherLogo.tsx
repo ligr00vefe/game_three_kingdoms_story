@@ -41,7 +41,7 @@ export function LauncherLogo({ logoRef }: { logoRef: RefObject<HTMLCanvasElement
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return
 
-    const background = loadImage('/assets/img/logo/main_logo_02.png')
+    const background = loadImage('/assets/img/logo/main_logo.png')
     const cloud = loadImage('/assets/img/logo/logo_cloud.png')
     const characters = characterLayers.map((layer) => ({ ...layer, image: loadImage(layer.src) }))
     const images = [background, cloud, ...characters.map(({ image }) => image)]
@@ -108,5 +108,5 @@ export function LauncherLogo({ logoRef }: { logoRef: RefObject<HTMLCanvasElement
     }
   }, [logoRef])
 
-  return <canvas ref={logoRef} className="launcher-logo" aria-label="Three Kingdoms Story logo" role="img" />
+  return <canvas ref={logoRef} className="launcher-logo" aria-label="Three Kingdoms Defense logo" role="img" />
 }

@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore'
 import { LauncherCommunity } from './LauncherCommunity'
 import { LauncherLogo } from './LauncherLogo'
 
-export const GAME_WINDOW_NAME = 'threeKingdomsStory'
+export const GAME_WINDOW_NAME = 'threeKingdomsDefense'
 export const GAME_WINDOW_WIDTH = 1280
 export const GAME_WINDOW_HEIGHT = 720
 
@@ -102,7 +102,7 @@ export function Launcher() {
       <LauncherLogo logoRef={logoRef} />
       {launched ? <p className="launcher-running">게임 실행 중…</p> : (
         <section className={'launcher-auth launcher-auth--' + mode}>
-          <p className="launcher-kicker">THREE KINGDOMS STORY</p>
+          <p className="launcher-kicker">THREE KINGDOMS DEFENSE</p>
           <h1>{mode === 'login' ? '게임에 입장하십시오' : '새 계정을 만드십시오'}</h1>
           <p className="launcher-subtitle">
             {mode === 'login' ? '저장된 장수의 여정을 이어갑니다.' : '로그인 ID와 이름을 정해 여정을 시작합니다.'}
